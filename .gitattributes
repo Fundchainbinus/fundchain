@@ -1,0 +1,8 @@
+# Semua teks disimpan & di-checkout sebagai LF (penting: checksum migration Prisma)
+* text=auto eol=lf
+*.sql text eol=lf
+# Biner — jangan pernah dikonversi
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary

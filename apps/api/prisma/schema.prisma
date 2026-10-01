@@ -1,0 +1,205 @@
+// FundChain — schema database (PostgreSQL @ Supabase).
+// DATABASE_URL = pooler transaction mode (port 6543) untuk aplikasi,
+// DIRECT_URL   = session pooler / koneksi langsung (port 5432) untuk migrate.
+// Status disimpan sebagai String; nilai valid ada di @fundchain/shared.
+// Nominal uang = Int rupiah (tanpa sen) — sama dengan format canonical payload.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                 String   @id @default(uuid())
+  microsoftId        String?  @unique @map("microsoft_id")
+  email              String   @unique
+  name               String
+  role               String   @default("STUDENT") // STUDENT | ADMIN
+  /// Pseudonim stabil untuk canonical payload (on-chain). Bukan email/nama.
+  integritySubjectId String   @unique @map("integrity_subject_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  campaigns     Campaign[]       @relation("CampaignCreator")
+  donations     Donation[]
+  reviews       CampaignReview[]
+  disbursements Disbursement[]   @relation("DisbursementRequester")
+  approvals     Disbursement[]   @relation("DisbursementAdmin")
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Campaign {
+  id              String   @id @default(uuid())
+  creatorId       String   @map("creator_id")
+  title           String
+  description     String
+  sdgCategory     String   @map("sdg_category")
+  targetAmount    Int      @map("target_amount")
+  currentAmount   Int      @default(0) @map("current_amount")
+  deadline        DateTime
+  status          String   @default("DRAFT")
+  rejectionReason String?  @map("rejection_reason")
+  frozenReason    String?  @map("frozen_reason")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  creator       User               @relation("CampaignCreator", fields: [creatorId], references: [id])
+  documents     CampaignDocument[]
+  reviews       CampaignReview[]
+  donations     Donation[]
+  disbursements Disbursement[]
+
+  @@index([status, deadline])
+  @@index([creatorId])
+  @@map("campaigns")
+}
+
+model CampaignDocument {
+  id           String   @id @default(uuid())
+  campaignId   String   @map("campaign_id")
+  originalName String   @map("original_name")
+  storageKey   String   @map("storage_key")
+  fileType     String   @map("file_type")
+  size         Int
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_documents")
+}
+
+model CampaignReview {
+  id         String   @id @default(uuid())
+  campaignId String   @map("campaign_id")
+  adminId    String   @map("admin_id")
+  decision   String // APPROVE | REJECT
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  admin    User     @relation(fields: [adminId], references: [id])
+
+  @@map("campaign_reviews")
+}
+
+model Donation {
+  id               String    @id @default(uuid())
+  campaignId       String    @map("campaign_id")
+  donorId          String    @map("donor_id")
+  amount           Int
+  isAnonymous      Boolean   @default(false) @map("is_anonymous")
+  status           String    @default("PENDING") // PENDING | PAID | FAILED | EXPIRED | REFUNDED
+  idempotencyKey   String    @unique @map("idempotency_key")
+  /// Waktu settlement — dipakai di canonical payload, tidak pernah dihitung ulang.
+  donatedAt        DateTime? @map("donated_at")
+  canonicalPayload String?   @map("canonical_payload")
+  hash             String?
+  integrityStatus  String    @default("PENDING") @map("integrity_status") // PENDING | VERIFIED | TAMPERED
+  lastCheckedAt    DateTime? @map("last_checked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  campaign    Campaign               @relation(fields: [campaignId], references: [id])
+  donor       User                   @relation(fields: [donorId], references: [id])
+  payment     Payment?
+  blockchain  BlockchainTransaction?
+
+  @@index([campaignId, status])
+  @@index([donorId])
+  @@map("donations")
+}
+
+model Payment {
+  id                String    @id @default(uuid())
+  donationId        String    @unique @map("donation_id")
+  provider          String
+  externalPaymentId String?   @unique @map("external_payment_id")
+  method            String    @default("QRIS")
+  amount            Int
+  status            String    @default("PENDING") // PENDING | SETTLED | FAILED | EXPIRED
+  qrString          String?   @map("qr_string")
+  paymentUrl        String?   @map("payment_url")
+  expiresAt         DateTime? @map("expires_at")
+  paidAt            DateTime? @map("paid_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+/// Juga berfungsi sebagai antrean notarisasi (outbox): worker mengambil baris QUEUED/RETRYING.
+model BlockchainTransaction {
+  id              String    @id @default(uuid())
+  donationId      String    @unique @map("donation_id")
+  network         String
+  chainId         Int       @map("chain_id")
+  contractAddress String?   @map("contract_address")
+  /// keccak256(lowercase(donationId)) — key bytes32 di contract.
+  onchainKey      String    @map("onchain_key")
+  txHash          String?   @unique @map("tx_hash")
+  status          String    @default("QUEUED") // QUEUED | SUBMITTED | CONFIRMED | FAILED | RETRYING
+  blockNumber     Int?      @map("block_number")
+  retryCount      Int       @default(0) @map("retry_count")
+  lastError       String?   @map("last_error")
+  nextAttemptAt   DateTime  @default(now()) @map("next_attempt_at")
+  submittedAt     DateTime? @map("submitted_at")
+  confirmedAt     DateTime? @map("confirmed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@map("blockchain_transactions")
+}
+
+model Disbursement {
+  id              String    @id @default(uuid())
+  campaignId      String    @map("campaign_id")
+  requesterId     String    @map("requester_id")
+  amount          Int
+  description     String
+  proofKey        String    @map("proof_key")
+  proofName       String    @map("proof_name")
+  proofType       String    @map("proof_type")
+  status          String    @default("REQUESTED") // REQUESTED | APPROVED | REJECTED | PAID
+  adminId         String?   @map("admin_id")
+  rejectionReason String?   @map("rejection_reason")
+  requestedAt     DateTime  @default(now()) @map("requested_at")
+  approvedAt      DateTime? @map("approved_at")
+  paidAt          DateTime? @map("paid_at")
+
+  campaign  Campaign @relation(fields: [campaignId], references: [id])
+  requester User     @relation("DisbursementRequester", fields: [requesterId], references: [id])
+  admin     User?    @relation("DisbursementAdmin", fields: [adminId], references: [id])
+
+  @@index([campaignId, status])
+  @@map("disbursements")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  /// JSON string
+  metadata   String   @default("{}")
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

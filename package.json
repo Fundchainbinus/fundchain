@@ -1,0 +1,26 @@
+{
+  "name": "fundchain",
+  "private": true,
+  "description": "FundChain — platform fundraising mahasiswa BINUS dengan blockchain proof layer",
+  "scripts": {
+    "postinstall": "pnpm --filter @fundchain/shared build",
+    "bootstrap": "pnpm --filter @fundchain/shared build && pnpm --filter @fundchain/api db:setup",
+    "dev": "pnpm --filter @fundchain/shared build && concurrently -n chain,deploy,api,web -c yellow,magenta,cyan,green \"pnpm --filter @fundchain/contracts node\" \"pnpm --filter @fundchain/contracts deploy:local:wait\" \"pnpm --filter @fundchain/api dev\" \"pnpm --filter @fundchain/web dev\"",
+    "dev:api": "pnpm --filter @fundchain/api dev",
+    "dev:web": "pnpm --filter @fundchain/web dev",
+    "chain": "pnpm --filter @fundchain/contracts node",
+    "deploy:local": "pnpm --filter @fundchain/contracts deploy:local",
+    "demo:tamper": "pnpm --filter @fundchain/api demo:tamper",
+    "db:reset": "pnpm --filter @fundchain/api db:reset",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

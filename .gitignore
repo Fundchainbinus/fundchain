@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+coverage/
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+contracts/deployments/localhost.json
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+apps/api/uploads/
