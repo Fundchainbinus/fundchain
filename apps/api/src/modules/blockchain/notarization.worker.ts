@@ -94,7 +94,8 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
       }
       await this.recoverStuck();
       const due = await this.prisma.blockchainTransaction.findMany({
-        where: { status: { in: ['QUEUED', 'RETRYING'] }, nextAttemptAt: { lte: new Date() } },
+        // Hanya antrean milik chain ini — dev lokal & production bisa berbagi database.
+        where: { status: { in: ['QUEUED', 'RETRYING'] }, nextAttemptAt: { lte: new Date() }, chainId: this.blockchain.target().chainId },
         orderBy: { createdAt: 'asc' },
         take: 5,
       });
@@ -220,7 +221,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     // Serverless: fungsi bisa berhenti setelah tx terkirim tapi sebelum konfirmasi ditunggu.
     // Tx yang sudah punya receipt cukup dikonfirmasi; tanpa receipt ditunggu sampai STUCK_SUBMITTED_MS.
     const pending = await this.prisma.blockchainTransaction.findMany({
-      where: { status: 'SUBMITTED', txHash: { not: null }, submittedAt: { lt: new Date(Date.now() - 5_000) } },
+      where: { status: 'SUBMITTED', txHash: { not: null }, submittedAt: { lt: new Date(Date.now() - 5_000) }, chainId: this.blockchain.target().chainId },
     });
     for (const job of pending) {
       const receipt = await this.blockchain.getProvider().getTransactionReceipt(job.txHash!).catch(() => null);
@@ -233,7 +234,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     }
 
     const stuck = await this.prisma.blockchainTransaction.findMany({
-      where: { status: 'SUBMITTED', submittedAt: { lt: new Date(Date.now() - STUCK_SUBMITTED_MS) } },
+      where: { status: 'SUBMITTED', submittedAt: { lt: new Date(Date.now() - STUCK_SUBMITTED_MS) }, chainId: this.blockchain.target().chainId },
     });
     for (const job of stuck) {
       const notarized = await this.blockchain.contract().isNotarized(job.onchainKey).catch(() => null);
@@ -262,7 +263,9 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
   private async resyncLocalChain() {
     const { chainId, contractAddress } = this.blockchain.target();
     if (chainId !== HARDHAT_CHAIN_ID) return;
-    const confirmed = await this.prisma.blockchainTransaction.findMany({ where: { status: { in: ['CONFIRMED', 'SUBMITTED'] } } });
+    const confirmed = await this.prisma.blockchainTransaction.findMany({
+      where: { status: { in: ['CONFIRMED', 'SUBMITTED'] }, chainId: HARDHAT_CHAIN_ID },
+    });
     let requeued = 0;
     for (const job of confirmed) {
       const exists = await this.blockchain.contract().isNotarized(job.onchainKey).catch(() => true);
