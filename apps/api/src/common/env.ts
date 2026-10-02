@@ -28,6 +28,9 @@ export function env() {
       baseUrl: (e.PAKASIR_BASE_URL || 'https://app.pakasir.com').replace(/\/$/, ''),
     },
     uploadDir: path.resolve(process.cwd(), e.UPLOAD_DIR || './uploads'),
+    storageDriver: (e.STORAGE_DRIVER || 'local') as 'local' | 'database',
+    /** Secret untuk endpoint cron (Vercel Cron mengirim Authorization: Bearer <CRON_SECRET>). */
+    cronSecret: e.CRON_SECRET || '',
     blockchain: {
       network: e.BLOCKCHAIN_NETWORK || 'localhost',
       rpcUrl: e.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545',
@@ -38,6 +41,8 @@ export function env() {
     },
     worker: {
       enabled: bool(e.WORKER_ENABLED, true),
+      /** interval = polling terus (server biasa); on-demand = dipicu request/cron (serverless). */
+      mode: (e.WORKER_MODE || 'interval') as 'interval' | 'on-demand',
       pollMs: int(e.WORKER_POLL_MS, 2000),
     },
   };

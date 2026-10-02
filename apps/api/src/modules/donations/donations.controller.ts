@@ -8,6 +8,7 @@ import { env } from '../../common/env';
 import { MOCK_SIGNATURE_HEADER, signMockBody } from '../payments/adapters/mock.adapter';
 import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../../common/prisma.service';
+import { NotarizationWorker } from '../blockchain/notarization.worker';
 import { DonationsService } from './donations.service';
 
 class CreateDonationDto {
@@ -30,7 +31,13 @@ export class DonationsController {
     private readonly donations: DonationsService,
     private readonly payments: PaymentsService,
     private readonly prisma: PrismaService,
+    private readonly worker: NotarizationWorker,
   ) {}
+
+  /** Serverless: picu worker notarisasi bila ada pekerjaan blockchain yang tertunda. */
+  private kickIfPending(status: string | null | undefined) {
+    if (status && status !== 'CONFIRMED' && status !== 'FAILED') this.worker.kick();
+  }
 
   @Post('campaigns/:id/donations')
   create(
@@ -51,8 +58,10 @@ export class DonationsController {
 
   @Public()
   @Get('donations/:id')
-  detail(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: CurrentUserPayload) {
-    return this.donations.detail(id, user);
+  async detail(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: CurrentUserPayload) {
+    const d = await this.donations.detail(id, user);
+    this.kickIfPending(d.blockchain?.status);
+    return d;
   }
 
   @Public()
@@ -78,8 +87,10 @@ export class DonationsController {
   @SkipThrottle()
   @Post('webhooks/payment')
   @HttpCode(200)
-  webhook(@Req() req: AuthedRequest & { rawBody?: Buffer }, @ClientIp() ip: string | null) {
-    return this.payments.handleWebhook({ rawBody: req.rawBody, headers: req.headers, body: req.body }, ip);
+  async webhook(@Req() req: AuthedRequest & { rawBody?: Buffer }, @ClientIp() ip: string | null) {
+    const result = await this.payments.handleWebhook({ rawBody: req.rawBody, headers: req.headers, body: req.body }, ip);
+    if (result.status === 'PAID') this.worker.kick();
+    return result;
   }
 
   /**
@@ -109,7 +120,7 @@ export class DonationsController {
       amount: payment.amount,
       payment_method: 'qris',
     });
-    return this.payments.handleWebhook(
+    const result = await this.payments.handleWebhook(
       {
         rawBody: Buffer.from(rawBody),
         headers: { [MOCK_SIGNATURE_HEADER]: signMockBody(rawBody) },
@@ -117,5 +128,7 @@ export class DonationsController {
       },
       ip,
     );
+    if (result.status === 'PAID') this.worker.kick();
+    return result;
   }
 }

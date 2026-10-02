@@ -1,11 +1,10 @@
 import 'reflect-metadata';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { configureApp } from './app.setup';
 import { env } from './common/env';
-import { validationExceptionFactory } from './common/http';
 
 async function bootstrap() {
   // rawBody dibutuhkan untuk verifikasi signature webhook.
@@ -13,22 +12,7 @@ async function bootstrap() {
   const cfg = env();
   const logger = new Logger('Bootstrap');
 
-  app.setGlobalPrefix('api/v1');
-  app.set('trust proxy', 'loopback');
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
-  app.enableCors({
-    origin: cfg.webUrl.split(','),
-    credentials: true,
-    allowedHeaders: ['Content-Type', 'Idempotency-Key', 'X-Acting-User'],
-  });
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      exceptionFactory: validationExceptionFactory,
-    }),
-  );
+  configureApp(app);
   app.enableShutdownHooks();
 
   if (cfg.isProduction && cfg.demoMode) {

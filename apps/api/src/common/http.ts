@@ -44,7 +44,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return send(429, 'RATE_LIMITED', 'Terlalu banyak permintaan, coba lagi sebentar.');
     }
     if (exception instanceof PayloadTooLargeException) {
-      return send(400, 'FILE_TOO_LARGE', 'Ukuran file maksimal 5MB.');
+      return send(400, 'FILE_TOO_LARGE', 'Ukuran file maksimal 4MB.');
     }
     if (exception instanceof HttpException) {
       const status = exception.getStatus();

@@ -1,10 +1,13 @@
-import { Controller, Get, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { Controller, Get, Headers, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { timingSafeEqual } from 'node:crypto';
 import { AppError } from '../../common/app-error';
 import { ClientIp, CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { env } from '../../common/env';
 import { BlockchainService } from '../blockchain/blockchain.service';
+import { NotarizationWorker } from '../blockchain/notarization.worker';
 import { IntegrityService } from './integrity.service';
 
 const VERIFY_LIMIT = { default: { limit: 10, ttl: 60_000 } };
@@ -16,7 +19,27 @@ export class IntegrityController {
     private readonly blockchain: BlockchainService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly worker: NotarizationWorker,
   ) {}
+
+  /**
+   * Cron (Vercel Cron → GET dengan header Authorization: Bearer <CRON_SECRET>).
+   * Jaring pengaman serverless: memproses antrean notarisasi, pembayaran kedaluwarsa,
+   * dan campaign yang lewat deadline.
+   */
+  @Public()
+  @SkipThrottle()
+  @Get('cron/tick')
+  async cron(@Headers('authorization') auth?: string) {
+    const secret = env().cronSecret;
+    const expected = Buffer.from(`Bearer ${secret}`);
+    const given = Buffer.from(auth ?? '');
+    if (!secret || expected.length !== given.length || !timingSafeEqual(expected, given)) {
+      throw new AppError('AUTH_UNAUTHENTICATED', 'Cron secret tidak valid.');
+    }
+    await this.worker.tick();
+    return { ok: true, at: new Date().toISOString() };
+  }
 
   @Public()
   @Get('blockchain/info')
@@ -69,6 +92,7 @@ export class IntegrityController {
       entityId: donationId,
       ipAddress: ip,
     });
+    this.worker.kick();
     return { donationId, status: 'QUEUED' };
   }
 }

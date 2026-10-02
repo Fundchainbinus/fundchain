@@ -14,3 +14,12 @@ allowBuilds:
   bufferutil: true
   utf-8-validate: true
   '@parcel/watcher': true
+
+# pnpm 10 (dipakai Vercel) memakai onlyBuiltDependencies
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - prisma
+  - esbuild
+  - keccak
+  - secp256k1

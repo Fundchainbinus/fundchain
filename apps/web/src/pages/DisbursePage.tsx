@@ -63,7 +63,7 @@ export function DisbursePage() {
           <textarea id="desc" className="input min-h-[100px]" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Contoh: Pembelian pipa & tandon tahap 1 sesuai RAB." />
         </div>
         <div>
-          <label className="label" htmlFor="proof">Bukti milestone / rencana penggunaan (PDF, PNG, JPG — maks. 5MB)</label>
+          <label className="label" htmlFor="proof">Bukti milestone / rencana penggunaan (PDF, PNG, JPG — maks. 4MB)</label>
           <input id="proof" type="file" accept=".pdf,.png,.jpg,.jpeg" className="text-sm" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </div>
         <ErrorBox error={create.error} />

@@ -136,7 +136,7 @@ export class DisbursementsService {
     if (viewer.role !== 'ADMIN' && viewer.id !== d.requesterId) {
       throw new AppError('AUTH_FORBIDDEN', 'Anda tidak memiliki akses ke bukti ini.');
     }
-    return { d, stream: this.storage.open(d.proofKey) };
+    return { d, stream: await this.storage.open(d.proofKey) };
   }
 
   async decide(

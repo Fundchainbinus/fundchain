@@ -62,7 +62,8 @@ export const LIMITS = {
   TITLE_MAX: 200,
   DESCRIPTION_MIN: 20,
   REASON_MIN: 10,
-  FILE_MAX_BYTES: 5 * 1024 * 1024,
+  // 4MB: di bawah batas body request Vercel Functions (4,5MB).
+  FILE_MAX_BYTES: 4 * 1024 * 1024,
   PAYMENT_EXPIRY_MINUTES: 15,
   NOTARIZE_MAX_ATTEMPTS: 5,
 } as const;

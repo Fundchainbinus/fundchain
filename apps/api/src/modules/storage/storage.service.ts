@@ -3,8 +3,10 @@ import { LIMITS } from '@fundchain/shared';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { Readable } from 'node:stream';
 import { AppError } from '../../common/app-error';
 import { env } from '../../common/env';
+import { PrismaService } from '../../common/prisma.service';
 
 export type FileKind = 'pdf' | 'png' | 'jpg';
 
@@ -22,14 +24,18 @@ export interface StoredFile {
 }
 
 /**
- * Adapter penyimpanan lokal (disk). Interface sengaja kecil supaya bisa diganti Supabase Storage.
- * File disimpan dengan nama acak di luar folder yang bisa dieksekusi.
+ * Penyimpanan file dengan dua driver (env STORAGE_DRIVER):
+ *  - local    : disk (apps/api/uploads) — untuk development
+ *  - database : tabel stored_files di Postgres — untuk serverless (Vercel tanpa disk permanen)
+ * File selalu disimpan dengan nama acak; tipe divalidasi lewat magic bytes.
  */
 @Injectable()
 export class StorageService {
+  constructor(private readonly prisma: PrismaService) {}
+
   async save(file: Express.Multer.File | undefined, folder: string, allowed: FileKind[]): Promise<StoredFile> {
     if (!file) throw new AppError('VALIDATION_ERROR', 'File wajib diunggah.');
-    if (file.size > LIMITS.FILE_MAX_BYTES) throw new AppError('FILE_TOO_LARGE', 'Ukuran file maksimal 5MB.');
+    if (file.size > LIMITS.FILE_MAX_BYTES) throw new AppError('FILE_TOO_LARGE', 'Ukuran file maksimal 4MB.');
 
     const ext = path.extname(file.originalname).toLowerCase();
     const kind = allowed.find((k) => {
@@ -46,19 +52,24 @@ export class StorageService {
     }
 
     const key = `${folder}/${randomUUID()}${SIGNATURES[kind].ext[0]}`;
-    const target = this.resolve(key);
-    await fs.promises.mkdir(path.dirname(target), { recursive: true });
-    await fs.promises.writeFile(target, file.buffer, { flag: 'wx' });
+    const fileType = SIGNATURES[kind].mime[0];
+    if (env().storageDriver === 'database') {
+      await this.prisma.storedFile.create({ data: { key, data: new Uint8Array(file.buffer), contentType: fileType, size: file.size } });
+    } else {
+      const target = this.resolve(key);
+      await fs.promises.mkdir(path.dirname(target), { recursive: true });
+      await fs.promises.writeFile(target, file.buffer, { flag: 'wx' });
+    }
 
-    return {
-      key,
-      originalName: path.basename(file.originalname).slice(0, 200),
-      fileType: SIGNATURES[kind].mime[0],
-      size: file.size,
-    };
+    return { key, originalName: path.basename(file.originalname).slice(0, 200), fileType, size: file.size };
   }
 
-  open(key: string): fs.ReadStream {
+  async open(key: string): Promise<Readable> {
+    if (env().storageDriver === 'database') {
+      const row = await this.prisma.storedFile.findUnique({ where: { key } });
+      if (!row) throw new AppError('NOT_FOUND', 'File tidak ditemukan.');
+      return Readable.from(Buffer.from(row.data));
+    }
     const target = this.resolve(key);
     if (!fs.existsSync(target)) throw new AppError('NOT_FOUND', 'File tidak ditemukan.');
     return fs.createReadStream(target);

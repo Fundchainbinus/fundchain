@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { HARDHAT_CHAIN_ID, LIMITS } from '@fundchain/shared';
 import type { BlockchainTransaction } from '@prisma/client';
+import { waitUntil } from '@vercel/functions';
 import type { ContractTransactionResponse } from 'ethers';
 import { env } from '../../common/env';
 import { PrismaService } from '../../common/prisma.service';
@@ -43,8 +44,28 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
       this.logger.log('Worker dinonaktifkan (WORKER_ENABLED=false)');
       return;
     }
+    if (cfg.mode === 'on-demand') {
+      this.logger.log('Worker mode on-demand: dipicu oleh request & cron (serverless)');
+      return;
+    }
     this.timer = setInterval(() => void this.tick(), cfg.pollMs);
     this.logger.log(`Worker aktif, polling tiap ${cfg.pollMs}ms`);
+  }
+
+  /**
+   * Mode serverless: jalankan satu tick di latar belakang tanpa menahan response.
+   * waitUntil() menjaga fungsi Vercel tetap hidup sampai tick selesai.
+   * Di mode interval tidak melakukan apa pun (polling sudah berjalan).
+   */
+  kick() {
+    const cfg = env().worker;
+    if (!cfg.enabled || cfg.mode !== 'on-demand' || this.running) return;
+    const work = this.tick();
+    try {
+      waitUntil(work);
+    } catch {
+      /* di luar Vercel: promise tetap berjalan normal */
+    }
   }
 
   onModuleDestroy() {
@@ -100,12 +121,17 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
         return;
       }
 
+      // Klaim atomic: di serverless beberapa instance bisa memproses antrean bersamaan.
+      // Hanya pemenang klaim yang mengirim tx, sehingga tidak ada tx dobel.
+      const claim = await this.prisma.blockchainTransaction.updateMany({
+        where: { id: job.id, status: { in: ['QUEUED', 'RETRYING'] } },
+        data: { status: 'SUBMITTED', submittedAt: new Date(), contractAddress, lastError: null },
+      });
+      if (claim.count === 0) return;
+
       const writer = this.blockchain.contract(true);
       const tx = (await writer.notarize(job.onchainKey, donation.hash)) as ContractTransactionResponse;
-      await this.prisma.blockchainTransaction.update({
-        where: { id: job.id },
-        data: { status: 'SUBMITTED', txHash: tx.hash, submittedAt: new Date(), contractAddress, lastError: null },
-      });
+      await this.prisma.blockchainTransaction.update({ where: { id: job.id }, data: { txHash: tx.hash } });
       this.logger.log(`Tx terkirim untuk donasi ${job.donationId}: ${tx.hash}`);
 
       const receipt = await tx.wait(env().blockchain.confirmations);
@@ -191,6 +217,21 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
 
   /** SUBMITTED yang menggantung (mis. proses mati saat menunggu konfirmasi). */
   private async recoverStuck() {
+    // Serverless: fungsi bisa berhenti setelah tx terkirim tapi sebelum konfirmasi ditunggu.
+    // Tx yang sudah punya receipt cukup dikonfirmasi; tanpa receipt ditunggu sampai STUCK_SUBMITTED_MS.
+    const pending = await this.prisma.blockchainTransaction.findMany({
+      where: { status: 'SUBMITTED', txHash: { not: null }, submittedAt: { lt: new Date(Date.now() - 5_000) } },
+    });
+    for (const job of pending) {
+      const receipt = await this.blockchain.getProvider().getTransactionReceipt(job.txHash!).catch(() => null);
+      if (!receipt) continue;
+      if (receipt.status === 1 && (await receipt.confirmations()) >= env().blockchain.confirmations) {
+        await this.confirm(job, { txHash: job.txHash, blockNumber: receipt.blockNumber, contractAddress: job.contractAddress, already: false });
+      } else if (receipt.status === 0) {
+        await this.retry(job, 'Transaksi di-revert oleh chain');
+      }
+    }
+
     const stuck = await this.prisma.blockchainTransaction.findMany({
       where: { status: 'SUBMITTED', submittedAt: { lt: new Date(Date.now() - STUCK_SUBMITTED_MS) } },
     });

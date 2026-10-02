@@ -1,0 +1,28 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm --filter @fundchain/shared build && cd apps/api && pnpm prisma generate && pnpm nest build && mkdir -p public && echo FundChain API > public/index.html",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60,
+      "includeFiles": "dist/**"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/v1/cron/tick",
+      "schedule": "0 0 * * *"
+    }
+  ],
+  "regions": [
+    "sin1"
+  ]
+}

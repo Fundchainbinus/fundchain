@@ -100,3 +100,30 @@ pnpm test
 ```
 
 Mencakup: canonical hash (deterministik & avalanche), smart contract (9 test), state machine, aturan pencairan, dan signature webhook.
+
+## Deploy (Vercel)
+
+Live: **https://fundchain-web.vercel.app** (web) · **https://fundchain-api.vercel.app/api/v1** (API)
+
+Dua project Vercel dari repo yang sama:
+
+| Project | Root Directory | Isi |
+|---|---|---|
+| `fundchain-web` | `apps/web` | Static Vite; `/api/*` di-proxy ke `fundchain-api` (same-origin) |
+| `fundchain-api` | `apps/api` | NestJS sebagai Vercel Function (`api/index.js` → `src/serverless.ts`), region `sin1` dekat Supabase |
+
+Perbedaan mode serverless (diatur lewat env di project `fundchain-api`):
+
+- `WORKER_MODE=on-demand`: tidak ada polling. Worker notarisasi dipicu setelah pembayaran lunas, saat halaman donasi melakukan polling, saat admin retry, dan oleh Vercel Cron harian (`/api/v1/cron/tick`).
+- `STORAGE_DRIVER=database`: upload disimpan di tabel `stored_files` (disk Vercel tidak permanen). Batas upload 4MB (batas body request Vercel 4,5MB).
+- Blockchain: Sepolia (`BLOCKCHAIN_NETWORK=sepolia`, `CHAIN_ID=11155111`, `RELAYER_PRIVATE_KEY`, `CONTRACT_ADDRESS`).
+
+Deploy ulang dari root repo:
+
+```bash
+vercel deploy --prod --project fundchain-api
+```
+
+```bash
+vercel deploy --prod --project fundchain-web
+```

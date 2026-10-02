@@ -207,7 +207,7 @@ export class CampaignsService {
     });
     if (!doc) throw new AppError('NOT_FOUND', 'Dokumen tidak ditemukan.');
     await this.getDetail(doc.campaignId, user); // cek visibilitas
-    return { doc, stream: this.storage.open(doc.storageKey) };
+    return { doc, stream: await this.storage.open(doc.storageKey) };
   }
 
   async submit(id: string, user: CurrentUserPayload, ip: string | null) {

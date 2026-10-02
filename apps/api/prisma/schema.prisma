@@ -5,7 +5,9 @@
 // Nominal uang = Int rupiah (tanpa sen) — sama dengan format canonical payload.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // rhel-openssl-3.0.x = runtime Vercel Functions (Amazon Linux 2023)
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -202,4 +204,16 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+/// File upload (proposal & bukti pencairan). Disimpan di Postgres agar jalan di serverless
+/// (Vercel tidak punya disk permanen). Maks 4MB per file.
+model StoredFile {
+  key         String   @id
+  data        Bytes
+  contentType String   @map("content_type")
+  size        Int
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("stored_files")
 }

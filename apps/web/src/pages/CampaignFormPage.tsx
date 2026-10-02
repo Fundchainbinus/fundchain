@@ -144,7 +144,7 @@ export function CampaignFormPage() {
 
       {id && c && !locked && (
         <div className="card mt-6 p-6">
-          <h2 className="flex items-center gap-2 font-semibold"><FileUp size={18} className="text-navy" /> Proposal (PDF, maks. 5MB)</h2>
+          <h2 className="flex items-center gap-2 font-semibold"><FileUp size={18} className="text-navy" /> Proposal (PDF, maks. 4MB)</h2>
           {c.documents.length > 0 ? (
             <p className="mt-2 flex items-center gap-2 text-sm text-emerald-700">
               <CheckCircle2 size={16} /> Terunggah:
