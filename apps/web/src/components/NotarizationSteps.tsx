@@ -1,4 +1,5 @@
 import { Check, Loader2, X } from 'lucide-react';
+import { useChainInfo } from '../lib/hooks';
 import type { DonationDetail } from '../lib/types';
 
 type StepState = 'done' | 'active' | 'todo' | 'error';
@@ -8,12 +9,17 @@ export function NotarizationSteps({ d }: { d: DonationDetail }) {
   const paid = d.status === 'PAID';
   const bc = d.blockchain?.status;
   const confirmed = bc === 'CONFIRMED';
+  const chain = useChainInfo();
+  // Tunjukkan alasan bila jaringan belum siap, supaya antrean tidak terlihat macet tanpa sebab.
+  const waitingChain = paid && (bc === 'QUEUED' || bc === 'RETRYING') && chain.data && !chain.data.ready;
   const steps: { label: string; hint: string; state: StepState }[] = [
     { label: 'Pembayaran lunas', hint: 'Webhook gateway terverifikasi', state: paid ? 'done' : d.status === 'PENDING' ? 'active' : 'error' },
     { label: 'Hash Keccak-256', hint: 'Canonical payload dibuat', state: d.hash ? 'done' : paid ? 'active' : 'todo' },
     {
       label: 'Antre notarisasi',
-      hint: bc === 'RETRYING' ? `Mencoba ulang (${d.blockchain?.retryCount}x)` : 'Worker relayer',
+      hint: waitingChain
+        ? `Menunggu jaringan blockchain: ${chain.data!.reason ?? 'belum siap'}. Donasi tetap tercatat lunas.`
+        : bc === 'RETRYING' ? `Mencoba ulang (${d.blockchain?.retryCount}x)` : 'Worker relayer',
       state: !paid ? 'todo' : bc === 'FAILED' ? 'error' : bc && bc !== 'QUEUED' && bc !== 'RETRYING' ? 'done' : 'active',
     },
     { label: 'Transaksi dikirim', hint: 'notarize(donationId, hash)', state: confirmed || bc === 'SUBMITTED' ? (confirmed ? 'done' : 'active') : 'todo' },
