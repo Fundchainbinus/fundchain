@@ -32,7 +32,7 @@ Buka http://localhost:5173. Data yang dibuat masuk ke database production.
 
 Kalau `.env` belum diisi, API berhenti dengan pesan yang menjelaskan langkahnya. Gejalanya di web: "Tidak dapat terhubung ke server".
 
-File upload selalu disimpan di database (`STORAGE_DRIVER=database`) karena dev lokal & production berbagi DB. Pernah mengunggah dengan versi lama (file tersimpan di `apps/api/uploads`)? Jalankan `pnpm --filter @fundchain/api files:sync` di laptop tersebut.
+File upload (proposal & bukti pencairan) **hanya** disimpan di database (tabel `stored_files`) — tidak ada file di laptop, jadi semua orang dan Vercel melihat file yang sama. Pernah mengunggah dengan versi lama (file tertinggal di `apps/api/uploads`)? Jalankan `pnpm --filter @fundchain/api files:sync` di laptop tersebut.
 
 ### 1. Siapkan Supabase (untuk Cara B)
 
@@ -139,7 +139,7 @@ Dua project Vercel dari repo yang sama:
 Perbedaan mode serverless (diatur lewat env di project `fundchain-api`):
 
 - `WORKER_MODE=on-demand`: tidak ada polling. Worker notarisasi dipicu setelah pembayaran lunas, saat halaman donasi melakukan polling, saat admin retry, dan oleh Vercel Cron harian (`/api/v1/cron/tick`).
-- `STORAGE_DRIVER=database`: upload disimpan di tabel `stored_files` (disk Vercel tidak permanen). Batas upload 4MB (batas body request Vercel 4,5MB).
+- Upload disimpan di tabel `stored_files` (disk Vercel tidak permanen). Batas upload 4MB (batas body request Vercel 4,5MB).
 - Blockchain: Sepolia (`BLOCKCHAIN_NETWORK=sepolia`, `CHAIN_ID=11155111`, `RELAYER_PRIVATE_KEY`, `CONTRACT_ADDRESS`).
 
 Deploy ulang dari root repo:

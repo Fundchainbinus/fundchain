@@ -20,4 +20,5 @@ contracts/deployments/localhost.json
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal
 apps/api/uploads/
+# (folder lama; upload kini hanya di database)
 .claude/launch.json
