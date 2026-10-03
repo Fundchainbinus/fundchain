@@ -14,7 +14,8 @@
     "db:reset": "pnpm --filter @fundchain/api db:reset",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "dev:web:remote": "pnpm --filter @fundchain/shared build && pnpm --filter @fundchain/web exec vite --mode remote"
   },
   "devDependencies": {
     "concurrently": "^9.2.0",

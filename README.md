@@ -8,9 +8,31 @@ Integrity checker menghitung ulang hash dari database dan membandingkannya denga
 
 ## Menjalankan
 
-Butuh **Node 20+**, **pnpm**, dan project **Supabase** (database PostgreSQL).
+Butuh **Node 20+** dan **pnpm**. `apps/api/.env` **tidak ada di repo** (berisi password database) — setelah clone, pilih salah satu cara di bawah.
 
-### 1. Siapkan Supabase
+### Cara A — Hanya frontend (paling cepat, tanpa `.env`)
+
+Web lokal memakai API production (`fundchain-api.vercel.app`). Cocok untuk mengerjakan tampilan.
+
+```bash
+pnpm install
+```
+
+```bash
+pnpm dev:web:remote
+```
+
+Buka http://localhost:5173. Data yang dibuat masuk ke database production.
+
+### Cara B — Full stack (API + blockchain lokal)
+
+1. Salin `apps/api/.env.example` menjadi `apps/api/.env`.
+2. Isi `DATABASE_URL` dan `DIRECT_URL` (minta ke pemilik project, atau pakai project Supabase sendiri — langkah di bawah).
+3. Jalankan `pnpm install`, `pnpm bootstrap`, lalu `pnpm dev`.
+
+Kalau `.env` belum diisi, API berhenti dengan pesan yang menjelaskan langkahnya. Gejalanya di web: "Tidak dapat terhubung ke server".
+
+### 1. Siapkan Supabase (untuk Cara B)
 
 1. Buat project di [supabase.com](https://supabase.com) dan catat password database.
 2. Dashboard → **Connect** → tab **ORMs** → **Prisma**. Salin dua connection string ke `apps/api/.env`:
@@ -81,7 +103,7 @@ FundChain_Complete_Planning_Docs   dokumen perencanaan (PRD, API spec, dll.)
 
 ## Konfigurasi
 
-Salin `apps/api/.env.example` → `apps/api/.env` (sudah dibuat). Variabel penting:
+Salin `apps/api/.env.example` → `apps/api/.env` (file ini tidak di-commit). Variabel penting:
 
 - `PAYMENT_PROVIDER=mock|pakasir`, `PAKASIR_PROJECT`, `PAKASIR_API_KEY`. Webhook diarahkan ke `POST /api/v1/webhooks/payment`.
 - `BLOCKCHAIN_NETWORK`, `BLOCKCHAIN_RPC_URL`, `CHAIN_ID`, `CONTRACT_ADDRESS`, `RELAYER_PRIVATE_KEY`, `BLOCKCHAIN_CONFIRMATIONS`.

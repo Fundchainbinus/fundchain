@@ -5,6 +5,7 @@ build/
 .env.local
 .env.*
 !.env.example
+!apps/web/.env.remote
 .vercel
 apps/api/public/
 *.log
