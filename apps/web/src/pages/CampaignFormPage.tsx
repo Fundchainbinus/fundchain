@@ -1,3 +1,4 @@
+import { FileButton } from '../components/FileButton';
 import { LIMITS, SDG_CATEGORIES, SDG_CODES } from '@fundchain/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FileUp, Send } from 'lucide-react';
@@ -148,7 +149,9 @@ export function CampaignFormPage() {
           {c.documents.length > 0 ? (
             <p className="mt-2 flex items-center gap-2 text-sm text-emerald-700">
               <CheckCircle2 size={16} /> Terunggah:
-              <a className="underline" href={`/api/v1/documents/${c.documents[0].id}/file`} target="_blank" rel="noreferrer">{c.documents[0].originalName}</a>
+              <FileButton path={`/documents/${c.documents[0].id}/file`} className="underline">
+                {c.documents[0].originalName}
+              </FileButton>
               <span className="text-xs text-slate-500">({dateTime(c.documents[0].createdAt)})</span>
             </p>
           ) : (

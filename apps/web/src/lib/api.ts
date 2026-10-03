@@ -41,12 +41,28 @@ export const post = <T,>(url: string, body?: unknown, headers?: Record<string, s
   api.post(url, body, { headers }) as unknown as Promise<T>;
 export const patch = <T,>(url: string, body?: unknown) => api.patch(url, body) as unknown as Promise<T>;
 
-/** Buka file yang butuh header identitas (mis. bukti pencairan) di tab baru. */
+/**
+ * Buka file (proposal, bukti pencairan) di tab baru DENGAN header identitas.
+ * Link biasa tidak membawa X-Acting-User, sehingga file campaign yang belum publik ditolak.
+ * Tab dibuka lebih dulu secara sinkron agar tidak diblokir popup blocker.
+ */
 export async function openProtectedFile(url: string) {
-  const res = (await api.get(url, { responseType: 'blob' })) as unknown as { data: Blob };
-  const blobUrl = URL.createObjectURL(res.data);
-  window.open(blobUrl, '_blank', 'noopener');
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  const tab = window.open('', '_blank');
+  try {
+    const id = useSession.getState().actingUserId;
+    const res = await fetch(`/api/v1${url}`, { headers: id ? { 'X-Acting-User': id } : {} });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError(body?.error?.code ?? 'NOT_FOUND', body?.error?.message ?? 'File tidak dapat dibuka.', res.status);
+    }
+    const blobUrl = URL.createObjectURL(await res.blob());
+    if (tab) tab.location.href = blobUrl;
+    else window.location.href = blobUrl;
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  } catch (e) {
+    tab?.close();
+    throw e;
+  }
 }
 
 export function errorMessage(e: unknown): string {

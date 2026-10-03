@@ -1,6 +1,7 @@
+import { FileButton } from '../components/FileButton';
 import { LIMITS } from '@fundchain/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, FileText, HandCoins, Pencil, Send, ShieldCheck, Snowflake, Sun } from 'lucide-react';
+import { CalendarClock, HandCoins, Pencil, Send, ShieldCheck, Snowflake, Sun } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -221,9 +222,9 @@ export function CampaignDetailPage() {
             {c.documents.length > 0 && (
               <div className="mt-5 flex flex-wrap gap-2">
                 {c.documents.slice(0, 1).map((d) => (
-                  <a key={d.id} href={`/api/v1/documents/${d.id}/file`} target="_blank" rel="noreferrer" className="btn-secondary btn-sm">
-                    <FileText size={14} /> Lihat proposal ({Math.ceil(d.size / 1024)} KB)
-                  </a>
+                  <FileButton key={d.id} path={`/documents/${d.id}/file`}>
+                    Lihat proposal ({Math.ceil(d.size / 1024)} KB)
+                  </FileButton>
                 ))}
               </div>
             )}
