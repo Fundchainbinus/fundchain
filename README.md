@@ -32,6 +32,8 @@ Buka http://localhost:5173. Data yang dibuat masuk ke database production.
 
 Kalau `.env` belum diisi, API berhenti dengan pesan yang menjelaskan langkahnya. Gejalanya di web: "Tidak dapat terhubung ke server".
 
+File upload selalu disimpan di database (`STORAGE_DRIVER=database`) karena dev lokal & production berbagi DB. Pernah mengunggah dengan versi lama (file tersimpan di `apps/api/uploads`)? Jalankan `pnpm --filter @fundchain/api files:sync` di laptop tersebut.
+
 ### 1. Siapkan Supabase (untuk Cara B)
 
 1. Buat project di [supabase.com](https://supabase.com) dan catat password database.

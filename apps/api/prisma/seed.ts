@@ -12,7 +12,6 @@ import { buildSamplePdf } from './sample-pdf';
 
 const prisma = new PrismaClient();
 const DAY = 24 * 60 * 60 * 1000;
-const uploadDir = path.resolve(process.cwd(), process.env.UPLOAD_DIR || './uploads');
 
 const USERS = [
   { email: 'admin@binus.ac.id', name: 'Admin BINUS', role: 'ADMIN', integritySubjectId: 'ADM-00001' },
@@ -27,13 +26,12 @@ function floorToSecond(d: Date) {
 
 async function saveProposal(campaignId: string, title: string) {
   const key = `proposals/${campaignId}/${randomUUID()}.pdf`;
-  const file = path.join(uploadDir, key);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
   const pdf = buildSamplePdf(`Proposal: ${title}`, [
     'Latar belakang, tujuan, dan rencana penggunaan dana.',
     'Dokumen contoh yang dibuat otomatis oleh seed FundChain.',
   ]);
-  fs.writeFileSync(file, pdf);
+  // Simpan ke database (stored_files) agar terbaca di semua lingkungan, termasuk Vercel.
+  await prisma.storedFile.create({ data: { key, data: new Uint8Array(pdf), contentType: 'application/pdf', size: pdf.length } });
   await prisma.campaignDocument.create({
     data: { campaignId, originalName: 'proposal.pdf', storageKey: key, fileType: 'application/pdf', size: pdf.length },
   });

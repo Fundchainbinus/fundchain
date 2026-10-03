@@ -25,8 +25,8 @@ export interface StoredFile {
 
 /**
  * Penyimpanan file dengan dua driver (env STORAGE_DRIVER):
- *  - local    : disk (apps/api/uploads) — untuk development
- *  - database : tabel stored_files di Postgres — untuk serverless (Vercel tanpa disk permanen)
+ *  - database : tabel stored_files di Postgres — default (dev & production berbagi DB)
+ *  - local    : disk (apps/api/uploads) — hanya bila DB tidak dipakai bersama
  * File selalu disimpan dengan nama acak; tipe divalidasi lewat magic bytes.
  */
 @Injectable()
@@ -64,15 +64,19 @@ export class StorageService {
     return { key, originalName: path.basename(file.originalname).slice(0, 200), fileType, size: file.size };
   }
 
+  /**
+   * Baca dari database dulu, lalu disk sebagai cadangan (file lama dari mode local) —
+   * apa pun driver-nya, karena dev lokal & production bisa berbagi database.
+   */
   async open(key: string): Promise<Readable> {
-    if (env().storageDriver === 'database') {
-      const row = await this.prisma.storedFile.findUnique({ where: { key } });
-      if (!row) throw new AppError('NOT_FOUND', 'File tidak ditemukan.');
-      return Readable.from(Buffer.from(row.data));
-    }
+    const row = await this.prisma.storedFile.findUnique({ where: { key } });
+    if (row) return Readable.from(Buffer.from(row.data));
     const target = this.resolve(key);
-    if (!fs.existsSync(target)) throw new AppError('NOT_FOUND', 'File tidak ditemukan.');
-    return fs.createReadStream(target);
+    if (fs.existsSync(target)) return fs.createReadStream(target);
+    throw new AppError(
+      'NOT_FOUND',
+      'File tidak tersedia di server (kemungkinan diunggah dari lingkungan lokal lain). Minta pembuat campaign mengunggah ulang.',
+    );
   }
 
   private resolve(key: string): string {

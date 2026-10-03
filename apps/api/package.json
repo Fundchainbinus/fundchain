@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "demo:tamper": "ts-node --transpile-only scripts/demo-tamper.ts",
     "db:deploy": "prisma migrate deploy",
-    "db:setup": "prisma migrate deploy && prisma db seed"
+    "db:setup": "prisma migrate deploy && prisma db seed",
+    "files:sync": "ts-node --transpile-only scripts/sync-files-to-db.ts"
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"

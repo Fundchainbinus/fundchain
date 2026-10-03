@@ -28,7 +28,8 @@ export function env() {
       baseUrl: (e.PAKASIR_BASE_URL || 'https://app.pakasir.com').replace(/\/$/, ''),
     },
     uploadDir: path.resolve(process.cwd(), e.UPLOAD_DIR || './uploads'),
-    storageDriver: (e.STORAGE_DRIVER || 'local') as 'local' | 'database',
+    // Default database: dev lokal & production berbagi DB, jadi file harus ikut di DB.
+    storageDriver: (e.STORAGE_DRIVER || 'database') as 'local' | 'database',
     /** Secret untuk endpoint cron (Vercel Cron mengirim Authorization: Bearer <CRON_SECRET>). */
     cronSecret: e.CRON_SECRET || '',
     blockchain: {
