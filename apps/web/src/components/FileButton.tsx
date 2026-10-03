@@ -1,9 +1,13 @@
 import { FileText, Loader2 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { errorMessage, openProtectedFile } from '../lib/api';
+import { errorMessage, openSignedFile } from '../lib/api';
 
-/** Tombol pembuka file yang tetap membawa identitas pengguna (lihat openProtectedFile). */
-export function FileButton({ path, children, className = 'btn-secondary btn-sm' }: { path: string; children: ReactNode; className?: string }) {
+/**
+ * Tombol pembuka file. Link biasa tidak membawa header identitas (mode demo), jadi file
+ * campaign yang belum publik akan ditolak; tombol ini meminta link bertanda tangan dulu.
+ * `linkPath` = endpoint yang mengembalikan { url }, mis. /documents/:id/link.
+ */
+export function FileButton({ linkPath, children, className = 'btn-secondary btn-sm' }: { linkPath: string; children: ReactNode; className?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -15,7 +19,7 @@ export function FileButton({ path, children, className = 'btn-secondary btn-sm' 
         onClick={() => {
           setError(null);
           setLoading(true);
-          openProtectedFile(path)
+          openSignedFile(linkPath)
             .catch((e) => setError(errorMessage(e)))
             .finally(() => setLoading(false));
         }}

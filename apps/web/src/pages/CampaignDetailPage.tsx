@@ -222,7 +222,7 @@ export function CampaignDetailPage() {
             {c.documents.length > 0 && (
               <div className="mt-5 flex flex-wrap gap-2">
                 {c.documents.slice(0, 1).map((d) => (
-                  <FileButton key={d.id} path={`/documents/${d.id}/file`}>
+                  <FileButton key={d.id} linkPath={`/documents/${d.id}/link`}>
                     Lihat proposal ({Math.ceil(d.size / 1024)} KB)
                   </FileButton>
                 ))}

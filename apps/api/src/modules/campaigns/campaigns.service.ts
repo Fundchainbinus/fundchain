@@ -200,13 +200,30 @@ export class CampaignsService {
     return doc;
   }
 
-  async openDocument(documentId: string, user?: CurrentUserPayload) {
-    const doc = await this.prisma.campaignDocument.findUnique({
-      where: { id: documentId },
-      include: { campaign: { select: { id: true } } },
-    });
+  /** Cek hak lihat dokumen: campaign publik, atau pemilik/admin. */
+  async assertDocumentVisible(documentId: string, user?: CurrentUserPayload) {
+    const doc = await this.prisma.campaignDocument.findUnique({ where: { id: documentId } });
     if (!doc) throw new AppError('NOT_FOUND', 'Dokumen tidak ditemukan.');
-    await this.getDetail(doc.campaignId, user); // cek visibilitas
+    try {
+      await this.getDetail(doc.campaignId, user);
+    } catch (e) {
+      if (e instanceof AppError && e.code === 'CAMPAIGN_NOT_FOUND') {
+        throw new AppError(
+          'AUTH_FORBIDDEN',
+          'Proposal campaign yang belum disetujui hanya untuk pembuat & admin. Buka lewat tombol "Lihat proposal" di aplikasi (muat ulang halaman dengan Ctrl+Shift+R bila perlu).',
+        );
+      }
+      throw e;
+    }
+    return doc;
+  }
+
+  /** `signedOk` = URL membawa tanda tangan valid (sudah diotorisasi saat link dibuat). */
+  async openDocument(documentId: string, user?: CurrentUserPayload, signedOk = false) {
+    const doc = signedOk
+      ? await this.prisma.campaignDocument.findUnique({ where: { id: documentId } })
+      : await this.assertDocumentVisible(documentId, user);
+    if (!doc) throw new AppError('NOT_FOUND', 'Dokumen tidak ditemukan.');
     return { doc, stream: await this.storage.open(doc.storageKey) };
   }
 

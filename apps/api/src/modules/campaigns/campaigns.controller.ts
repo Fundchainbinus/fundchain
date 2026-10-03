@@ -17,6 +17,7 @@ import { LIMITS } from '@fundchain/shared';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
 import { ClientIp, CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
+import { createSignedQuery, verifySignedQuery } from '../../common/signed-link';
 import { AuditService } from '../audit/audit.service';
 import { CreateCampaignDto, ListCampaignsQuery, ReasonDto, UpdateCampaignDto } from './campaigns.dto';
 import { CampaignsService } from './campaigns.service';
@@ -81,16 +82,28 @@ export class CampaignsController {
     return this.campaigns.submit(id, user, ip);
   }
 
+  /** Link file bertanda tangan (5 menit) — otorisasi dicek di sini, saat header identitas masih ada. */
+  @Public()
+  @Get('documents/:id/link')
+  async link(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: CurrentUserPayload) {
+    await this.campaigns.assertDocumentVisible(id, user);
+    return { url: `/api/v1/documents/${id}/file?${createSignedQuery(`document:${id}`)}` };
+  }
+
   @Public()
   @Get('documents/:id/file')
   async file(
     @Param('id', ParseUUIDPipe) id: string,
     @Res({ passthrough: true }) res: Response,
+    @Query('e') e?: string,
+    @Query('t') t?: string,
     @CurrentUser() user?: CurrentUserPayload,
   ) {
-    const { doc, stream } = await this.campaigns.openDocument(id, user);
+    const signedOk = verifySignedQuery(`document:${id}`, e, t);
+    const { doc, stream } = await this.campaigns.openDocument(id, user, signedOk);
     res.setHeader('Content-Type', doc.fileType);
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.originalName)}"`);
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.originalName)}`);
+    res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     return new StreamableFile(stream);
   }

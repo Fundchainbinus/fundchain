@@ -65,6 +65,22 @@ export async function openProtectedFile(url: string) {
   }
 }
 
+/**
+ * Buka file lewat link bertanda tangan: server memeriksa hak akses (dengan header identitas)
+ * lalu mengembalikan URL berumur 5 menit yang bisa dibuka tab biasa — nama file & viewer PDF normal.
+ */
+export async function openSignedFile(linkPath: string) {
+  const tab = window.open('', '_blank');
+  try {
+    const { url } = await get<{ url: string }>(linkPath);
+    if (tab) tab.location.href = url;
+    else window.location.href = url;
+  } catch (e) {
+    tab?.close();
+    throw e;
+  }
+}
+
 export function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : 'Terjadi kesalahan.';
 }
