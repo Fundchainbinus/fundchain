@@ -4,8 +4,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        navy: { DEFAULT: '#003D7C', dark: '#002A57', light: '#E6EEF8', 50: '#F3F7FC' },
-        accent: { DEFAULT: '#F7A21B', light: '#FEF3E2' },
+        // Biru BINUSMAYA untuk aksi utama; navy untuk kartu peran di banner.
+        brand: { DEFAULT: '#0A8FD6', dark: '#0773AE', light: '#E5F4FC', 50: '#F2F9FD' },
+        navy: { DEFAULT: '#0B3D5C', dark: '#072B42' },
+        accent: { DEFAULT: '#F18A00', light: '#FEF1E0' },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

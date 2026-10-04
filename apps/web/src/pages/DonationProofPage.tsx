@@ -50,10 +50,10 @@ export function DonationProofPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <p className="text-sm text-slate-500">
-        Bukti donasi untuk <Link className="font-medium text-navy hover:underline" to={`/campaigns/${d.campaign.id}`}>{d.campaign.title}</Link>
+        Bukti donasi untuk <Link className="font-medium text-brand hover:underline" to={`/campaigns/${d.campaign.id}`}>{d.campaign.title}</Link>
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">{rupiah(d.amount)}</h1>
+        <h1 className="text-lg font-semibold">{rupiah(d.amount)}</h1>
         <DonationBadge status={d.status} />
         <IntegrityBadge status={d.integrityStatus} large />
       </div>
@@ -115,7 +115,7 @@ export function DonationProofPage() {
           </section>
 
           {d.viewer.isAdmin && (
-            <section className="card border-navy/20 p-5">
+            <section className="card border-brand/20 p-5">
               <h2 className="font-semibold">Integrity checker (admin)</h2>
               <p className="mt-1 text-sm text-slate-600">Hitung ulang hash dari data database saat ini lalu bandingkan dengan hash di smart contract.</p>
               <button className="btn-primary mt-3" onClick={() => verify.mutate()} disabled={verify.isPending || bc?.status !== 'CONFIRMED'}>

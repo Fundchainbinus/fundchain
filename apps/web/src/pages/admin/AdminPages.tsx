@@ -32,15 +32,13 @@ export function AdminLayout() {
   ];
   return (
     <div>
-      <nav className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200" aria-label="Menu admin">
+      <nav className="mb-5 flex flex-wrap gap-1.5" aria-label="Menu admin">
         {tabs.map((t) => (
           <NavLink
             key={t.to}
             to={t.to}
             end={t.end}
-            className={({ isActive }) =>
-              `whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium ${isActive ? 'border-navy text-navy' : 'border-transparent text-slate-500 hover:text-slate-800'}`
-            }
+            className={({ isActive }) => `chip ${isActive ? 'chip-active' : ''}`}
           >
             {t.label}
           </NavLink>
@@ -62,7 +60,7 @@ function ChainCard({ chain }: { chain?: ChainInfo }) {
         <div><dt className="text-xs text-slate-500">Jaringan</dt><dd>{chain.network} (chain ID {chain.chainId})</dd></div>
         <div>
           <dt className="text-xs text-slate-500">Contract DonationRegistry</dt>
-          <dd>{chain.explorerUrl ? <a className="mono text-navy hover:underline" href={chain.explorerUrl} target="_blank" rel="noreferrer">{chain.contractAddress}</a> : <HashText value={chain.contractAddress} />}</dd>
+          <dd>{chain.explorerUrl ? <a className="mono text-brand hover:underline" href={chain.explorerUrl} target="_blank" rel="noreferrer">{chain.contractAddress}</a> : <HashText value={chain.contractAddress} />}</dd>
         </div>
         <div><dt className="text-xs text-slate-500">Relayer wallet</dt><dd><HashText value={chain.relayer?.address} label="alamat relayer" /></dd></div>
         <div>
@@ -98,7 +96,7 @@ export function AdminDashboardPage() {
     <div className="space-y-6">
       <PageHeader title="Dashboard admin" subtitle="Ringkasan operasional FundChain." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Menunggu review" value={s.campaigns.PENDING_REVIEW ?? 0} hint={<Link to="/admin/reviews" className="text-navy hover:underline">Buka antrean →</Link>} />
+        <Stat label="Menunggu review" value={s.campaigns.PENDING_REVIEW ?? 0} hint={<Link to="/admin/reviews" className="text-brand hover:underline">Buka antrean →</Link>} />
         <Stat label="Total donasi lunas" value={rupiah(s.totalRaised)} hint={`${s.donations.PAID ?? 0} transaksi`} />
         <Stat label="Notarisasi" value={`${s.blockchain.CONFIRMED ?? 0} on-chain`} hint={`${pendingChain} dalam proses · ${s.blockchain.FAILED ?? 0} gagal`} danger={(s.blockchain.FAILED ?? 0) > 0} />
         <Stat
@@ -253,7 +251,7 @@ export function AdminIntegrityPage() {
               {donations.data?.map((d) => (
                 <tr key={d.id} className={d.integrityStatus === 'TAMPERED' ? 'bg-red-50' : ''}>
                   <td className="px-4 py-3">
-                    <Link to={`/donations/${d.id}`} className="font-medium hover:text-navy">{d.campaign.title}</Link>
+                    <Link to={`/donations/${d.id}`} className="font-medium hover:text-brand">{d.campaign.title}</Link>
                     <p className="text-xs text-slate-500">{d.donor.name} ({d.donor.integritySubjectId}) · {dateTime(d.donatedAt)}</p>
                   </td>
                   <td className="px-3 py-3 font-medium">{rupiah(d.amount)}</td>
@@ -322,7 +320,7 @@ export function AdminDisbursementsPage() {
                     <DisbursementBadge status={d.status} />
                     {d.campaign.status === 'FROZEN' && <CampaignBadge status="FROZEN" />}
                   </div>
-                  <Link to={`/campaigns/${d.campaign.id}`} className="text-sm font-medium text-navy hover:underline">{d.campaign.title}</Link>
+                  <Link to={`/campaigns/${d.campaign.id}`} className="text-sm font-medium text-brand hover:underline">{d.campaign.title}</Link>
                   <p className="mt-1 text-sm text-slate-700">{d.description}</p>
                   <p className="mt-1 text-xs text-slate-500">
                     oleh {d.requester.name} · {dateTime(d.requestedAt)} · saldo campaign {rupiah(d.campaign.currentAmount)}
@@ -417,7 +415,7 @@ export function AdminAuditPage() {
                   <td className="px-3 py-2.5 text-xs">
                     {l.entityType}
                     {l.entityId && (
-                      <Link className="ml-1 font-mono text-navy hover:underline" to={l.entityType === 'Campaign' ? `/campaigns/${l.entityId}` : l.entityType === 'Donation' ? `/donations/${l.entityId}` : '#'}>
+                      <Link className="ml-1 font-mono text-brand hover:underline" to={l.entityType === 'Campaign' ? `/campaigns/${l.entityId}` : l.entityType === 'Donation' ? `/donations/${l.entityId}` : '#'}>
                         {l.entityId.slice(0, 8)}
                       </Link>
                     )}

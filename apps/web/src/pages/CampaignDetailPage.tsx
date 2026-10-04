@@ -48,7 +48,7 @@ function DonatePanel({ campaign }: { campaign: CampaignDetail }) {
   const valid = Number.isInteger(amount) && amount >= LIMITS.DONATION_MIN && amount <= LIMITS.DONATION_MAX;
   return (
     <div className="card p-5">
-      <h2 className="flex items-center gap-2 font-semibold"><HandCoins size={18} className="text-navy" /> Donasi sekarang</h2>
+      <h2 className="flex items-center gap-2 font-semibold"><HandCoins size={18} className="text-brand" /> Donasi sekarang</h2>
       {!me ? (
         <p className="mt-3 text-sm text-slate-600">Pilih pengguna (mahasiswa) di pojok kanan atas untuk berdonasi.</p>
       ) : (
@@ -65,7 +65,7 @@ function DonatePanel({ campaign }: { campaign: CampaignDetail }) {
                 key={p}
                 type="button"
                 onClick={() => setAmount(p)}
-                className={`rounded-lg border px-3 py-2 text-sm font-medium ${amount === p ? 'border-navy bg-navy-light text-navy' : 'border-slate-200 hover:border-slate-300'}`}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium ${amount === p ? 'border-brand bg-brand-light text-brand' : 'border-slate-200 hover:border-slate-300'}`}
               >
                 {rupiah(p)}
               </button>
@@ -115,8 +115,8 @@ function AdminPanel({ campaign }: { campaign: CampaignDetail }) {
   });
 
   return (
-    <div className="card border-navy/20 bg-navy-50 p-5">
-      <h2 className="font-semibold text-navy">Panel Admin</h2>
+    <div className="card border-brand/20 bg-brand-50 p-5">
+      <h2 className="font-semibold text-brand">Panel Admin</h2>
       <div className="mt-3 flex flex-wrap gap-2">
         {campaign.status === 'PENDING_REVIEW' && (
           <>
@@ -216,7 +216,7 @@ export function CampaignDetailPage() {
               <SdgTag code={c.sdgCategory} />
               <CampaignBadge status={c.status} />
             </div>
-            <h1 className="mt-3 text-2xl font-bold">{c.title}</h1>
+            <h1 className="mt-3 text-lg font-semibold">{c.title}</h1>
             <p className="mt-1 text-sm text-slate-500">oleh {c.creator.name} · dibuat {date(c.createdAt)}</p>
             <p className="mt-5 whitespace-pre-line text-slate-700">{c.description}</p>
             {c.documents.length > 0 && (
@@ -275,7 +275,7 @@ export function CampaignDetailPage() {
                           <div className="flex flex-col gap-1"><ChainBadge status={d.blockchainStatus} /><ExplorerLink url={d.explorerUrl} txHash={d.txHash} /></div>
                         </td>
                         <td className="px-3 py-3"><IntegrityBadge status={d.integrityStatus} /></td>
-                        <td className="whitespace-nowrap px-5 py-3 text-right"><Link to={`/donations/${d.id}`} className="text-xs font-medium text-navy hover:underline">Bukti →</Link></td>
+                        <td className="whitespace-nowrap px-5 py-3 text-right"><Link to={`/donations/${d.id}`} className="text-xs font-medium text-brand hover:underline">Bukti →</Link></td>
                       </tr>
                     ))}
                   </tbody>
@@ -310,7 +310,7 @@ export function CampaignDetailPage() {
 
         <aside className="space-y-4">
           <div className="card p-5">
-            <p className="text-2xl font-bold text-slate-900">{rupiah(c.currentAmount)}</p>
+            <p className="text-lg font-semibold text-slate-900">{rupiah(c.currentAmount)}</p>
             <p className="text-sm text-slate-500">terkumpul dari target {rupiah(c.targetAmount)}</p>
             <div className="mt-3"><ProgressBar current={c.currentAmount} target={c.targetAmount} /></div>
             <div className="mt-3 flex justify-between text-xs text-slate-500">
@@ -350,7 +350,7 @@ export function CampaignDetailPage() {
               <ol className="mt-3 space-y-3 border-l border-slate-200 pl-4">
                 {activity.data.map((a) => (
                   <li key={a.id} className="relative text-xs">
-                    <span className={`absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full ${a.action === 'CAMPAIGN_FROZEN' ? 'bg-red-500' : 'bg-navy'}`} />
+                    <span className={`absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full ${a.action === 'CAMPAIGN_FROZEN' ? 'bg-red-500' : 'bg-brand'}`} />
                     <p className="font-medium text-slate-800">{ACTION_LABEL[a.action] ?? a.action}</p>
                     <p className="text-slate-500">{a.actor.name} · {dateTime(a.createdAt)}</p>
                   </li>
