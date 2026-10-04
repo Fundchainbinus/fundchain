@@ -3,8 +3,9 @@
   "private": true,
   "description": "FundChain — platform fundraising mahasiswa BINUS dengan blockchain proof layer",
   "scripts": {
-    "postinstall": "pnpm --filter @fundchain/shared build",
-    "bootstrap": "pnpm --filter @fundchain/shared build && pnpm --filter @fundchain/api db:setup",
+    "postinstall": "pnpm --filter @fundchain/shared build && pnpm --filter @fundchain/api db:generate",
+    "bootstrap": "pnpm --filter @fundchain/shared build && pnpm --filter @fundchain/api db:generate && pnpm --filter @fundchain/api db:setup",
+    "prisma:generate": "pnpm --filter @fundchain/api db:generate",
     "dev": "pnpm --filter @fundchain/shared build && concurrently -n chain,deploy,api,web -c yellow,magenta,cyan,green \"pnpm --filter @fundchain/contracts node\" \"pnpm --filter @fundchain/contracts deploy:local:wait\" \"pnpm --filter @fundchain/api dev\" \"pnpm --filter @fundchain/web dev\"",
     "dev:api": "pnpm --filter @fundchain/api dev",
     "dev:web": "pnpm --filter @fundchain/web dev",
