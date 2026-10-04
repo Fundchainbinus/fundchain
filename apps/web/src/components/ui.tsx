@@ -5,7 +5,7 @@ import { percent, sdg, shortHash } from '../lib/format';
 
 const tone = {
   gray: 'bg-slate-100 text-slate-700',
-  blue: 'bg-brand-light text-brand',
+  blue: 'bg-navy-light text-navy',
   green: 'bg-emerald-100 text-emerald-800',
   amber: 'bg-amber-100 text-amber-800',
   red: 'bg-red-100 text-red-700',
@@ -14,11 +14,11 @@ const tone = {
 
 const CAMPAIGN: Record<CampaignStatus, [string, keyof typeof tone]> = {
   DRAFT: ['Draft', 'gray'],
-  PENDING_REVIEW: ['Pending', 'amber'],
-  ACTIVE: ['Active', 'green'],
-  REJECTED: ['Rejected', 'red'],
-  FROZEN: ['Frozen', 'red'],
-  COMPLETED: ['Completed', 'blue'],
+  PENDING_REVIEW: ['Menunggu Review', 'amber'],
+  ACTIVE: ['Aktif', 'green'],
+  REJECTED: ['Ditolak', 'red'],
+  FROZEN: ['Dibekukan', 'red'],
+  COMPLETED: ['Selesai', 'blue'],
 };
 const DONATION: Record<DonationStatus, [string, keyof typeof tone]> = {
   PENDING: ['Menunggu Bayar', 'amber'],
@@ -76,17 +76,17 @@ export function SdgTag({ code }: { code: string }) {
   const s = sdg(code);
   if (!s) return null;
   return (
-    <span className="text-[11px] text-slate-500" title={s.label}>
+    <span className="badge bg-accent-light text-amber-900" title={s.label}>
       SDG {s.number} · {s.label}
     </span>
   );
 }
 
-export function ProgressBar({ current, target, danger }: { current: number; target: number; danger?: boolean }) {
+export function ProgressBar({ current, target }: { current: number; target: number }) {
   const p = percent(current, target);
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={p} aria-valuemin={0} aria-valuemax={100}>
-      <div className={`h-full rounded-full transition-all ${danger ? 'bg-red-500' : 'bg-brand'}`} style={{ width: `${p}%` }} />
+    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={p} aria-valuemin={0} aria-valuemax={100}>
+      <div className="h-full rounded-full bg-navy transition-all" style={{ width: `${p}%` }} />
     </div>
   );
 }
@@ -101,7 +101,7 @@ export function HashText({ value, full, label }: { value: string | null | undefi
       </code>
       <button
         type="button"
-        className="shrink-0 text-slate-400 hover:text-brand"
+        className="shrink-0 text-slate-400 hover:text-navy"
         aria-label={`Salin ${label ?? 'hash'}`}
         onClick={() => {
           void navigator.clipboard.writeText(value);
@@ -119,7 +119,7 @@ export function ExplorerLink({ url, txHash }: { url: string | null; txHash: stri
   if (!txHash) return <span className="text-slate-400">—</span>;
   if (!url) return <HashText value={txHash} label="tx hash" />;
   return (
-    <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-xs text-brand hover:underline">
+    <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-xs text-navy hover:underline">
       {shortHash(txHash)} <ExternalLink size={12} />
     </a>
   );
@@ -163,10 +163,10 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h2 className="text-base font-semibold">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
@@ -176,9 +176,9 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 export function Stat({ label, value, hint, danger }: { label: string; value: ReactNode; hint?: ReactNode; danger?: boolean }) {
   return (
     <div className={`card p-4 ${danger ? 'border-red-200 bg-red-50' : ''}`}>
-      <p className="text-[11px] text-slate-500">{label}</p>
-      <p className={`mt-1 text-xl font-semibold ${danger ? 'text-red-700' : 'text-slate-900'}`}>{value}</p>
-      {hint && <p className="mt-1 text-[11px] text-slate-500">{hint}</p>}
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+      <p className={`mt-1 text-2xl font-bold ${danger ? 'text-red-700' : 'text-slate-900'}`}>{value}</p>
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );
 }
@@ -233,34 +233,6 @@ export function ReasonDialog({
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-/** Filter berbentuk chip, mis. "Semua (4) · Active (2) · Frozen (1)". */
-export function Chips<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string; count?: number }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5" role="tablist">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          role="tab"
-          aria-selected={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={`chip ${value === o.value ? 'chip-active' : ''}`}
-        >
-          {o.label}
-          {o.count !== undefined && ` (${o.count})`}
-        </button>
-      ))}
     </div>
   );
 }

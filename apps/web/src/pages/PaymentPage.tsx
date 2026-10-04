@@ -50,9 +50,9 @@ export function PaymentPage() {
   return (
     <div className="mx-auto max-w-4xl">
       <p className="text-sm text-slate-500">
-        Donasi untuk <Link className="font-medium text-brand hover:underline" to={`/campaigns/${d.campaign.id}`}>{d.campaign.title}</Link>
+        Donasi untuk <Link className="font-medium text-navy hover:underline" to={`/campaigns/${d.campaign.id}`}>{d.campaign.title}</Link>
       </p>
-      <h1 className="mt-1 flex flex-wrap items-center gap-3 text-lg font-semibold">
+      <h1 className="mt-1 flex flex-wrap items-center gap-3 text-2xl font-bold">
         {rupiah(d.amount)} <DonationBadge status={d.status} />
       </h1>
 

@@ -36,7 +36,7 @@ export function NotarizationSteps({ d }: { d: DonationDetail }) {
         <li key={s.label} className="flex items-start gap-3">
           <span
             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white ${
-              { done: 'bg-emerald-500', active: 'bg-brand', todo: 'bg-slate-200', error: 'bg-red-500' }[s.state]
+              { done: 'bg-emerald-500', active: 'bg-navy', todo: 'bg-slate-200', error: 'bg-red-500' }[s.state]
             }`}
           >
             {s.state === 'done' ? <Check size={14} /> : s.state === 'active' ? <Loader2 size={14} className="animate-spin" /> : s.state === 'error' ? <X size={14} /> : null}

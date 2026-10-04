@@ -50,8 +50,8 @@ export function DisbursePage() {
           create.mutate();
         }}
       >
-        <div className="rounded-lg bg-brand-50 p-4 text-sm">
-          Sisa dana yang dapat diajukan: <b className="text-brand">{rupiah(c.funds.available)}</b>
+        <div className="rounded-lg bg-navy-50 p-4 text-sm">
+          Sisa dana yang dapat diajukan: <b className="text-navy">{rupiah(c.funds.available)}</b>
           <span className="block text-xs text-slate-500">Terkumpul {rupiah(c.funds.raised)} − sudah diajukan/dicairkan {rupiah(c.funds.raised - c.funds.available)}</span>
         </div>
         <div>
