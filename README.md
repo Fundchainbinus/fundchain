@@ -38,8 +38,8 @@ File upload (proposal & bukti pencairan) **hanya** disimpan di database (tabel `
 
 1. Buat project di [supabase.com](https://supabase.com) dan catat password database.
 2. Dashboard → **Connect** → tab **ORMs** → **Prisma**. Salin dua connection string ke `apps/api/.env`:
-   - `DATABASE_URL` → *Transaction pooler* (port **6543**, dengan `?pgbouncer=true`)
-   - `DIRECT_URL` → *Session pooler* (port **5432**), dipakai untuk migrate
+   - `DATABASE_URL` → _Transaction pooler_ (port **6543**, dengan `?pgbouncer=true`)
+   - `DIRECT_URL` → _Session pooler_ (port **5432**), dipakai untuk migrate
 3. Password yang mengandung karakter khusus (`@ # / ?`) harus di-URL-encode.
 
 Migration otomatis mengaktifkan **Row Level Security** di semua tabel. Data tidak bisa diakses lewat REST API Supabase memakai anon key; hanya backend (role postgres) yang bisa.
@@ -60,27 +60,41 @@ pnpm dev
 
 `pnpm bootstrap` menjalankan migration ke Supabase dan mengisi data seed. Aman diulang: seed dilewati kalau campaign sudah ada. `pnpm dev` menjalankan sekaligus:
 
-| Proses | Alamat |
-|---|---|
-| Hardhat node (blockchain lokal) | `http://127.0.0.1:8545` |
-| Deploy `DonationRegistry` | otomatis → `contracts/deployments/localhost.json` |
-| API NestJS + worker notarisasi | `http://localhost:3000/api/v1` |
-| Web React | **http://localhost:5173** |
+| Proses                          | Alamat                                            |
+| ------------------------------- | ------------------------------------------------- |
+| Hardhat node (blockchain lokal) | `http://127.0.0.1:8545`                           |
+| Deploy `DonationRegistry`       | otomatis → `contracts/deployments/localhost.json` |
+| API NestJS + worker notarisasi  | `http://localhost:3000/api/v1`                    |
+| Web React                       | **http://localhost:5173**                         |
 
 Blockchain lokal Hardhat kosong setiap restart. Worker otomatis menotarisasi ulang hash yang **tersimpan saat pembayaran**, sehingga data yang sudah dimanipulasi tetap terdeteksi.
 
+### 3. Set Up Prisma (Optional / kalau error aja)
+
+Buat yang baru clone terus udah jalanin semua step di atas tapi masih error karena koneksi API, bisa aja karena prisma belum ke install, caranya buka cmd di folder besar fundchain, lalu :
+
+```bash
+cd apps/api
+```
+
+```bash
+pnpm prisma generate
+```
+
+setelah install, balik lagi ke folder besar fundchain dan jalan `pnpm dev` disana
+
 ## Skenario demo
 
-1. Pilih **Budi Santoso** → *Campaign Saya* → *Buat campaign* → unggah `samples/proposal-contoh.pdf` → *Ajukan*.
-2. Pilih **Admin BINUS** → *Admin → Review campaign* → buka → *Setujui*.
-3. Pilih **Siti Rahma** → buka campaign → *Donasi* → *Simulasi bayar berhasil*. Lihat langkahnya: lunas → hash → tx → blok → terverifikasi.
-4. Buka *Bukti donasi*: canonical payload, hash, tx hash, dan tombol hitung ulang hash di browser.
+1. Pilih **Budi Santoso** → _Campaign Saya_ → _Buat campaign_ → unggah `samples/proposal-contoh.pdf` → _Ajukan_.
+2. Pilih **Admin BINUS** → _Admin → Review campaign_ → buka → _Setujui_.
+3. Pilih **Siti Rahma** → buka campaign → _Donasi_ → _Simulasi bayar berhasil_. Lihat langkahnya: lunas → hash → tx → blok → terverifikasi.
+4. Buka _Bukti donasi_: canonical payload, hash, tx hash, dan tombol hitung ulang hash di browser.
 5. Manipulasi data langsung di database:
    ```bash
    pnpm demo:tamper --latest 900000
    ```
-6. Admin → *Integritas* → *Verifikasi semua donasi* → **TAMPERED** → campaign **FROZEN**.
-7. Budi coba *Ajukan pencairan* → ditolak `CAMPAIGN_FROZEN`.
+6. Admin → _Integritas_ → _Verifikasi semua donasi_ → **TAMPERED** → campaign **FROZEN**.
+7. Budi coba _Ajukan pencairan_ → ditolak `CAMPAIGN_FROZEN`.
 
 ## Struktur
 
@@ -95,13 +109,13 @@ FundChain_Complete_Planning_Docs   dokumen perencanaan (PRD, API spec, dll.)
 
 ## Keputusan implementasi vs dokumen planning
 
-| Dokumen | Implementasi | Alasan |
-|---|---|---|
-| PostgreSQL | PostgreSQL di Supabase (Prisma, pooler + direct URL) | Sesuai rencana deploy; RLS aktif di semua tabel |
-| Redis + BullMQ | Tabel `blockchain_transactions` sebagai antrean (outbox) + worker polling | Tanpa Redis; retry/backoff/FAILED tetap sesuai spec |
-| Microsoft SSO | Persona switcher (`DEMO_MODE`) | Permintaan: tanpa login |
-| Midtrans | `mock` (default) + adapter `pakasir` | Sesuai keputusan Pakasir + Mock |
-| Worker app terpisah | Worker di dalam proses API | Satu perintah untuk jalan |
+| Dokumen             | Implementasi                                                              | Alasan                                              |
+| ------------------- | ------------------------------------------------------------------------- | --------------------------------------------------- |
+| PostgreSQL          | PostgreSQL di Supabase (Prisma, pooler + direct URL)                      | Sesuai rencana deploy; RLS aktif di semua tabel     |
+| Redis + BullMQ      | Tabel `blockchain_transactions` sebagai antrean (outbox) + worker polling | Tanpa Redis; retry/backoff/FAILED tetap sesuai spec |
+| Microsoft SSO       | Persona switcher (`DEMO_MODE`)                                            | Permintaan: tanpa login                             |
+| Midtrans            | `mock` (default) + adapter `pakasir`                                      | Sesuai keputusan Pakasir + Mock                     |
+| Worker app terpisah | Worker di dalam proses API                                                | Satu perintah untuk jalan                           |
 
 ## Konfigurasi
 
@@ -131,10 +145,10 @@ Live: **https://fundchain-web.vercel.app** (web) · **https://fundchain-api.verc
 
 Dua project Vercel dari repo yang sama:
 
-| Project | Root Directory | Isi |
-|---|---|---|
-| `fundchain-web` | `apps/web` | Static Vite; `/api/*` di-proxy ke `fundchain-api` (same-origin) |
-| `fundchain-api` | `apps/api` | NestJS sebagai Vercel Function (`api/index.js` → `src/serverless.ts`), region `sin1` dekat Supabase |
+| Project         | Root Directory | Isi                                                                                                 |
+| --------------- | -------------- | --------------------------------------------------------------------------------------------------- |
+| `fundchain-web` | `apps/web`     | Static Vite; `/api/*` di-proxy ke `fundchain-api` (same-origin)                                     |
+| `fundchain-api` | `apps/api`     | NestJS sebagai Vercel Function (`api/index.js` → `src/serverless.ts`), region `sin1` dekat Supabase |
 
 Perbedaan mode serverless (diatur lewat env di project `fundchain-api`):
 
