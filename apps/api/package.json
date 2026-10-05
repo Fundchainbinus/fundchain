@@ -18,9 +18,6 @@
     "db:setup": "prisma migrate deploy && prisma db seed",
     "files:sync": "ts-node --transpile-only scripts/sync-files-to-db.ts"
   },
-  "prisma": {
-    "seed": "ts-node --transpile-only prisma/seed.ts"
-  },
   "dependencies": {
     "@fundchain/shared": "workspace:*",
     "@nestjs/common": "^11.1.0",
