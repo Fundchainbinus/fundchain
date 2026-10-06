@@ -17,6 +17,6 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
-    seed: 'ts-node --transpile-only prisma/seed.ts',
+    seed: 'pnpm exec ts-node --transpile-only prisma/seed.ts',
   },
 });
