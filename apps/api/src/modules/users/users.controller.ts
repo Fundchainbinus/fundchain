@@ -1,10 +1,21 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { IsString, MaxLength, MinLength } from 'class-validator';
+import { AppError } from '../../common/app-error';
 import { CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
 import { env } from '../../common/env';
 import { PrismaService } from '../../common/prisma.service';
+import { createSessionToken } from '../../common/session-token';
 import { AuditService } from '../audit/audit.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { PaymentsService } from '../payments/payments.service';
+
+class GoogleLoginDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2048)
+  accessToken!: string;
+}
 
 @Controller()
 export class UsersController {
@@ -27,22 +38,56 @@ export class UsersController {
   config() {
     const e = env();
     return {
-      demoMode: e.demoMode,
+      googleClientId: e.googleClientId,
       devTools: e.devTools,
       paymentProvider: this.payments.gateway.name,
       chain: this.blockchain.target(),
     };
   }
 
-  /** Daftar persona untuk mode demo tanpa login. */
+  /**
+   * Login Google (popup GIS): frontend mengirim access token Google, server memverifikasi
+   * audience & email, membuat/menemukan user, lalu menerbitkan token sesi.
+   */
   @Public()
-  @Get('users')
-  users() {
-    if (!env().demoMode) return [];
-    return this.prisma.user.findMany({
-      select: { id: true, name: true, email: true, role: true, integritySubjectId: true },
-      orderBy: [{ role: 'asc' }, { name: 'asc' }],
-    });
+  @Post('auth/google')
+  async loginGoogle(@Body() dto: GoogleLoginDto) {
+    const cfg = env();
+    if (!cfg.googleClientId) throw new AppError('AUTH_UNAUTHENTICATED', 'Login Google belum dikonfigurasi di server.');
+
+    const q = encodeURIComponent(dto.accessToken);
+    const [info, profile] = await Promise.all([
+      fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${q}`),
+      fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${dto.accessToken}` } }),
+    ]);
+    if (!info.ok || !profile.ok) throw new AppError('AUTH_UNAUTHENTICATED', 'Token Google tidak valid.');
+    const tokenInfo = (await info.json()) as { aud?: string; azp?: string };
+    const g = (await profile.json()) as { email?: string; email_verified?: boolean; name?: string };
+    if ((tokenInfo.aud ?? tokenInfo.azp) !== cfg.googleClientId || !g.email || g.email_verified !== true) {
+      throw new AppError('AUTH_UNAUTHENTICATED', 'Akun Google tidak dapat diverifikasi.');
+    }
+
+    const email = g.email.toLowerCase();
+    const name = g.name?.trim() || email.split('@')[0];
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    const isAdmin = cfg.adminEmails.includes(email);
+    const user = existing
+      ? isAdmin && existing.role !== 'ADMIN'
+        ? await this.prisma.user.update({ where: { id: existing.id }, data: { role: 'ADMIN' } })
+        : existing
+      : await this.prisma.user.create({
+          data: {
+            email,
+            name,
+            role: isAdmin ? 'ADMIN' : 'STUDENT',
+            integritySubjectId: `${isAdmin ? 'ADM' : 'STU'}-${randomBytes(5).toString('hex').toUpperCase()}`,
+          },
+        });
+
+    return {
+      token: createSessionToken(user.id),
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, integritySubjectId: user.integritySubjectId },
+    };
   }
 
   @Get('me')

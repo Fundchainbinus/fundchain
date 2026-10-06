@@ -33,8 +33,8 @@ async function bootstrap() {
   configureApp(app);
   app.enableShutdownHooks();
 
-  if (cfg.isProduction && cfg.demoMode) {
-    logger.warn('DEMO_MODE aktif di produksi! Siapa pun bisa berpura-pura menjadi user lain.');
+  if (!cfg.googleClientId) {
+    logger.warn('GOOGLE_CLIENT_ID belum diisi — login Google tidak akan berfungsi.');
   }
 
   await app.listen(cfg.port);

@@ -2,16 +2,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 /**
- * Mode demo tanpa login: pengguna aktif dipilih lewat persona switcher.
- * Hanya ID yang disimpan; role selalu ditentukan backend.
+ * Sesi login Google. Hanya token sesi dari API yang disimpan; role selalu ditentukan backend.
  */
 interface SessionState {
-  actingUserId: string | null;
-  setActingUser: (id: string | null) => void;
+  token: string | null;
+  setToken: (token: string | null) => void;
 }
 
 export const useSession = create<SessionState>()(
-  persist((set) => ({ actingUserId: null, setActingUser: (id) => set({ actingUserId: id }) }), {
-    name: 'fundchain-session',
+  persist((set) => ({ token: null, setToken: (token) => set({ token }) }), {
+    name: 'fundchain-session-google',
   }),
 );

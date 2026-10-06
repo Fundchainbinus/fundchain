@@ -9,15 +9,13 @@ import { Reflector } from '@nestjs/core';
 import type { Role } from '@fundchain/shared';
 import type { Request } from 'express';
 import { AppError } from './app-error';
-import { env } from './env';
 import { PrismaService } from './prisma.service';
+import { verifySessionToken } from './session-token';
 
 /**
- * MODE DEMO TANPA LOGIN
- * ---------------------
- * Identitas diambil dari header `X-Acting-User: <userId>` yang dipilih lewat persona switcher di UI.
+ * Login Google (popup). Setelah login, API menerbitkan token sesi yang dikirim frontend
+ * lewat header `Authorization: Bearer <token>`.
  * Role SELALU dibaca dari database, tidak pernah dari request (BR-AUTH-002).
- * Untuk produksi, ganti resolveUser() dengan verifikasi session dari Microsoft SSO.
  */
 export interface CurrentUserPayload {
   id: string;
@@ -60,7 +58,7 @@ export class ActingUserGuard implements CanActivate {
     const roles = this.reflector.getAllAndOverride<Role[]>(ROLES, targets);
 
     if (isPublic && !roles) return true;
-    if (!req.user) throw new AppError('AUTH_UNAUTHENTICATED', 'Pilih pengguna terlebih dahulu.');
+    if (!req.user) throw new AppError('AUTH_UNAUTHENTICATED', 'Silakan login dengan Google terlebih dahulu.');
     if (roles?.length && !roles.includes(req.user.role)) {
       throw new AppError('AUTH_FORBIDDEN', 'Anda tidak memiliki akses ke fitur ini.');
     }
@@ -68,10 +66,11 @@ export class ActingUserGuard implements CanActivate {
   }
 
   private async resolveUser(req: Request): Promise<CurrentUserPayload | undefined> {
-    if (!env().demoMode) return undefined;
-    const header = req.header('x-acting-user');
-    if (!header || header.length > 64) return undefined;
-    const user = await this.prisma.user.findUnique({ where: { id: header } });
+    const match = /^Bearer (.+)$/.exec(req.header('authorization') ?? '');
+    if (!match || match[1].length > 512) return undefined;
+    const userId = verifySessionToken(match[1]);
+    if (!userId) return undefined;
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) return undefined;
     return {
       id: user.id,

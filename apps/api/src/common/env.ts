@@ -18,7 +18,12 @@ export function env() {
     port: int(e.PORT, 3000),
     webUrl: e.WEB_URL || 'http://localhost:5173',
     isProduction: e.NODE_ENV === 'production',
-    demoMode: bool(e.DEMO_MODE, true),
+    googleClientId: e.GOOGLE_CLIENT_ID || '',
+    /** Email (dipisah koma) yang otomatis menjadi ADMIN saat login Google. */
+    adminEmails: (e.ADMIN_EMAILS || '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
     devTools: bool(e.ENABLE_DEV_TOOLS, true),
     paymentProvider: (e.PAYMENT_PROVIDER || 'mock') as 'mock' | 'pakasir',
     mockWebhookSecret: e.MOCK_WEBHOOK_SECRET || 'dev-mock-webhook-secret',

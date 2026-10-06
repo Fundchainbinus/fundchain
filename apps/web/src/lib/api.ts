@@ -15,8 +15,8 @@ export class ApiError extends Error {
 export const api = axios.create({ baseURL: '/api/v1' });
 
 api.interceptors.request.use((config) => {
-  const id = useSession.getState().actingUserId;
-  if (id) config.headers.set('X-Acting-User', id);
+  const token = useSession.getState().token;
+  if (token) config.headers.set('Authorization', `Bearer ${token}`);
   return config;
 });
 
@@ -43,14 +43,14 @@ export const patch = <T,>(url: string, body?: unknown) => api.patch(url, body) a
 
 /**
  * Buka file (proposal, bukti pencairan) di tab baru DENGAN header identitas.
- * Link biasa tidak membawa X-Acting-User, sehingga file campaign yang belum publik ditolak.
+ * Link biasa tidak membawa header Authorization, sehingga file campaign yang belum publik ditolak.
  * Tab dibuka lebih dulu secara sinkron agar tidak diblokir popup blocker.
  */
 export async function openProtectedFile(url: string) {
   const tab = window.open('', '_blank');
   try {
-    const id = useSession.getState().actingUserId;
-    const res = await fetch(`/api/v1${url}`, { headers: id ? { 'X-Acting-User': id } : {} });
+    const token = useSession.getState().token;
+    const res = await fetch(`/api/v1${url}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       throw new ApiError(body?.error?.code ?? 'NOT_FOUND', body?.error?.message ?? 'File tidak dapat dibuka.', res.status);

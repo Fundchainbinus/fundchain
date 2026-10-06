@@ -13,7 +13,7 @@ export function configureApp(app: INestApplication) {
   app.enableCors({
     origin: cfg.webUrl.split(','),
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Idempotency-Key', 'X-Acting-User'],
+    allowedHeaders: ['Content-Type', 'Idempotency-Key', 'Authorization'],
   });
   app.useGlobalPipes(
     new ValidationPipe({

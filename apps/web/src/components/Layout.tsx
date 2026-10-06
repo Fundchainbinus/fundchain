@@ -1,35 +1,114 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Blocks, LayoutDashboard, Menu, UserRound, X } from 'lucide-react';
+import { Blocks, LogIn, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useChainInfo, useMe, useUsers } from '../lib/hooks';
+import { errorMessage, post } from '../lib/api';
+import { requestGoogleAccessToken } from '../lib/google';
+import { useChainInfo, useConfig, useMe } from '../lib/hooks';
 import { useSession } from '../lib/session';
 
-function PersonaSwitcher() {
-  const users = useUsers();
-  const { actingUserId, setActingUser } = useSession();
+function GoogleAuthButton() {
+  const { me } = useMe();
+  const config = useConfig();
+  const setToken = useSession((s) => s.setToken);
   const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const login = async () => {
+    const clientId = config.data?.googleClientId;
+    if (!clientId) return setError('Login Google belum dikonfigurasi.');
+    setBusy(true);
+    setError(null);
+    try {
+      const accessToken = await requestGoogleAccessToken(clientId);
+      const res = await post<{ token: string }>('/auth/google', { accessToken });
+      setToken(res.token);
+      setOpen(false);
+      void qc.invalidateQueries();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const logout = () => {
+    setToken(null);
+    qc.clear();
+  };
+
+  if (me) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-white">
+        <span className="max-w-[160px] truncate" title={me.email}>
+          {me.name}
+        </span>
+        <button
+          onClick={logout}
+          className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm hover:bg-white/20"
+        >
+          <LogOut size={14} aria-hidden /> Keluar
+        </button>
+      </div>
+    );
+  }
+  const close = () => {
+    setOpen(false);
+    setError(null);
+  };
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <UserRound size={16} className="text-white/80" aria-hidden />
-      <span className="sr-only">Pilih pengguna</span>
-      <select
-        className="max-w-[210px] rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white outline-none focus:ring-2 focus:ring-white/40 [&>option]:text-slate-900"
-        value={actingUserId ?? ''}
-        onChange={(e) => {
-          setActingUser(e.target.value || null);
-          void qc.invalidateQueries();
-        }}
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100"
       >
-        <option value="">Pengunjung (publik)</option>
-        {users.data?.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.role === 'ADMIN' ? '🛡️ ' : '🎓 '}
-            {u.name}
-          </option>
-        ))}
-      </select>
-    </label>
+        <LogIn size={14} aria-hidden /> Login
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={close}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Login"
+        >
+          <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <button onClick={close} className="absolute right-3 top-3 text-slate-400 hover:text-slate-600" aria-label="Tutup">
+              <X size={18} />
+            </button>
+            <Blocks size={32} className="mx-auto text-accent" aria-hidden />
+            <h2 className="mt-3 text-xl font-bold text-slate-900">Masuk ke FundChain</h2>
+            <p className="mt-1 text-sm text-slate-500">Gunakan akun Google Anda untuk melanjutkan.</p>
+            <button
+              onClick={login}
+              disabled={busy}
+              className="mt-6 flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <GoogleLogo />
+              {busy ? 'Menunggu popup Google…' : 'Login dengan Google'}
+            </button>
+            {error && (
+              <p className="mt-3 text-xs text-red-600" role="alert">
+                {error}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function GoogleLogo() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
   );
 }
 
@@ -77,7 +156,7 @@ export function Layout() {
           </nav>
           <div className="ml-auto flex items-center gap-4">
             <ChainIndicator />
-            <div className="hidden sm:block"><PersonaSwitcher /></div>
+            <div className="hidden sm:block"><GoogleAuthButton /></div>
             <button className="text-white md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
               {open ? <X /> : <Menu />}
             </button>
@@ -92,20 +171,10 @@ export function Layout() {
                 </NavLink>
               ))}
             </nav>
-            <div className="mt-3 sm:hidden" onClick={(e) => e.stopPropagation()}><PersonaSwitcher /></div>
+            <div className="mt-3 sm:hidden" onClick={(e) => e.stopPropagation()}><GoogleAuthButton /></div>
           </div>
         )}
       </header>
-
-      <div className="border-b border-amber-200 bg-amber-50 text-xs text-amber-900">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-1.5">
-          <LayoutDashboard size={14} aria-hidden />
-          <span>
-            <b>Mode demo tanpa login</b> — pilih peran di pojok kanan atas.
-            {me ? <> Sedang aktif sebagai <b>{me.name}</b> ({me.role === 'ADMIN' ? 'Admin' : 'Mahasiswa'}).</> : ' Saat ini sebagai pengunjung publik.'}
-          </span>
-        </div>
-      </div>
 
       <main key={location.pathname} className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <Outlet />
@@ -128,11 +197,11 @@ export function RequireUser({ admin, children }: { admin?: boolean; children: Re
   if (!me || (admin && !isAdmin)) {
     return (
       <div className="card mx-auto max-w-lg p-8 text-center">
-        <h1 className="text-xl font-bold">{admin ? 'Khusus Admin BINUS' : 'Pilih pengguna dulu'}</h1>
+        <h1 className="text-xl font-bold">{me && admin ? 'Khusus Admin' : 'Login dulu'}</h1>
         <p className="mt-2 text-sm text-slate-600">
-          {admin
-            ? 'Halaman ini hanya untuk admin. Ganti peran ke "Admin BINUS" lewat pemilih di pojok kanan atas.'
-            : 'Aplikasi berjalan dalam mode demo tanpa login. Pilih salah satu mahasiswa atau admin di pojok kanan atas.'}
+          {me && admin
+            ? 'Halaman ini hanya untuk admin. Akun Google Anda tidak memiliki akses admin.'
+            : 'Silakan klik "Login dengan Google" di pojok kanan atas untuk melanjutkan.'}
         </p>
       </div>
     );
