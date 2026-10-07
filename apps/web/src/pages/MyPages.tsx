@@ -214,46 +214,47 @@ export function MyCampaignsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start justify-between gap-3">
         <PageHeader title="Ruang Mahasiswa" subtitle={`${me?.name ?? "Mahasiswa"} · kelola kampanye, proposal, dan penggunaan dana Anda.`} />
         <span className="badge bg-[#FFF5E7] text-[#8A5A1E]">Student</span>
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <section className="min-w-0 space-y-3">
-          <h2 className="section-title">Kampanye Saya</h2>
-          {campaignsQ.isLoading ? (
-            <Spinner />
-          ) : campaignsQ.error ? (
-            <ErrorBox error={campaignsQ.error} />
-          ) : campaigns.length === 0 ? (
-            <EmptyState title="Belum punya kampanye">Isi form di sebelah untuk mulai menggalang dana.</EmptyState>
-          ) : (
-            <MyCampaignsCard campaigns={campaigns} onEdit={edit} />
-          )}
-        </section>
-        <section id="form-kampanye" className="min-w-0 scroll-mt-28 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="section-title">Buat / Edit Kampanye</h2>
-            {editingId && (
-              <button className="btn-secondary btn-sm" onClick={() => setEditingId(undefined)}>
-                <Plus size={12} /> Kampanye baru
-              </button>
+      {/* Dua kolom independen: tinggi form di kanan tidak membuat celah kosong di kolom kiri. */}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
+          <section className="space-y-3">
+            <h2 className="section-title">Kampanye Saya</h2>
+            {campaignsQ.isLoading ? (
+              <Spinner />
+            ) : campaignsQ.error ? (
+              <ErrorBox error={campaignsQ.error} />
+            ) : campaigns.length === 0 ? (
+              <EmptyState title="Belum punya kampanye">Isi form Buat / Edit Kampanye untuk mulai menggalang dana.</EmptyState>
+            ) : (
+              <MyCampaignsCard campaigns={campaigns} onEdit={edit} />
             )}
-          </div>
-          <CampaignFormCard key={editingId ?? "new"} id={editingId} onCreated={setEditingId} />
-        </section>
-
-        <section className="min-w-0">
+          </section>
           <Panel title="Donasi Saya">
             {donationsQ.isLoading ? <Spinner /> : donationsQ.error ? <ErrorBox error={donationsQ.error} /> : <MyDonationsCard donations={donationsQ.data ?? []} />}
           </Panel>
-        </section>
-        <section className="min-w-0">
+        </div>
+
+        <div className="min-w-0 space-y-6">
+          <section id="form-kampanye" className="scroll-mt-28 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="section-title">Buat / Edit Kampanye</h2>
+              {editingId && (
+                <button className="btn-secondary btn-sm" onClick={() => setEditingId(undefined)}>
+                  <Plus size={12} /> Kampanye baru
+                </button>
+              )}
+            </div>
+            <CampaignFormCard key={editingId ?? "new"} id={editingId} onCreated={setEditingId} />
+          </section>
           <Panel title="Ajukan Pencairan Dana">
             {campaignsQ.isLoading ? <Spinner /> : <DisburseFormCard campaigns={fundable} />}
           </Panel>
-        </section>
+        </div>
       </div>
 
       {fundable.length > 0 && (

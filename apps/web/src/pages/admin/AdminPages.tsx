@@ -1,9 +1,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, ExternalLink, FileText, Glasses, LayoutDashboard, RefreshCw, ShieldCheck, Terminal } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, FileText, RefreshCw, ShieldCheck, Terminal } from 'lucide-react';
 import { useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { FileButton } from '../../components/FileButton';
-import { RoleCard } from '../../components/RoleCard';
 import {
   CampaignBadge,
   ChainBadge,
@@ -20,48 +19,18 @@ import {
 } from '../../components/ui';
 import { errorMessage, get, openProtectedFile, post } from '../../lib/api';
 import { date, dateTime, fileSize, rupiah, sdg, shortHash } from '../../lib/format';
-import { useMe } from '../../lib/hooks';
 import type { AdminDisbursement, AuditLog, CampaignDetail, CampaignSummary, ChainInfo, VerifyResult } from '../../lib/types';
 
 const count = <T,>(rows: T[], pred: (r: T) => boolean) => rows.filter(pred).length;
 
+/** Kolom konten admin; sidebar biru dirender oleh Layout (dibuka/tutup lewat ikon grid). */
 export function AdminLayout() {
-  const { me } = useMe();
-  const menu = [
-    { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
-    { to: '/admin/reviews', label: 'Review Campaign', icon: Glasses },
-    { to: '/admin/integrity', label: 'Integritas', icon: Glasses },
-    { to: '/admin/disbursements', label: 'Pencairan', icon: Glasses },
-    { to: '/admin/audit', label: 'Audit Log', icon: Glasses },
-  ];
   return (
-    <div className="flex flex-1 flex-col md:flex-row">
-      <aside className="shrink-0 bg-navy text-white md:w-[232px]">
-        {/* CHANGE berpindah ke tampilan mahasiswa/pengunjung. */}
-        <RoleCard role="Admin" name={me?.name} changeTo="/" className="m-3 hidden md:flex" />
-        <nav className="flex gap-1 overflow-x-auto p-2 md:flex-col md:gap-0 md:p-0 md:pt-1" aria-label="Menu admin">
-          {menu.map((m) => (
-            <NavLink
-              key={m.to}
-              to={m.to}
-              end={m.end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 whitespace-nowrap rounded-l-full px-4 py-2.5 text-[17px] font-bold transition md:ml-0.5 ${
-                  isActive ? 'bg-navy-deep text-white' : 'text-white hover:bg-white/10'
-                }`
-              }
-            >
-              <m.icon size={20} aria-hidden fill={m.icon === LayoutDashboard ? 'currentColor' : 'none'} /> {m.label}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col bg-white">
-        <div className="flex-1 px-4 py-6">
-          <Outlet />
-        </div>
-        <footer className="bg-footer px-4 py-5 text-[13px] text-white">Copyright © BINUS University. All rights reserved.</footer>
+    <div className="flex min-w-0 flex-1 flex-col bg-white">
+      <div className="flex-1 px-4 py-6">
+        <Outlet />
       </div>
+      <footer className="bg-footer px-4 py-5 text-[13px] text-white">Copyright © BINUS University. All rights reserved.</footer>
     </div>
   );
 }

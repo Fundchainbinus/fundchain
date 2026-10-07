@@ -1,10 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Blocks, LogIn, LogOut, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { Bell, Blocks, LogIn, LogOut, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { errorMessage, post } from '../lib/api';
 import { requestGoogleAccessToken } from '../lib/google';
 import { useConfig, useMe } from '../lib/hooks';
+import { AppSidebar } from './AppSidebar';
 import { RoleCard } from './RoleCard';
 import { useSession } from '../lib/session';
 
@@ -215,11 +216,16 @@ function StudentBanner() {
   );
 }
 
+const isDesktop = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
+
 export function Layout() {
   const { me, isAdmin } = useMe();
-  const [open, setOpen] = useState(false);
   const location = useLocation();
   const inAdmin = location.pathname.startsWith('/admin');
+  // Admin di desktop: sidebar menempel di kiri (Frame-1). Selain itu: laci yang muncul saat ikon grid diklik.
+  const [sidebarOpen, setSidebarOpen] = useState(() => inAdmin && isDesktop());
+  const docked = inAdmin && isDesktop();
+  useEffect(() => setSidebarOpen(inAdmin && isDesktop()), [inAdmin]);
 
   const links = [
     { to: '/', label: 'FundChain', end: true },
@@ -231,62 +237,74 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 border-b border-line bg-white">
+      <header className="sticky top-0 z-50 border-b border-line bg-white">
         <div className="flex h-[54px] items-center gap-4 px-4">
-          <DotsGrid />
-          <Link to="/" className="flex items-center gap-4" aria-label="FundChain beranda">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen((o) => !o)}
+            aria-label={sidebarOpen ? 'Tutup menu' : 'Buka menu'}
+            aria-expanded={sidebarOpen}
+            aria-controls="app-sidebar"
+            className="-m-2 rounded p-2 hover:bg-slate-100"
+          >
+            <DotsGrid />
+          </button>
+          <Link to="/" className="flex min-w-0 items-center gap-4" aria-label="FundChain beranda">
             <BinusmayaLogo />
-            <span className="h-6 w-px bg-line" aria-hidden />
-            <span className="text-sm uppercase text-ink">{inAdmin ? 'FundChain' : 'My Dashboard'}</span>
+            <span className="hidden h-6 w-px bg-line sm:block" aria-hidden />
+            <span className="hidden text-sm uppercase text-ink sm:inline">{inAdmin ? 'FundChain' : 'My Dashboard'}</span>
           </Link>
           <div className="ml-auto flex items-center gap-4">
             <LanguageToggle />
             <Bell size={20} className="hidden text-slate-400 sm:block" aria-hidden />
-            <div className="hidden sm:block"><GoogleAuthButton /></div>
-            <button className="text-ink md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
-              {open ? <X /> : <Menu />}
-            </button>
+            <GoogleAuthButton />
           </div>
         </div>
-        {open && (
-          <div className="border-t border-line px-4 pb-4 md:hidden" onClick={() => setOpen(false)}>
-            <nav className="flex flex-col pt-2">
-              {links.map((l) => (
-                <NavLink key={l.to} to={l.to} end={l.end} className={navClass}>
-                  {l.label}
-                </NavLink>
-              ))}
-            </nav>
-            <div className="mt-3 sm:hidden" onClick={(e) => e.stopPropagation()}><GoogleAuthButton /></div>
-          </div>
-        )}
       </header>
 
-      {!inAdmin && (
-        <>
-          <StudentBanner />
-          <nav className="no-scrollbar flex justify-center overflow-x-auto overflow-y-hidden border-b border-line bg-white" aria-label="Navigasi utama">
-            {links.map((l) => (
-              <NavLink key={l.to} to={l.to} end={l.end} className={navClass}>
-                {l.label}
-              </NavLink>
-            ))}
-          </nav>
-        </>
-      )}
-      <main key={location.pathname} className={inAdmin ? 'flex flex-1 flex-col' : 'w-full flex-1 bg-[#F5F5F5] px-4 pb-12 pt-6'}>
-        <Outlet />
-      </main>
+      <div className="flex flex-1">
+        {sidebarOpen && (
+          <>
+            {!docked && (
+              <div className="fixed inset-0 top-[55px] z-30 bg-black/40" onClick={() => setSidebarOpen(false)} aria-hidden />
+            )}
+            <aside
+              id="app-sidebar"
+              className={`w-[232px] shrink-0 bg-navy ${docked ? '' : 'fixed bottom-0 left-0 top-[55px] z-40 overflow-y-auto shadow-xl'}`}
+            >
+              <AppSidebar inAdmin={inAdmin} onNavigate={docked ? undefined : () => setSidebarOpen(false)} />
+            </aside>
+          </>
+        )}
 
-      {/* Admin punya footer gelap sendiri di kolom konten (lihat AdminLayout). */}
-      {!inAdmin && (
-        <footer className="border-t border-line bg-white">
-          <div className="flex justify-between px-4 py-4 text-[13px] text-ink">
-            <span>© {new Date().getFullYear()} BINUS Higher Education</span>
-            <span>BINUSMAYA</span>
-          </div>
-        </footer>
-      )}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {!inAdmin && (
+            <>
+              <StudentBanner />
+              <nav className="no-scrollbar flex justify-center overflow-x-auto overflow-y-hidden border-b border-line bg-white" aria-label="Navigasi utama">
+                {links.map((l) => (
+                  <NavLink key={l.to} to={l.to} end={l.end} className={navClass}>
+                    {l.label}
+                  </NavLink>
+                ))}
+              </nav>
+            </>
+          )}
+          <main key={location.pathname} className={inAdmin ? 'flex flex-1 flex-col' : 'w-full flex-1 bg-[#F5F5F5] px-4 pb-12 pt-6'}>
+            <Outlet />
+          </main>
+
+          {/* Admin punya footer gelap sendiri di kolom konten (lihat AdminLayout). */}
+          {!inAdmin && (
+            <footer className="border-t border-line bg-white">
+              <div className="flex justify-between gap-4 px-4 py-4 text-[13px] text-ink">
+                <span>© {new Date().getFullYear()} BINUS Higher Education</span>
+                <span>BINUSMAYA</span>
+              </div>
+            </footer>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
