@@ -61,8 +61,6 @@ export const LIMITS = {
   TITLE_MIN: 5,
   TITLE_MAX: 200,
   DESCRIPTION_MIN: 20,
-  /** Deadline campaign minimal H+2 (dihitung per tanggal kalender). */
-  DEADLINE_MIN_DAYS: 2,
   REASON_MIN: 10,
   // 4MB: di bawah batas body request Vercel Functions (4,5MB).
   FILE_MAX_BYTES: 4 * 1024 * 1024,

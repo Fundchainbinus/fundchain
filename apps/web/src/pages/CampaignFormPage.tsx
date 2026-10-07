@@ -19,17 +19,11 @@ const schema = z.object({
     .int('Target harus bilangan bulat')
     .min(LIMITS.DONATION_MIN, 'Target minimal Rp10.000')
     .max(LIMITS.TARGET_MAX, 'Target maksimal Rp1.000.000.000'),
-  deadline: z.string().min(1, 'Deadline wajib diisi'),
+  deadline: z.string().refine((v) => v && new Date(v).getTime() > (Date.now() + 1 * 86_400_000), 'Deadline minimal 2 hari dari hari ini'),
 });
 type Form = z.infer<typeof schema>;
 
 const toDateInput = (iso: string) => iso.slice(0, 10);
-/** Tanggal lokal (YYYY-MM-DD) paling awal yang boleh dipilih sebagai deadline. */
-const minDeadline = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + LIMITS.DEADLINE_MIN_DAYS);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 const defaultDeadline = () => toDateInput(new Date(Date.now() + 30 * 86_400_000).toISOString());
 
 export function CampaignFormPage() {
@@ -94,12 +88,6 @@ export function CampaignFormPage() {
       setErrors(Object.fromEntries(parsed.error.issues.map((i) => [i.path[0], i.message])));
       return;
     }
-    // Deadline yang tidak diubah saat edit tetap boleh disimpan walau sudah < H+2.
-    const unchanged = c && form.deadline === toDateInput(c.deadline);
-    if (!unchanged && form.deadline < minDeadline()) {
-      setErrors({ deadline: `Deadline minimal ${LIMITS.DEADLINE_MIN_DAYS} hari dari hari ini` });
-      return;
-    }
     setErrors({});
     save.mutate(parsed.data);
   };
@@ -141,7 +129,7 @@ export function CampaignFormPage() {
             </div>
             <div>
               <label className="label" htmlFor="deadline">Deadline</label>
-              <input id="deadline" type="date" className="input" min={minDeadline()} value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
+              <input id="deadline" type="date" className="input" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
               {errors.deadline && <p className="mt-1 text-xs text-red-600">{errors.deadline}</p>}
             </div>
           </div>

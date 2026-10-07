@@ -15,9 +15,9 @@ export function CampaignCard({ c, to }: { c: CampaignSummary; to?: string }) {
         <SdgTag code={c.sdgCategory} />
         {c.status !== 'ACTIVE' && <CampaignBadge status={c.status} />}
       </div>
-      <h3 className="mt-3 line-clamp-2 text-base font-semibold group-hover:text-navy [overflow-wrap:anywhere]">{c.title}</h3>
-      <p className="mt-1 text-xs text-slate-500 [overflow-wrap:anywhere]">oleh {c.creator.name}</p>
-      <p className="mt-3 line-clamp-2 text-sm text-slate-600 [overflow-wrap:anywhere]">{c.description}</p>
+      <h3 className="mt-3 line-clamp-2 text-base font-semibold group-hover:text-navy break-all">{c.title}</h3>
+      <p className="mt-1 text-xs text-slate-500 break-all">oleh {c.creator.name}</p>
+      <p className="mt-3 line-clamp-2 text-sm text-slate-600 break-all">{c.description}</p>
       <div className="mt-auto pt-5">
         {c.status === 'FROZEN' && (
           <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-red-700">

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CAMPAIGN_STATUSES, LIMITS, PUBLIC_CAMPAIGN_STATUSES, type CampaignStatus } from '@fundchain/shared';
+import { CAMPAIGN_STATUSES, PUBLIC_CAMPAIGN_STATUSES, type CampaignStatus } from '@fundchain/shared';
 import { Prisma } from '@prisma/client';
 import { AppError } from '../../common/app-error';
 import type { CurrentUserPayload } from '../../common/auth';
@@ -130,7 +130,7 @@ export class CampaignsService {
   }
 
   async create(dto: CreateCampaignDto, user: CurrentUserPayload, ip: string | null) {
-    this.assertMinDeadline(dto.deadline);
+    this.assertFutureDeadline(dto.deadline);
     const campaign = await this.prisma.campaign.create({
       data: {
         creatorId: user.id,
@@ -158,11 +158,7 @@ export class CampaignsService {
     if (!EDITABLE_STATUSES.includes(campaign.status as CampaignStatus)) {
       throw new AppError('CAMPAIGN_INVALID_STATUS', 'Campaign hanya bisa diedit saat DRAFT atau REJECTED.');
     }
-    if (dto.deadline) {
-      // Deadline yang tidak diubah cukup masih di masa depan; deadline baru wajib >= H+2.
-      if (new Date(dto.deadline).getTime() === campaign.deadline.getTime()) this.assertFutureDeadline(dto.deadline);
-      else this.assertMinDeadline(dto.deadline);
-    }
+    if (dto.deadline) this.assertFutureDeadline(dto.deadline);
     const updated = await this.prisma.campaign.update({
       where: { id },
       data: { ...dto, deadline: dto.deadline ? new Date(dto.deadline) : undefined },
@@ -391,14 +387,6 @@ export class CampaignsService {
   private assertFutureDeadline(deadline: string) {
     if (new Date(deadline).getTime() <= Date.now()) {
       throw new AppError('CAMPAIGN_DEADLINE_PASSED', 'Deadline harus di masa depan.');
-    }
-  }
-
-  /** Frontend mengirim akhir hari (23:59:59) dari tanggal H+2, jadi selalu > 2x24 jam dari sekarang. */
-  private assertMinDeadline(deadline: string) {
-    this.assertFutureDeadline(deadline);
-    if (new Date(deadline).getTime() <= Date.now() + LIMITS.DEADLINE_MIN_DAYS * 86_400_000) {
-      throw new AppError('CAMPAIGN_DEADLINE_TOO_SOON', `Deadline minimal ${LIMITS.DEADLINE_MIN_DAYS} hari dari hari ini.`);
     }
   }
 }
