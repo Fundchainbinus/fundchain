@@ -23,5 +23,10 @@ apps/api/prisma/*.db
 apps/api/prisma/*.db-journal
 apps/api/uploads/
 # (folder lama; upload kini hanya di database)
-.claude/launch.json
+.claude/
+claude/
+CLAUDE.md
+CLAUDE.local.md
 graphify-out/
+# Ekspor frame Figma (sumber); aset yang dipakai web ada di apps/web/public/figma/
+FundChain figma/

@@ -1,79 +1,113 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, FileSearch, RefreshCw, ShieldCheck, Terminal } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, FileText, Glasses, LayoutDashboard, RefreshCw, ShieldCheck, Terminal } from 'lucide-react';
 import { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
+import { FileButton } from '../../components/FileButton';
+import { RoleCard } from '../../components/RoleCard';
 import {
   CampaignBadge,
   ChainBadge,
   DisbursementBadge,
   EmptyState,
   ErrorBox,
-  ExplorerLink,
-  HashText,
+  FilterTabs,
+  InfoNote,
   IntegrityBadge,
   PageHeader,
-  ReasonDialog,
   Spinner,
   Stat,
   SuccessBox,
 } from '../../components/ui';
 import { errorMessage, get, openProtectedFile, post } from '../../lib/api';
-import { date, dateTime, rupiah } from '../../lib/format';
-import { useChainInfo } from '../../lib/hooks';
-import type { AdminDisbursement, AuditLog, CampaignSummary, ChainInfo, VerifyResult } from '../../lib/types';
+import { date, dateTime, fileSize, rupiah, sdg, shortHash } from '../../lib/format';
+import { useMe } from '../../lib/hooks';
+import type { AdminDisbursement, AuditLog, CampaignDetail, CampaignSummary, ChainInfo, VerifyResult } from '../../lib/types';
+
+const count = <T,>(rows: T[], pred: (r: T) => boolean) => rows.filter(pred).length;
 
 export function AdminLayout() {
-  const tabs = [
-    { to: '/admin', label: 'Ringkasan', end: true },
-    { to: '/admin/reviews', label: 'Review campaign' },
-    { to: '/admin/integrity', label: 'Integritas' },
-    { to: '/admin/disbursements', label: 'Pencairan' },
-    { to: '/admin/audit', label: 'Audit log' },
+  const { me } = useMe();
+  const menu = [
+    { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+    { to: '/admin/reviews', label: 'Review Campaign', icon: Glasses },
+    { to: '/admin/integrity', label: 'Integritas', icon: Glasses },
+    { to: '/admin/disbursements', label: 'Pencairan', icon: Glasses },
+    { to: '/admin/audit', label: 'Audit Log', icon: Glasses },
   ];
   return (
-    <div>
-      <nav className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200" aria-label="Menu admin">
-        {tabs.map((t) => (
-          <NavLink
-            key={t.to}
-            to={t.to}
-            end={t.end}
-            className={({ isActive }) =>
-              `whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium ${isActive ? 'border-navy text-navy' : 'border-transparent text-slate-500 hover:text-slate-800'}`
-            }
-          >
-            {t.label}
-          </NavLink>
-        ))}
-      </nav>
-      <Outlet />
+    <div className="flex flex-1 flex-col md:flex-row">
+      <aside className="shrink-0 bg-navy text-white md:w-[232px]">
+        {/* CHANGE berpindah ke tampilan mahasiswa/pengunjung. */}
+        <RoleCard role="Admin" name={me?.name} changeTo="/" className="m-3 hidden md:flex" />
+        <nav className="flex gap-1 overflow-x-auto p-2 md:flex-col md:gap-0 md:p-0 md:pt-1" aria-label="Menu admin">
+          {menu.map((m) => (
+            <NavLink
+              key={m.to}
+              to={m.to}
+              end={m.end}
+              className={({ isActive }) =>
+                `flex items-center gap-3 whitespace-nowrap rounded-l-full px-4 py-2.5 text-[17px] font-bold transition md:ml-0.5 ${
+                  isActive ? 'bg-navy-deep text-white' : 'text-white hover:bg-white/10'
+                }`
+              }
+            >
+              <m.icon size={20} aria-hidden fill={m.icon === LayoutDashboard ? 'currentColor' : 'none'} /> {m.label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col bg-white">
+        <div className="flex-1 px-4 py-6">
+          <Outlet />
+        </div>
+        <footer className="bg-footer px-4 py-5 text-[13px] text-white">Copyright © BINUS University. All rights reserved.</footer>
+      </div>
     </div>
   );
 }
 
-function ChainCard({ chain }: { chain?: ChainInfo }) {
+function ChainCard({ chain, onRefresh, refreshing }: { chain?: ChainInfo; onRefresh?: () => void; refreshing?: boolean }) {
   if (!chain) return null;
   return (
-    <div className={`card p-5 ${chain.ready ? '' : 'border-red-200 bg-red-50'}`}>
-      <h2 className="flex items-center gap-2 font-semibold">
-        <span className={`h-2.5 w-2.5 rounded-full ${chain.ready ? 'bg-emerald-500' : 'bg-red-500'}`} /> Blockchain
-      </h2>
-      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-        <div><dt className="text-xs text-slate-500">Jaringan</dt><dd>{chain.network} (chain ID {chain.chainId})</dd></div>
+    <div className={chain.ready ? '' : 'rounded-lg border border-red-200 bg-red-50 p-4'}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xl text-ink">{chain.network}</p>
+        <span className={`badge ${chain.ready ? 'bg-emerald-50 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+          {chain.ready ? 'Connected' : 'Offline'}
+        </span>
+      </div>
+      <p className="mt-3 text-xs text-ink">Chain ID: {chain.chainId} · DonationRegistry</p>
+      <div className="mt-3 grid gap-3">
         <div>
-          <dt className="text-xs text-slate-500">Contract DonationRegistry</dt>
-          <dd>{chain.explorerUrl ? <a className="mono text-navy hover:underline" href={chain.explorerUrl} target="_blank" rel="noreferrer">{chain.contractAddress}</a> : <HashText value={chain.contractAddress} />}</dd>
+          <p className="label">Contract address</p>
+          <code className="hash-box">{chain.contractAddress ?? '—'}</code>
         </div>
-        <div><dt className="text-xs text-slate-500">Relayer wallet</dt><dd><HashText value={chain.relayer?.address} label="alamat relayer" /></dd></div>
         <div>
-          <dt className="text-xs text-slate-500">Saldo relayer</dt>
-          <dd className={chain.relayer?.lowBalance ? 'font-semibold text-red-700' : ''}>
-            {chain.relayer?.balance ? `${Number(chain.relayer.balance).toFixed(4)} ETH` : '—'}
-            {chain.relayer?.lowBalance && ' (rendah! isi dari faucet)'}
-          </dd>
+          <p className="label">Relayer address</p>
+          <code className="hash-box">{chain.relayer?.address ?? '—'}</code>
         </div>
-      </dl>
-      {!chain.ready && <p className="mt-3 text-sm text-red-700">{chain.reason}. Notarisasi ditunda dan akan dilanjutkan otomatis.</p>}
+        <div>
+          <p className="text-[11px] font-semibold text-slate-600">Saldo relayer</p>
+          <p className={`mt-2 text-[22px] ${chain.relayer?.lowBalance ? 'text-red-700' : 'text-ink'}`}>
+            {chain.relayer?.balance ? `${Number(chain.relayer.balance).toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ETH` : '—'}
+            {chain.relayer?.lowBalance && <span className="ml-2 text-xs font-medium">rendah, isi dari faucet</span>}
+          </p>
+        </div>
+      </div>
+      {!chain.ready && <p className="mt-3 text-sm text-red-700">{chain.reason}. Notarisasi ditunda dan dilanjutkan otomatis.</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {onRefresh && (
+          <button className="btn-secondary btn-sm" onClick={onRefresh} disabled={refreshing}>
+            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} /> Refresh
+          </button>
+        )}
+        {chain.explorerUrl && (
+          <a className="btn-secondary btn-sm" href={chain.explorerUrl} target="_blank" rel="noreferrer">
+            Buka contract <ExternalLink size={12} />
+          </a>
+        )}
+      </div>
+      <p className="mt-3 text-[11px] font-semibold text-slate-600">Relayer membayar gas untuk mencatat hash. Dana donasi tidak disimpan di DonationRegistry.</p>
     </div>
   );
 }
@@ -93,61 +127,209 @@ export function AdminDashboardPage() {
   if (stats.isLoading) return <Spinner />;
   if (stats.error) return <ErrorBox error={stats.error} />;
   const s = stats.data!;
-  const pendingChain = (s.blockchain.QUEUED ?? 0) + (s.blockchain.SUBMITTED ?? 0) + (s.blockchain.RETRYING ?? 0);
+  const n = (r: Record<string, number>, k: string) => r[k] ?? 0;
+  const pendingChain = n(s.blockchain, 'QUEUED') + n(s.blockchain, 'SUBMITTED') + n(s.blockchain, 'RETRYING');
+  const req = s.disbursements.REQUESTED;
+  const appr = s.disbursements.APPROVED;
+  const paidDonations = n(s.integrity, 'VERIFIED') + n(s.integrity, 'TAMPERED') + n(s.integrity, 'PENDING');
   return (
-    <div className="space-y-6">
-      <PageHeader title="Dashboard admin" subtitle="Ringkasan operasional FundChain." />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Menunggu review" value={s.campaigns.PENDING_REVIEW ?? 0} hint={<Link to="/admin/reviews" className="text-navy hover:underline">Buka antrean →</Link>} />
-        <Stat label="Total donasi lunas" value={rupiah(s.totalRaised)} hint={`${s.donations.PAID ?? 0} transaksi`} />
-        <Stat label="Notarisasi" value={`${s.blockchain.CONFIRMED ?? 0} on-chain`} hint={`${pendingChain} dalam proses · ${s.blockchain.FAILED ?? 0} gagal`} danger={(s.blockchain.FAILED ?? 0) > 0} />
+    <div className="space-y-5">
+      <h1 className="mb-5 text-[28px] font-normal text-ink">Administrasi FundChain</h1>
+      <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
-          label="Integritas"
-          value={s.integrity.TAMPERED ? `${s.integrity.TAMPERED} TAMPERED` : `${s.integrity.VERIFIED ?? 0} terverifikasi`}
-          hint={`${s.campaigns.FROZEN ?? 0} campaign dibekukan`}
-          danger={(s.integrity.TAMPERED ?? 0) > 0}
+          label="Review kampanye"
+          value={`${n(s.campaigns, 'PENDING_REVIEW')} menunggu`}
+          hint={<Link to="/admin/reviews" className="text-navy hover:underline">Buka antrean →</Link>}
+        />
+        <Stat
+          label="Pencairan"
+          value={rupiah((req?.amount ?? 0) + (appr?.amount ?? 0))}
+          hint={`${req?.count ?? 0} Requested · ${appr?.count ?? 0} Approved`}
+        />
+        <Stat
+          label="Integritas bermasalah"
+          value={`${n(s.integrity, 'TAMPERED')} Tampered`}
+          hint={`${n(s.campaigns, 'FROZEN')} campaign Frozen`}
+        />
+        <Stat
+          label="Notarisasi gagal"
+          value={`${n(s.blockchain, 'FAILED')} Failed`}
+          hint={n(s.blockchain, 'FAILED') ? 'perlu retry di halaman Integritas' : 'tidak ada'}
+        />
+        <Stat
+          label="Campaign aktif"
+          value={`${n(s.campaigns, 'ACTIVE')} aktif`}
+          hint={`${n(s.campaigns, 'COMPLETED')} Completed · ${n(s.campaigns, 'FROZEN')} Frozen`}
+        />
+        <Stat label="Dana terkumpul" value={rupiah(s.totalRaised)} hint={`Dari ${n(s.donations, 'PAID')} donasi`} />
+        <Stat
+          label="Integritas donasi"
+          value={`${n(s.integrity, 'VERIFIED')} / ${paidDonations} Verified`}
+          hint={`${n(s.integrity, 'TAMPERED')} Tampered · ${n(s.integrity, 'PENDING')} Pending`}
+        />
+        <Stat
+          label="Notarisasi"
+          value={`${n(s.blockchain, 'CONFIRMED')} On-Chain`}
+          hint={`${pendingChain} Dalam Progress · ${n(s.blockchain, 'FAILED')} Gagal`}
         />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Campaign aktif" value={s.campaigns.ACTIVE ?? 0} />
-        <Stat label="Pencairan diajukan" value={s.disbursements.REQUESTED?.count ?? 0} hint={rupiah(s.disbursements.REQUESTED?.amount)} />
-        <Stat label="Pencairan disetujui" value={s.disbursements.APPROVED?.count ?? 0} hint={rupiah(s.disbursements.APPROVED?.amount)} />
-        <Stat label="Sudah dicairkan" value={rupiah(s.disbursements.PAID?.amount)} />
+      <h2 className="pt-2 text-[28px] font-normal text-ink">Monitoring Blockchain</h2>
+      <ChainCard chain={s.chain} onRefresh={() => void stats.refetch()} refreshing={stats.isFetching} />
+    </div>
+  );
+}
+
+type ReviewTab = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FROZEN';
+const REVIEW_GROUPS: Record<ReviewTab, string[]> = {
+  PENDING: ['PENDING_REVIEW'],
+  APPROVED: ['ACTIVE', 'COMPLETED'],
+  REJECTED: ['REJECTED'],
+  FROZEN: ['FROZEN'],
+};
+
+/** Nama & ukuran proposal; detail kampanye di-cache sehingga dipakai ulang oleh panel review. */
+function ProposalCell({ id }: { id: string }) {
+  const detail = useQuery({ queryKey: ['campaign', id], queryFn: () => get<CampaignDetail>(`/campaigns/${id}`) });
+  const doc = detail.data?.documents[0];
+  if (detail.isLoading) return <span className="text-slate-400">…</span>;
+  if (!doc) return <span className="text-slate-400">Belum ada</span>;
+  return (
+    <>
+      <p className="[overflow-wrap:anywhere]">{doc.originalName}</p>
+      <p className="text-slate-500">{fileSize(doc.size)}</p>
+    </>
+  );
+}
+
+function ReviewPanel({ id }: { id: string }) {
+  const qc = useQueryClient();
+  const detail = useQuery({ queryKey: ['campaign', id], queryFn: () => get<CampaignDetail>(`/campaigns/${id}`) });
+  const [reason, setReason] = useState('');
+  const done = () => {
+    setReason('');
+    void qc.invalidateQueries();
+  };
+  const approve = useMutation({ mutationFn: () => post(`/admin/campaigns/${id}/approve`), onSuccess: done });
+  const reject = useMutation({ mutationFn: () => post(`/admin/campaigns/${id}/reject`, { reason: reason.trim() }), onSuccess: done });
+
+  if (detail.isLoading) return <Spinner />;
+  if (detail.error) return <ErrorBox error={detail.error} />;
+  const c = detail.data!;
+  const s = sdg(c.sdgCategory);
+  const pending = c.status === 'PENDING_REVIEW';
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-ink [overflow-wrap:anywhere]">Review · {c.title}</p>
+        {c.documents[0] && (
+          <FileButton linkPath={`/documents/${c.documents[0].id}/link`}>Periksa proposal PDF</FileButton>
+        )}
       </div>
-      <ChainCard chain={s.chain} />
+      <p className="text-xs text-slate-500">
+        {c.creator.name} · {s ? `SDG ${s.number} · ${s.label}` : c.sdgCategory} · target {rupiah(c.targetAmount)} · deadline {date(c.deadline)}
+      </p>
+      <p className="whitespace-pre-line text-xs text-ink [overflow-wrap:anywhere]">{c.description}</p>
+      {!c.documents.length && <InfoNote tone="amber">Proposal belum diunggah.</InfoNote>}
+      {pending ? (
+        <>
+          <div>
+            <label className="label" htmlFor="review-reason">Alasan penolakan *</label>
+            <input
+              id="review-reason"
+              className="input"
+              placeholder="Contoh: Rincian penerima bantuan belum dilampirkan."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-slate-500">Wajib diisi (min. 10 karakter) saat menolak; alasan terlihat oleh pembuat kampanye.</p>
+          </div>
+          <ErrorBox error={approve.error ?? reject.error} />
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-primary btn-sm" onClick={() => approve.mutate()} disabled={approve.isPending || reject.isPending}>
+              <CheckCircle2 size={14} /> Setujui kampanye
+            </button>
+            <button
+              className="btn-secondary btn-sm"
+              onClick={() => reject.mutate()}
+              disabled={reason.trim().length < 10 || approve.isPending || reject.isPending}
+            >
+              Tolak dengan alasan
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <CampaignBadge status={c.status} />
+          {c.rejectionReason && <span className="text-xs text-slate-600">Alasan: {c.rejectionReason}</span>}
+          {c.frozenReason && <span className="text-xs text-slate-600">Alasan: {c.frozenReason}</span>}
+          <Link to={`/campaigns/${c.id}`} className="btn-secondary btn-sm ml-auto">Buka halaman kampanye</Link>
+        </div>
+      )}
     </div>
   );
 }
 
 export function AdminReviewsPage() {
-  const [status, setStatus] = useState('PENDING_REVIEW');
-  const q = useQuery({ queryKey: ['admin', 'campaigns', status], queryFn: () => get<{ campaigns: CampaignSummary[] }>('/admin/campaigns', { status, limit: 100 }) });
-  const filters = [['PENDING_REVIEW', 'Menunggu review'], ['ACTIVE', 'Aktif'], ['REJECTED', 'Ditolak'], ['FROZEN', 'Dibekukan'], ['ALL', 'Semua']];
+  const [tab, setTab] = useState<ReviewTab>('PENDING');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const q = useQuery({
+    queryKey: ['admin', 'campaigns', 'ALL'],
+    queryFn: () => get<{ campaigns: CampaignSummary[] }>('/admin/campaigns', { status: 'ALL', limit: 100 }),
+  });
+  const all = q.data?.campaigns ?? [];
+  const list = all.filter((c) => REVIEW_GROUPS[tab].includes(c.status));
+  const selected = list.find((c) => c.id === selectedId) ?? list[0];
+  const tabs = (Object.keys(REVIEW_GROUPS) as ReviewTab[]).map((k) => ({
+    value: k,
+    label: { PENDING: 'Pending', APPROVED: 'Approved', REJECTED: 'Rejected', FROZEN: 'Frozen' }[k],
+    count: count(all, (c) => REVIEW_GROUPS[k].includes(c.status)),
+  }));
+
   return (
-    <div>
-      <PageHeader title="Review campaign" subtitle="Periksa proposal lalu setujui atau tolak dengan alasan." />
-      <div className="mb-4 flex flex-wrap gap-2">
-        {filters.map(([v, l]) => (
-          <button key={v} className={status === v ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'} onClick={() => setStatus(v)}>{l}</button>
-        ))}
-      </div>
-      {q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : q.data!.campaigns.length === 0 ? (
-        <EmptyState title="Antrean kosong">Tidak ada campaign dengan status ini.</EmptyState>
+    <div className="space-y-4">
+      <PageHeader title="Review Kampanye FundChain" />
+      <FilterTabs items={tabs} value={tab} onChange={(v) => { setTab(v); setSelectedId(null); }} />
+      {q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : list.length === 0 ? (
+        <EmptyState title="Antrean kosong">Tidak ada kampanye di tab ini.</EmptyState>
       ) : (
-        <div className="card divide-y divide-slate-100">
-          {q.data!.campaigns.map((c) => (
-            <div key={c.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="truncate font-medium">{c.title}</p>
-                <p className="text-xs text-slate-500">{c.creator.name} · target {rupiah(c.targetAmount)} · deadline {date(c.deadline)} · dibuat {date(c.createdAt)}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <CampaignBadge status={c.status} />
-                <Link to={`/campaigns/${c.id}`} className="btn-secondary btn-sm"><FileSearch size={14} /> Review</Link>
-              </div>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="card overflow-x-auto">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Kampanye / pembuat</th>
+                  <th>Target / deadline</th>
+                  <th>Proposal</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((c) => {
+                  const s = sdg(c.sdgCategory);
+                  return (
+                    <tr key={c.id} className={selected?.id === c.id ? 'bg-navy-50' : ''}>
+                      <td className="min-w-[220px]">
+                        <p className="text-ink [overflow-wrap:anywhere]">{c.title}</p>
+                        <p className="text-xs text-slate-500">{c.creator.name}{s ? ` · SDG ${s.number}` : ''}</p>
+                      </td>
+                      <td className="whitespace-nowrap">
+                        <p>{rupiah(c.targetAmount)}</p>
+                        <p className="text-xs text-slate-500">{date(c.deadline)}</p>
+                      </td>
+                      <td><ProposalCell id={c.id} /></td>
+                      <td>
+                        <button className="text-xs text-ink hover:text-navy hover:underline" onClick={() => setSelectedId(c.id)}>
+                          {tab === 'PENDING' ? 'Review' : 'Detail'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {selected && <ReviewPanel key={selected.id} id={selected.id} />}
+        </>
       )}
     </div>
   );
@@ -167,11 +349,11 @@ interface AdminDonation {
 
 export function AdminIntegrityPage() {
   const qc = useQueryClient();
-  const chain = useChainInfo();
-  const [filter, setFilter] = useState('');
+  const [integrity, setIntegrity] = useState('');
+  const [chainFilter, setChainFilter] = useState('');
   const donations = useQuery({
-    queryKey: ['admin', 'donations', filter],
-    queryFn: () => get<AdminDonation[]>('/admin/donations', { integrityStatus: filter || undefined }),
+    queryKey: ['admin', 'donations'],
+    queryFn: () => get<AdminDonation[]>('/admin/donations'),
     refetchInterval: 5000,
   });
   const [last, setLast] = useState<VerifyResult | null>(null);
@@ -188,90 +370,111 @@ export function AdminIntegrityPage() {
   });
   const retry = useMutation({ mutationFn: (id: string) => post(`/admin/blockchain/${id}/retry`), onSuccess: () => qc.invalidateQueries() });
 
+  const all = donations.data ?? [];
+  const byIntegrity = all.filter((d) => !integrity || d.integrityStatus === integrity);
+  const rows = byIntegrity.filter((d) => !chainFilter || d.blockchain?.status === chainFilter);
+  const lastRow = last && all.find((d) => d.id === last.donationId);
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Integrity checker"
-        subtitle="Hash dihitung ulang dari data database saat ini lalu dibandingkan dengan hash di smart contract."
-        actions={
-          <button className="btn-primary" onClick={() => verifyAll.mutate()} disabled={verifyAll.isPending}>
-            <ShieldCheck size={16} /> {verifyAll.isPending ? 'Memeriksa…' : 'Verifikasi semua donasi'}
-          </button>
-        }
+    <div className="space-y-4">
+      <PageHeader title="Pemeriksa Integritas & Antrean Notarisasi" />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+      <FilterTabs
+        value={integrity}
+        onChange={setIntegrity}
+        items={[
+          { value: '', label: 'Semua', count: all.length },
+          { value: 'VERIFIED', label: 'Verified', count: count(all, (d) => d.integrityStatus === 'VERIFIED') },
+          { value: 'TAMPERED', label: 'Tampered', count: count(all, (d) => d.integrityStatus === 'TAMPERED') },
+          { value: 'PENDING', label: 'Pending', count: count(all, (d) => d.integrityStatus === 'PENDING') },
+        ]}
       />
-      <ChainCard chain={chain.data} />
+        <button className="btn-primary btn-sm" onClick={() => verifyAll.mutate()} disabled={verifyAll.isPending}>
+          <ShieldCheck size={14} /> {verifyAll.isPending ? 'Memeriksa…' : 'Verifikasi semua'}
+        </button>
+      </div>
+      <FilterTabs
+        size="sm"
+        value={chainFilter}
+        onChange={setChainFilter}
+        items={[
+          { value: '', label: 'Semua status chain' },
+          ...(['QUEUED', 'SUBMITTED', 'CONFIRMED', 'RETRYING', 'FAILED'] as const).map((s) => ({
+            value: s,
+            label: s[0] + s.slice(1).toLowerCase(),
+            count: count(byIntegrity, (d) => d.blockchain?.status === s),
+            tone: s === 'CONFIRMED' ? ('green' as const) : s === 'FAILED' ? ('red' as const) : undefined,
+          })),
+        ]}
+      />
 
-      <div className="space-y-3">
-        <ErrorBox error={verifyAll.error ?? verifyOne.error ?? retry.error} />
-        {verifyAll.data && (
-          verifyAll.data.tampered > 0 ? (
-            <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800" role="alert">
-              <AlertTriangle size={18} className="shrink-0" />
-              <span><b>{verifyAll.data.tampered} donasi TAMPERED</b> dari {verifyAll.data.checked} yang dicek. {verifyAll.data.frozenCampaigns.length} campaign otomatis dibekukan dan pencairannya dikunci.</span>
-            </div>
-          ) : (
-            <SuccessBox>Semua {verifyAll.data.checked} donasi cocok dengan blockchain.{verifyAll.data.skippedNotNotarized ? ` ${verifyAll.data.skippedNotNotarized} belum ternotarisasi (dilewati).` : ''}</SuccessBox>
-          )
-        )}
-        {last && (
-          <div className={`rounded-lg border p-4 text-sm ${last.status === 'VERIFIED' ? 'border-emerald-200 bg-emerald-50' : 'border-red-300 bg-red-50'}`}>
-            <div className="flex items-center gap-2"><IntegrityBadge status={last.status} /> <span className="text-xs text-slate-500">donasi {last.donationId.slice(0, 8)}</span></div>
-            <p className="mono mt-2 break-all">DB      : {last.currentHash}</p>
-            <p className="mono break-all">On-chain: {last.onChainHash}</p>
-            {last.campaignFrozen && <p className="mt-2 font-semibold text-red-800">Campaign dibekukan otomatis.</p>}
+      <ErrorBox error={verifyAll.error ?? verifyOne.error ?? retry.error} />
+      {verifyAll.data && (
+        verifyAll.data.tampered > 0 ? (
+          <div className="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800" role="alert">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+            <span><b>{verifyAll.data.tampered} donasi TAMPERED</b> dari {verifyAll.data.checked} yang dicek. {verifyAll.data.frozenCampaigns.length} kampanye otomatis dibekukan dan pencairannya dikunci.</span>
           </div>
-        )}
-      </div>
+        ) : (
+          <SuccessBox>Semua {verifyAll.data.checked} donasi cocok dengan blockchain.{verifyAll.data.skippedNotNotarized ? ` ${verifyAll.data.skippedNotNotarized} belum ternotarisasi (dilewati).` : ''}</SuccessBox>
+        )
+      )}
 
-      <div className="card flex items-start gap-3 border-dashed bg-slate-50 p-4 text-sm text-slate-700">
-        <Terminal size={18} className="mt-0.5 shrink-0 text-slate-500" />
-        <div>
-          <b>Simulasi manipulasi data (demo)</b> — jalankan di terminal project, lalu klik verifikasi:
-          <code className="mono mt-1 block rounded bg-slate-900 px-3 py-2 text-emerald-300">pnpm demo:tamper --latest 900000</code>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {[['', 'Semua'], ['VERIFIED', 'Terverifikasi'], ['TAMPERED', 'Tampered'], ['PENDING', 'Belum dicek']].map(([v, l]) => (
-          <button key={v} className={filter === v ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'} onClick={() => setFilter(v)}>{l}</button>
-        ))}
-      </div>
-      {donations.isLoading ? <Spinner /> : donations.data?.length === 0 ? <EmptyState title="Tidak ada donasi" /> : (
+      {donations.isLoading ? <Spinner /> : donations.error ? <ErrorBox error={donations.error} /> : rows.length === 0 ? (
+        <EmptyState title="Tidak ada donasi" />
+      ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <table className="tbl">
+            <thead>
               <tr>
-                <th className="px-4 py-3 font-medium">Donasi</th>
-                <th className="px-3 py-3 font-medium">Nominal (DB)</th>
-                <th className="px-3 py-3 font-medium">Hash</th>
-                <th className="px-3 py-3 font-medium">Blockchain</th>
-                <th className="px-3 py-3 font-medium">Integritas</th>
-                <th className="px-4 py-3"><span className="sr-only">Aksi</span></th>
+                <th>Donasi / kampanye</th>
+                <th>DB hash</th>
+                <th>Tx on-chain</th>
+                <th>Integritas</th>
+                <th>Chain / aksi</th>
+                <th>Verifikasi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {donations.data?.map((d) => (
+            <tbody>
+              {rows.map((d) => (
                 <tr key={d.id} className={d.integrityStatus === 'TAMPERED' ? 'bg-red-50' : ''}>
-                  <td className="px-4 py-3">
-                    <Link to={`/donations/${d.id}`} className="font-medium hover:text-navy">{d.campaign.title}</Link>
-                    <p className="text-xs text-slate-500">{d.donor.name} ({d.donor.integritySubjectId}) · {dateTime(d.donatedAt)}</p>
+                  <td className="min-w-[200px]">
+                    <Link to={`/donations/${d.id}`} className="text-ink hover:text-navy [overflow-wrap:anywhere]">{d.campaign.title}</Link>
+                    <p>{rupiah(d.amount)} · {d.donor.name}</p>
                   </td>
-                  <td className="px-3 py-3 font-medium">{rupiah(d.amount)}</td>
-                  <td className="px-3 py-3"><HashText value={d.hash} /></td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-col gap-1">
-                      <ChainBadge status={d.blockchain?.status} />
-                      <ExplorerLink url={d.blockchain?.explorerUrl ?? null} txHash={d.blockchain?.txHash ?? null} />
-                      {d.blockchain?.lastError && d.blockchain.status !== 'CONFIRMED' && <span className="max-w-[200px] truncate text-xs text-red-600" title={d.blockchain.lastError}>{d.blockchain.lastError}</span>}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3"><IntegrityBadge status={d.integrityStatus} /><p className="mt-1 text-xs text-slate-500">{d.lastCheckedAt ? dateTime(d.lastCheckedAt) : ''}</p></td>
-                  <td className="px-4 py-3 text-right">
-                    {d.blockchain?.status === 'FAILED' ? (
-                      <button className="btn-secondary btn-sm" onClick={() => retry.mutate(d.id)}><RefreshCw size={12} /> Ulangi</button>
+                  <td className="whitespace-nowrap" title={d.hash}>{shortHash(d.hash)}</td>
+                  <td>
+                    {d.blockchain?.txHash ? (
+                      d.blockchain.explorerUrl ? (
+                        <a href={d.blockchain.explorerUrl} target="_blank" rel="noreferrer" className="whitespace-nowrap hover:text-navy" title={d.blockchain.txHash}>
+                          {shortHash(d.blockchain.txHash)}
+                        </a>
+                      ) : (
+                        <span className="whitespace-nowrap" title={d.blockchain.txHash}>{shortHash(d.blockchain.txHash)}</span>
+                      )
                     ) : (
-                      <button className="btn-secondary btn-sm" disabled={d.blockchain?.status !== 'CONFIRMED' || verifyOne.isPending} onClick={() => verifyOne.mutate(d.id)}>
-                        Verifikasi
+                      'Belum tercatat'
+                    )}
+                  </td>
+                  <td><IntegrityBadge status={d.integrityStatus} /></td>
+                  <td>
+                    <ChainBadge status={d.blockchain?.status} />
+                    {d.blockchain?.lastError && d.blockchain.status !== 'CONFIRMED' && (
+                      <p className="mt-1 max-w-[180px] truncate text-xs text-red-600" title={d.blockchain.lastError}>{d.blockchain.lastError}</p>
+                    )}
+                  </td>
+                  <td>
+                    {d.blockchain?.status === 'FAILED' ? (
+                      <button className="btn-secondary btn-sm" onClick={() => retry.mutate(d.id)} disabled={retry.isPending}>
+                        <RefreshCw size={12} /> Ulangi
+                      </button>
+                    ) : (
+                      <button
+                        className="btn-primary btn-sm"
+                        disabled={d.blockchain?.status !== 'CONFIRMED' || verifyOne.isPending}
+                        onClick={() => verifyOne.mutate(d.id)}
+                      >
+                        <ShieldCheck size={12} /> Verifikasi
                       </button>
                     )}
                   </td>
@@ -281,6 +484,33 @@ export function AdminIntegrityPage() {
           </table>
         </div>
       )}
+
+      {last && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-ink">
+            Perbandingan terpilih · {lastRow ? lastRow.campaign.title : shortHash(last.donationId)}
+          </p>
+          <div className="space-y-1 font-mono text-xs">
+            <p className="break-all"><span className="inline-block w-16 text-slate-500">DB</span>
+              <span className={last.status === 'TAMPERED' ? 'text-red-600' : 'text-slate-700'}>{last.currentHash}</span>
+            </p>
+            <p className="break-all"><span className="inline-block w-16 text-slate-500">On-chain</span>{last.onChainHash}</p>
+          </div>
+          {last.status === 'TAMPERED' ? (
+            <InfoNote tone="red">
+              Hash tidak cocok: donasi ditandai TAMPERED{last.campaignFrozen ? ' dan kampanyenya dibekukan otomatis (pencairan dikunci)' : ''}.
+            </InfoNote>
+          ) : (
+            <SuccessBox>Hash DB sama dengan hash on-chain.</SuccessBox>
+          )}
+        </div>
+      )}
+
+      <details className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-700">
+        <summary className="flex cursor-pointer items-center gap-2 font-medium"><Terminal size={14} /> Simulasi manipulasi data (demo)</summary>
+        <p className="mt-2">Jalankan di terminal project, lalu klik Verifikasi:</p>
+        <code className="mono mt-1 block rounded bg-slate-900 px-3 py-2 text-emerald-300">pnpm demo:tamper --latest 900000</code>
+      </details>
     </div>
   );
 }
@@ -288,150 +518,247 @@ export function AdminIntegrityPage() {
 export function AdminDisbursementsPage() {
   const qc = useQueryClient();
   const [status, setStatus] = useState('REQUESTED');
-  const [rejecting, setRejecting] = useState<string | null>(null);
-  const q = useQuery({ queryKey: ['admin', 'disbursements', status], queryFn: () => get<AdminDisbursement[]>('/admin/disbursements', { status: status || undefined }) });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [proofError, setProofError] = useState<string | null>(null);
+  const q = useQuery({ queryKey: ['admin', 'disbursements'], queryFn: () => get<AdminDisbursement[]>('/admin/disbursements') });
   const act = useMutation({
-    mutationFn: ({ id, action, reason }: { id: string; action: 'approve' | 'reject' | 'mark-paid'; reason?: string }) =>
-      post(`/admin/disbursements/${id}/${action}`, reason ? { reason } : undefined),
+    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' | 'mark-paid' }) =>
+      post(`/admin/disbursements/${id}/${action}`, action === 'reject' ? { reason: reason.trim() } : undefined),
     onSuccess: () => {
-      setRejecting(null);
+      setReason('');
       void qc.invalidateQueries();
     },
   });
-  const [proofError, setProofError] = useState<string | null>(null);
+  const all = q.data ?? [];
+  const list = all.filter((d) => d.status === status);
+  const selected = list.find((d) => d.id === selectedId) ?? list[0];
+  const openProof = (id: string) => {
+    setProofError(null);
+    openProtectedFile(`/disbursements/${id}/proof`).catch((e) => setProofError(errorMessage(e)));
+  };
 
   return (
-    <div>
-      <PageHeader title="Pencairan dana" subtitle="Setujui hanya jika bukti milestone valid. Campaign FROZEN otomatis terkunci." />
-      <div className="mb-4 flex flex-wrap gap-2">
-        {[['REQUESTED', 'Diajukan'], ['APPROVED', 'Disetujui'], ['PAID', 'Dicairkan'], ['REJECTED', 'Ditolak'], ['', 'Semua']].map(([v, l]) => (
-          <button key={v} className={status === v ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'} onClick={() => setStatus(v)}>{l}</button>
-        ))}
-      </div>
-      <div className="mb-4 space-y-2"><ErrorBox error={act.error ?? proofError} /></div>
-      {q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : q.data!.length === 0 ? (
+    <div className="space-y-4">
+      <PageHeader title="Review Pencairan & Transfer" />
+      <FilterTabs
+        value={status}
+        onChange={(v) => { setStatus(v); setSelectedId(null); setReason(''); }}
+        items={(['REQUESTED', 'APPROVED', 'PAID', 'REJECTED'] as const).map((s) => ({
+          value: s,
+          label: s[0] + s.slice(1).toLowerCase(),
+          count: count(all, (d) => d.status === s),
+        }))}
+      />
+      <ErrorBox error={act.error ?? proofError} />
+      {q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : list.length === 0 ? (
         <EmptyState title="Tidak ada pengajuan" />
       ) : (
-        <div className="space-y-3">
-          {q.data!.map((d) => (
-            <div key={d.id} className={`card p-4 ${d.campaign.status === 'FROZEN' ? 'border-red-200' : ''}`}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-lg font-semibold">{rupiah(d.amount)}</p>
-                    <DisbursementBadge status={d.status} />
-                    {d.campaign.status === 'FROZEN' && <CampaignBadge status="FROZEN" />}
+        <>
+          <div className="card overflow-x-auto">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Pengajuan / pembuat</th>
+                  <th>Nominal</th>
+                  <th>Penggunaan / bukti</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((d) => (
+                  <tr key={d.id} className={selected?.id === d.id ? 'bg-navy-50' : ''}>
+                    <td className="min-w-[180px]">
+                      <p>{d.requester.name}</p>
+                      <Link to={`/campaigns/${d.campaign.id}`} className="hover:text-navy [overflow-wrap:anywhere]">{d.campaign.title}</Link>
+                      {d.campaign.status === 'FROZEN' && <span className="ml-1"><CampaignBadge status="FROZEN" /></span>}
+                    </td>
+                    <td className="whitespace-nowrap">{rupiah(d.amount)}</td>
+                    <td className="min-w-[200px]">
+                      <p className="[overflow-wrap:anywhere]">{d.description}</p>
+                      <p>{d.proofName}</p>
+                    </td>
+                    <td><DisbursementBadge status={d.status} /></td>
+                    <td className="whitespace-nowrap">
+                      <button className="hover:text-navy hover:underline" onClick={() => openProof(d.id)}>Periksa bukti</button>
+                      {(d.status === 'REQUESTED' || d.status === 'APPROVED') && (
+                        <>
+                          {' · '}
+                          <button className="hover:text-navy hover:underline" onClick={() => setSelectedId(d.id)}>
+                            {d.status === 'REQUESTED' ? 'Review' : 'Tandai paid'}
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {selected && (selected.status === 'REQUESTED' || selected.status === 'APPROVED') && (
+            <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+              <div>
+                <p className="text-sm font-semibold text-ink">
+                  {rupiah(selected.amount)} · {selected.campaign.title}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Diajukan {selected.requester.name} · {dateTime(selected.requestedAt)} · saldo kampanye {rupiah(selected.campaign.currentAmount)}
+                </p>
+                {selected.status === 'REQUESTED' && (
+                  <div className="mt-3">
+                    <label className="label" htmlFor="disb-reason">Alasan penolakan *</label>
+                    <input
+              id="disb-reason"
+              className="input"
+                      placeholder="Contoh: Bukti milestone belum menunjukkan jumlah buku yang dibeli."
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">Wajib untuk penolakan (min. 10 karakter). Kampanye Frozen tidak dapat dicairkan.</p>
                   </div>
-                  <Link to={`/campaigns/${d.campaign.id}`} className="text-sm font-medium text-navy hover:underline">{d.campaign.title}</Link>
-                  <p className="mt-1 text-sm text-slate-700">{d.description}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    oleh {d.requester.name} · {dateTime(d.requestedAt)} · saldo campaign {rupiah(d.campaign.currentAmount)}
-                    {d.rejectionReason && ` · alasan tolak: ${d.rejectionReason}`}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    className="btn-secondary btn-sm"
-                    onClick={() => {
-                      setProofError(null);
-                      openProtectedFile(`/disbursements/${d.id}/proof`).catch((e) => setProofError(errorMessage(e)));
-                    }}
-                  >
-                    Lihat bukti
-                  </button>
-                  {d.status === 'REQUESTED' && (
-                    <>
-                      <button className="btn-success btn-sm" disabled={act.isPending} onClick={() => act.mutate({ id: d.id, action: 'approve' })}>Setujui</button>
-                      <button className="btn-danger btn-sm" onClick={() => setRejecting(d.id)}>Tolak</button>
-                    </>
-                  )}
-                  {d.status === 'APPROVED' && (
-                    <button className="btn-primary btn-sm" disabled={act.isPending} onClick={() => act.mutate({ id: d.id, action: 'mark-paid' })}>Tandai sudah ditransfer</button>
-                  )}
-                </div>
+                )}
               </div>
+              <div className="flex flex-wrap items-start gap-2 md:flex-col md:items-stretch">
+                <button className="btn-secondary btn-sm" onClick={() => openProof(selected.id)}>
+                  <FileText size={12} /> Lihat bukti milestone
+                </button>
+                {selected.status === 'REQUESTED' ? (
+                  <div className="flex gap-2">
+                    <button className="btn-primary btn-sm flex-1" disabled={act.isPending} onClick={() => act.mutate({ id: selected.id, action: 'approve' })}>
+                      Setujui
+                    </button>
+                    <button
+                      className="btn-secondary btn-sm flex-1"
+                      disabled={act.isPending || reason.trim().length < 10}
+                      onClick={() => act.mutate({ id: selected.id, action: 'reject' })}
+                    >
+                      Tolak
+                    </button>
+                  </div>
+                ) : (
+                  <button className="btn-primary btn-sm" disabled={act.isPending} onClick={() => act.mutate({ id: selected.id, action: 'mark-paid' })}>
+                    Tandai transfer dibayar
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 md:col-span-2">
+                Mark paid mencatat transfer dana di luar blockchain. Riwayat mahasiswa menampilkan Requested → Approved → Paid, atau Rejected beserta alasannya.
+              </p>
             </div>
-          ))}
-        </div>
-      )}
-      {rejecting && (
-        <ReasonDialog
-          open
-          title="Tolak pengajuan pencairan"
-          confirmLabel="Tolak"
-          danger
-          pending={act.isPending}
-          error={act.error}
-          onCancel={() => setRejecting(null)}
-          onConfirm={(reason) => act.mutate({ id: rejecting, action: 'reject', reason })}
-        />
+          )}
+        </>
       )}
     </div>
   );
 }
 
+const ACTION_FILTERS = [
+  ['', 'Semua aksi'],
+  ['CAMPAIGN', 'Kampanye'],
+  ['DONATION', 'Donasi'],
+  ['PAYMENT', 'Pembayaran'],
+  ['BLOCKCHAIN', 'Notarisasi / blockchain'],
+  ['INTEGRITY', 'Integritas'],
+  ['DISBURSEMENT', 'Pencairan'],
+];
+
+/** Ringkas metadata audit jadi "kunci: nilai · …" agar mudah dibaca. */
+function metaSummary(meta: Record<string, unknown>) {
+  return Object.entries(meta)
+    .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+    .join(' · ');
+}
+
 export function AdminAuditPage() {
-  const [action, setAction] = useState('');
-  const [entityType, setEntityType] = useState('');
+  const [draft, setDraft] = useState({ action: '', entityType: '' });
+  const [filter, setFilter] = useState(draft);
   const q = useInfiniteQuery({
-    queryKey: ['admin', 'audit', action, entityType],
+    queryKey: ['admin', 'audit', filter.action, filter.entityType],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) =>
-      get<{ logs: AuditLog[]; nextCursor: string | null }>('/admin/audit-logs', { action: action || undefined, entityType: entityType || undefined, cursor: pageParam, limit: 50 }),
+      get<{ logs: AuditLog[]; nextCursor: string | null }>('/admin/audit-logs', {
+        action: filter.action || undefined,
+        entityType: filter.entityType || undefined,
+        cursor: pageParam,
+        limit: 50,
+      }),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
   const logs = q.data?.pages.flatMap((p) => p.logs) ?? [];
-  const danger = (a: string) => /TAMPERED|FROZEN|MISMATCH|REJECTED|FAILED/.test(a);
 
   return (
-    <div>
-      <PageHeader title="Audit log" subtitle="Semua keputusan dan event kritis tercatat di sini." />
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
-        <input className="input sm:w-64" placeholder="Filter aksi, mis. INTEGRITY" value={action} onChange={(e) => setAction(e.target.value.toUpperCase())} aria-label="Filter aksi" />
-        <select className="input sm:w-48" value={entityType} onChange={(e) => setEntityType(e.target.value)} aria-label="Filter entitas">
-          <option value="">Semua entitas</option>
-          <option value="Campaign">Campaign</option>
-          <option value="Donation">Donasi</option>
-          <option value="Payment">Payment</option>
-          <option value="System">Sistem</option>
-        </select>
-      </div>
-      {q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : (
+    <div className="space-y-4">
+      <PageHeader title="Audit Log" />
+      <form
+        className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setFilter(draft);
+        }}
+      >
+        <div>
+          <label className="label" htmlFor="f-action">Filter aksi</label>
+          <select id="f-action" className="input sm:w-56" value={draft.action} onChange={(e) => setDraft({ ...draft, action: e.target.value })}>
+            {ACTION_FILTERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="f-entity">Filter entitas</label>
+          <select id="f-entity" className="input sm:w-48" value={draft.entityType} onChange={(e) => setDraft({ ...draft, entityType: e.target.value })}>
+            <option value="">Semua entitas</option>
+            <option value="Campaign">Campaign</option>
+            <option value="Donation">Donasi</option>
+            <option value="Payment">Payment</option>
+            <option value="System">Sistem</option>
+          </select>
+        </div>
+        <button className="btn-secondary whitespace-nowrap">Terapkan filter</button>
+        {!q.isLoading && <span className="text-xs text-slate-500 sm:pb-2.5">Menampilkan {logs.length} catatan{q.hasNextPage ? ' (masih ada lagi)' : ''}</span>}
+      </form>
+      {q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : logs.length === 0 ? (
+        <EmptyState title="Belum ada catatan" />
+      ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <table className="tbl">
+            <thead>
               <tr>
-                <th className="px-4 py-3 font-medium">Waktu</th>
-                <th className="px-3 py-3 font-medium">Aksi</th>
-                <th className="px-3 py-3 font-medium">Aktor</th>
-                <th className="px-3 py-3 font-medium">Entitas</th>
-                <th className="px-4 py-3 font-medium">Detail</th>
+                <th>Waktu</th>
+                <th>Aksi</th>
+                <th>Aktor</th>
+                <th>Entitas</th>
+                <th>Detail</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {logs.map((l) => (
-                <tr key={l.id} className="align-top">
-                  <td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-500">{dateTime(l.createdAt)}</td>
-                  <td className="px-3 py-2.5"><span className={`mono font-medium ${danger(l.action) ? 'text-red-700' : 'text-slate-800'}`}>{l.action}</span></td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-xs">{l.actor ? `${l.actor.name}` : <span className="text-slate-400">Sistem</span>}</td>
-                  <td className="px-3 py-2.5 text-xs">
+                <tr key={l.id}>
+                  <td className="whitespace-nowrap">{dateTime(l.createdAt)}</td>
+                  <td className="whitespace-nowrap">{l.action}</td>
+                  <td className="whitespace-nowrap">{l.actor ? l.actor.name : 'Sistem'}</td>
+                  <td className="whitespace-nowrap">
                     {l.entityType}
                     {l.entityId && (
-                      <Link className="ml-1 font-mono text-navy hover:underline" to={l.entityType === 'Campaign' ? `/campaigns/${l.entityId}` : l.entityType === 'Donation' ? `/donations/${l.entityId}` : '#'}>
+                      <Link
+                        className="ml-1 hover:text-navy hover:underline"
+                        to={l.entityType === 'Campaign' ? `/campaigns/${l.entityId}` : l.entityType === 'Donation' ? `/donations/${l.entityId}` : '#'}
+                      >
                         {l.entityId.slice(0, 8)}
                       </Link>
                     )}
                   </td>
-                  <td className="max-w-md px-4 py-2.5"><code className="mono break-all text-slate-600">{Object.keys(l.metadata).length ? JSON.stringify(l.metadata) : ''}</code></td>
+                  <td className="min-w-[220px] [overflow-wrap:anywhere]">{metaSummary(l.metadata)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {q.hasNextPage && (
-            <div className="border-t border-slate-100 p-3 text-center">
+          <div className="flex items-center justify-between border-t border-slate-100 p-3 text-xs text-slate-500">
+            <span>Jejak aktivitas review, donasi, notarisasi, integritas, dan pencairan.</span>
+            {q.hasNextPage && (
               <button className="btn-secondary btn-sm" onClick={() => q.fetchNextPage()} disabled={q.isFetchingNextPage}>Muat lebih banyak</button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>

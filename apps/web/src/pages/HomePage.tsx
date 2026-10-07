@@ -1,89 +1,122 @@
 import { SDG_CATEGORIES } from '@fundchain/shared';
-import { useQuery } from '@tanstack/react-query';
-import { Fingerprint, Search, ShieldCheck, Snowflake } from 'lucide-react';
+import { useQueries, useQuery } from '@tanstack/react-query';
+import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { CampaignCard } from '../components/CampaignCard';
-import { EmptyState, ErrorBox, Spinner } from '../components/ui';
+import { EmptyState, ErrorBox, FilterTabs, InfoNote, Spinner, Stat } from '../components/ui';
 import { get } from '../lib/api';
-import type { CampaignSummary } from '../lib/types';
+import { rupiah } from '../lib/format';
+import { useMe } from '../lib/hooks';
+import type { CampaignDetail, CampaignSummary, MyDonation } from '../lib/types';
 
-const STATUS_TABS = [
-  { value: 'ACTIVE', label: 'Aktif' },
-  { value: 'COMPLETED', label: 'Selesai' },
-  { value: 'FROZEN', label: 'Dibekukan' },
-];
+const PUBLIC = 'ACTIVE,COMPLETED,FROZEN';
+
+function SummaryStats() {
+  const { me } = useMe();
+  const all = useQuery({
+    queryKey: ['campaigns', 'public-summary'],
+    queryFn: () => get<{ campaigns: CampaignSummary[] }>('/campaigns', { status: PUBLIC, limit: 100 }),
+  });
+  const cs = all.data?.campaigns ?? [];
+  // Ringkasan integritas hanya ada di detail kampanye (publik); detail ini juga dipakai ulang halaman kampanye.
+  const details = useQueries({
+    queries: cs.map((c) => ({ queryKey: ['campaign', c.id], queryFn: () => get<CampaignDetail>(`/campaigns/${c.id}`) })),
+  });
+  const mine = useQuery({ queryKey: ['me', 'donations'], queryFn: () => get<MyDonation[]>('/me/donations'), enabled: !!me });
+  const by = (s: string) => cs.filter((c) => c.status === s).length;
+  const paid = (mine.data ?? []).filter((d) => d.status === 'PAID');
+  const integ = (k: 'VERIFIED' | 'TAMPERED' | 'PENDING') => details.reduce((n, q) => n + (q.data?.integritySummary[k] ?? 0), 0);
+  const totalDonations = cs.reduce((n, c) => n + c.donorCount, 0);
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Stat large label="Dana terkumpul" value={rupiah(cs.reduce((n, c) => n + c.currentAmount, 0))} hint={`Dari ${totalDonations} donasi berhasil`} />
+      <Stat large label="Kampanye publik" value={`${cs.length} kampanye`} hint={`${by('ACTIVE')} Active · ${by('COMPLETED')} Completed · ${by('FROZEN')} Frozen`} />
+      <Stat
+        large
+        label={me ? <>Donasi saya · <b className="font-semibold text-ink">{me.name.split(' ')[0]}</b></> : 'Donasi saya'}
+        value={me ? rupiah(paid.reduce((n, d) => n + d.amount, 0)) : '—'}
+        hint={me ? `${paid.length} pembayaran berhasil` : 'Login untuk melihat donasi Anda'}
+      />
+      <Stat
+        large
+        label="Integritas donasi"
+        value={`${integ('VERIFIED')} / ${totalDonations} Verified`}
+        hint={`${integ('TAMPERED')} Tampered · ${integ('PENDING')} Pending`}
+      />
+    </div>
+  );
+}
 
 export function HomePage() {
   const [q, setQ] = useState('');
   const [sdg, setSdg] = useState('');
-  const [status, setStatus] = useState('ACTIVE');
+  const [status, setStatus] = useState('');
   const campaigns = useQuery({
-    queryKey: ['campaigns', { q, sdg, status }],
-    queryFn: () => get<{ campaigns: CampaignSummary[] }>('/campaigns', { q: q || undefined, sdg: sdg || undefined, status }),
+    queryKey: ['campaigns', { q, sdg, status: PUBLIC }],
+    queryFn: () => get<{ campaigns: CampaignSummary[] }>('/campaigns', { q: q || undefined, sdg: sdg || undefined, status: PUBLIC, limit: 100 }),
   });
+  const list = campaigns.data?.campaigns ?? [];
+  const shown = list.filter((c) => !status || c.status === status);
+  const n = (s: string) => list.filter((c) => c.status === s).length;
 
   return (
-    <div>
-      <section className="mb-10 overflow-hidden rounded-2xl bg-gradient-to-br from-navy to-navy-dark px-6 py-10 text-white sm:px-10">
-        <p className="text-sm font-semibold uppercase tracking-wider text-accent">Fundraising mahasiswa BINUS</p>
-        <h1 className="mt-2 max-w-2xl text-3xl font-bold leading-tight text-white sm:text-4xl">
-          Donasi yang bisa dibuktikan, bukan sekadar dipercaya.
-        </h1>
-        <p className="mt-3 max-w-2xl text-white/80">
-          Setiap donasi yang lunas dibuat sidik jarinya (hash Keccak-256) lalu dicatat permanen di blockchain. Kalau data
-          diubah diam-diam, sistem mendeteksinya dan pencairan dana otomatis dikunci.
-        </p>
-        <div className="mt-6 grid gap-3 text-sm sm:grid-cols-3">
-          {[
-            { icon: <Fingerprint size={18} />, t: 'Hash setiap donasi', d: 'Bukti publik di smart contract' },
-            { icon: <ShieldCheck size={18} />, t: 'Integrity checker', d: 'Data DB dibandingkan dengan on-chain' },
-            { icon: <Snowflake size={18} />, t: 'Auto-freeze', d: 'Manipulasi → campaign dibekukan' },
-          ].map((f) => (
-            <div key={f.t} className="flex items-start gap-3 rounded-xl bg-white/10 p-3">
-              <span className="text-accent">{f.icon}</span>
-              <span><b className="block">{f.t}</b><span className="text-white/70">{f.d}</span></span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="flex gap-1 rounded-lg bg-slate-200/60 p-1" role="tablist">
-          {STATUS_TABS.map((t) => (
-            <button
-              key={t.value}
-              role="tab"
-              aria-selected={status === t.value}
-              onClick={() => setStatus(t.value)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${status === t.value ? 'bg-white text-navy shadow-sm' : 'text-slate-600'}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden />
-          <input className="input pl-9" placeholder="Cari campaign…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari campaign" />
-        </div>
-        <select className="input lg:w-72" value={sdg} onChange={(e) => setSdg(e.target.value)} aria-label="Filter SDG">
-          <option value="">Semua kategori SDG</option>
-          {SDG_CATEGORIES.map((s) => (
-            <option key={s.code} value={s.code}>SDG {s.number} · {s.label}</option>
-          ))}
-        </select>
+    <div className="space-y-6">
+      <div>
+        <h1 className="page-title">FundChain</h1>
+        <p className="mt-1 text-[13px] text-ink">Penggalangan dana mahasiswa BINUS · transparan dari donasi hingga pencairan.</p>
       </div>
+      <InfoNote>
+        Seluruh donasi lunas dibuat sidik jarinya (hash Keccak-256) lalu dicatat di blockchain. Blockchain hanya menyimpan hash bukti yang
+        immutable, bukan dana donasi.
+      </InfoNote>
+      <SummaryStats />
 
-      {campaigns.isLoading ? (
-        <Spinner />
-      ) : campaigns.error ? (
-        <ErrorBox error={campaigns.error} />
-      ) : campaigns.data!.campaigns.length === 0 ? (
-        <EmptyState title="Belum ada campaign di sini">Coba ubah filter atau kata kunci.</EmptyState>
-      ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {campaigns.data!.campaigns.map((c) => <CampaignCard key={c.id} c={c} />)}
+      <section className="space-y-3">
+        <h2 className="section-title">Jelajahi Kampanye</h2>
+        <div className="grid gap-4 lg:grid-cols-[440px_290px_1fr] lg:items-end">
+          <div>
+            <label className="mb-2 block text-[13px] text-ink" htmlFor="q">Cari kampanye</label>
+            <div className="relative">
+              <input id="q" className="input pr-9" placeholder="Cari judul atau deskripsi…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" aria-hidden />
+            </div>
+          </div>
+          <div>
+            <label className="mb-2 block text-[13px] text-ink" htmlFor="sdg">Kategori SDG</label>
+            <select id="sdg" className="input" value={sdg} onChange={(e) => setSdg(e.target.value)}>
+              <option value="">Semua kategori SDG</option>
+              {SDG_CATEGORIES.map((s) => (
+                <option key={s.code} value={s.code}>SDG {s.number} · {s.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="lg:pb-1">
+            <FilterTabs
+              value={status}
+              onChange={setStatus}
+              items={[
+                { value: '', label: 'Semua', count: list.length },
+                { value: 'ACTIVE', label: 'Active', count: n('ACTIVE') },
+                { value: 'COMPLETED', label: 'Completed', count: n('COMPLETED') },
+                { value: 'FROZEN', label: 'Frozen', count: n('FROZEN') },
+              ]}
+            />
+          </div>
         </div>
-      )}
+
+        {campaigns.isLoading ? (
+          <Spinner />
+        ) : campaigns.error ? (
+          <ErrorBox error={campaigns.error} />
+        ) : shown.length === 0 ? (
+          <EmptyState title="Belum ada kampanye di sini">Coba ubah filter atau kata kunci.</EmptyState>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {shown.map((c) => <CampaignCard key={c.id} c={c} />)}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

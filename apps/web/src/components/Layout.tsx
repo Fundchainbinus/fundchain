@@ -1,10 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Blocks, LogIn, LogOut, Menu, X } from 'lucide-react';
+import { Bell, Blocks, LogIn, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { errorMessage, post } from '../lib/api';
 import { requestGoogleAccessToken } from '../lib/google';
-import { useChainInfo, useConfig, useMe } from '../lib/hooks';
+import { useConfig, useMe } from '../lib/hooks';
+import { RoleCard } from './RoleCard';
 import { useSession } from '../lib/session';
 
 function GoogleAuthButton() {
@@ -41,16 +42,19 @@ function GoogleAuthButton() {
 
   if (me) {
     return (
-      <div className="flex items-center gap-2 text-sm text-white">
-        <span className="max-w-[160px] truncate" title={me.email}>
-          {me.name}
-        </span>
-        <button
-          onClick={logout}
-          className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm hover:bg-white/20"
-        >
-          <LogOut size={14} aria-hidden /> Keluar
+      <div className="relative">
+        <button onClick={() => setOpen(!open)} aria-label="Menu akun" aria-expanded={open} className="block rounded-full">
+          <Avatar name={me.name} />
         </button>
+        {open && (
+          <div className="absolute right-0 top-10 z-50 w-56 rounded-md border border-line bg-white p-3 text-sm shadow-lg">
+            <p className="truncate font-semibold text-ink">{me.name}</p>
+            <p className="truncate text-xs text-slate-500">{me.email}</p>
+            <button onClick={logout} className="btn-secondary btn-sm mt-3 w-full">
+              <LogOut size={14} aria-hidden /> Keluar
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -62,7 +66,7 @@ function GoogleAuthButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100"
+        className="btn-primary btn-sm"
       >
         <LogIn size={14} aria-hidden /> Login
       </button>
@@ -112,17 +116,102 @@ function GoogleLogo() {
   );
 }
 
-function ChainIndicator() {
-  const { data } = useChainInfo();
-  if (!data) return null;
+/** Logo BINUSMAYA (dipotong dari frame ekspor Figma). */
+export function BinusmayaLogo() {
+  return <img src="/figma/binusmaya-logo.png" alt="BINUSMAYA" className="h-[18px] w-auto select-none" draggable={false} />;
+}
+
+function DotsGrid() {
   return (
-    <span
-      className="hidden items-center gap-1.5 text-xs text-white/80 lg:inline-flex"
-      title={data.ready ? `${data.network} · ${data.contractAddress}` : data.reason ?? ''}
-    >
-      <span className={`h-2 w-2 rounded-full ${data.ready ? 'bg-emerald-400' : 'bg-red-400'}`} />
-      {data.ready ? `Chain: ${data.network}` : 'Chain offline'}
+    <svg width="18" height="18" viewBox="0 0 18 18" className="shrink-0 text-ink" aria-hidden>
+      {[2, 9, 16].flatMap((y) => [2, 9, 16].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="2" fill="currentColor" />))}
+    </svg>
+  );
+}
+
+export function Avatar({ name }: { name: string }) {
+  const initials = name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('');
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-semibold text-white" aria-hidden>
+      {initials}
     </span>
+  );
+}
+
+/** Toggle bahasa seperti di Figma. Aplikasi baru tersedia dalam Bahasa Indonesia. */
+function LanguageToggle() {
+  return (
+    <div className="hidden overflow-hidden rounded-full border border-line text-xs sm:flex" role="group" aria-label="Bahasa">
+      <span className="bg-accent px-3 py-1.5 text-white">ID</span>
+      <button type="button" disabled title="Bahasa Inggris belum tersedia" className="px-3 py-1.5 text-ink disabled:cursor-not-allowed">
+        EN
+      </button>
+    </div>
+  );
+}
+
+function greeting() {
+  const h = new Date().getHours();
+  return h < 11 ? 'Selamat pagi' : h < 15 ? 'Selamat siang' : h < 18 ? 'Selamat sore' : 'Selamat malam';
+}
+
+// Baris aplikasi BINUSMaya dari Pengunjung.png. Hanya FundChain yang aktif di aplikasi ini.
+const APPS = [
+  ['lms', 'LMS'],
+  ['academic-service', 'Academic Service'],
+  ['beelingua', 'Beelingua'],
+  ['library', 'Library'],
+  ['student-activity', 'Student Activity'],
+  ['binus-support', 'BINUS Support'],
+  ['enrichment', 'Enrichment'],
+  ['freshmen', 'Freshmen'],
+  ['neksus', 'Neksus'],
+  ['thesis', 'Thesis'],
+  ['binus-square', 'BINUS Square'],
+  ['fundchain', 'FundChain'],
+  ['customize', 'Customize'],
+];
+
+/** Banner, kartu Role, dan baris aplikasi seperti header "MY DASHBOARD" di Pengunjung.png. */
+function StudentBanner() {
+  const { me, isAdmin } = useMe();
+  return (
+    <div className="bg-white">
+      <div className="relative">
+        <div className="h-[160px] bg-cover bg-center" style={{ backgroundImage: 'url(/figma/banner.jpg)' }} />
+        <div className="absolute inset-x-0 top-6 flex items-start gap-4 px-4">
+          <RoleCard
+            role={!me ? 'Pengunjung' : isAdmin ? 'Admin' : 'Student'}
+            name={me?.name}
+            changeTo={isAdmin ? '/admin' : undefined}
+            className="hidden w-[280px] shrink-0 sm:flex"
+          />
+          <div className="pt-8 text-white">
+            <p className="text-[22px]">{greeting()},</p>
+            <p className="text-2xl uppercase sm:text-[30px] sm:leading-tight [overflow-wrap:anywhere]">{me?.name ?? 'Binusian'}</p>
+          </div>
+        </div>
+      </div>
+      <div className="no-scrollbar flex gap-6 overflow-x-auto px-4 pb-6 pt-[78px] sm:justify-between sm:gap-2" aria-label="Aplikasi BINUSMaya">
+        {APPS.map(([key, label]) =>
+          key === 'fundchain' ? (
+            <Link key={key} to="/" className="flex w-[84px] shrink-0 flex-col items-center gap-1.5 text-center" aria-current="page">
+              <img src="/figma/app-fundchain-active.png" alt="" className="h-12 w-12" />
+              <span className="text-[11px] font-bold text-navy-deep">{label}</span>
+            </Link>
+          ) : (
+            <span key={key} className="flex w-[84px] shrink-0 flex-col items-center gap-1.5 text-center" aria-hidden>
+              <img src={`/figma/app-${key}.png`} alt="" className="h-12 w-12" />
+              <span className="text-[11px] text-ink">{label}</span>
+            </span>
+          ),
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -130,41 +219,38 @@ export function Layout() {
   const { me, isAdmin } = useMe();
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const inAdmin = location.pathname.startsWith('/admin');
 
   const links = [
-    { to: '/', label: 'Jelajahi', end: true },
-    ...(me ? [{ to: '/my/campaigns', label: 'Campaign Saya' }, { to: '/my/donations', label: 'Donasi Saya' }] : []),
+    { to: '/', label: 'FundChain', end: true },
+    ...(me ? [{ to: '/my/campaigns', label: 'Ruang Mahasiswa' }] : []),
     ...(isAdmin ? [{ to: '/admin', label: 'Admin' }] : []),
   ];
   const navClass = ({ isActive }: { isActive: boolean }) =>
-    `rounded-lg px-3 py-2 text-sm font-medium transition ${isActive ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'}`;
+    `-mb-px whitespace-nowrap border-b-2 px-5 py-3 text-[15px] transition ${isActive ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-ink'}`;
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 bg-navy shadow">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
-          <Link to="/" className="flex items-center gap-2 text-white">
-            <Blocks size={24} className="text-accent" aria-hidden />
-            <span className="text-lg font-bold tracking-tight">FundChain</span>
+      <header className="sticky top-0 z-40 border-b border-line bg-white">
+        <div className="flex h-[54px] items-center gap-4 px-4">
+          <DotsGrid />
+          <Link to="/" className="flex items-center gap-4" aria-label="FundChain beranda">
+            <BinusmayaLogo />
+            <span className="h-6 w-px bg-line" aria-hidden />
+            <span className="text-sm uppercase text-ink">{inAdmin ? 'FundChain' : 'My Dashboard'}</span>
           </Link>
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Navigasi utama">
-            {links.map((l) => (
-              <NavLink key={l.to} to={l.to} end={l.end} className={navClass}>
-                {l.label}
-              </NavLink>
-            ))}
-          </nav>
           <div className="ml-auto flex items-center gap-4">
-            <ChainIndicator />
+            <LanguageToggle />
+            <Bell size={20} className="hidden text-slate-400 sm:block" aria-hidden />
             <div className="hidden sm:block"><GoogleAuthButton /></div>
-            <button className="text-white md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
+            <button className="text-ink md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
               {open ? <X /> : <Menu />}
             </button>
           </div>
         </div>
         {open && (
-          <div className="border-t border-white/10 px-4 pb-4 md:hidden" onClick={() => setOpen(false)}>
-            <nav className="flex flex-col gap-1 pt-2">
+          <div className="border-t border-line px-4 pb-4 md:hidden" onClick={() => setOpen(false)}>
+            <nav className="flex flex-col pt-2">
               {links.map((l) => (
                 <NavLink key={l.to} to={l.to} end={l.end} className={navClass}>
                   {l.label}
@@ -176,16 +262,31 @@ export function Layout() {
         )}
       </header>
 
-      <main key={location.pathname} className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      {!inAdmin && (
+        <>
+          <StudentBanner />
+          <nav className="no-scrollbar flex justify-center overflow-x-auto overflow-y-hidden border-b border-line bg-white" aria-label="Navigasi utama">
+            {links.map((l) => (
+              <NavLink key={l.to} to={l.to} end={l.end} className={navClass}>
+                {l.label}
+              </NavLink>
+            ))}
+          </nav>
+        </>
+      )}
+      <main key={location.pathname} className={inAdmin ? 'flex flex-1 flex-col' : 'w-full flex-1 bg-[#F5F5F5] px-4 pb-12 pt-6'}>
         <Outlet />
       </main>
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-6 text-xs text-slate-500">
-          FundChain · Data di database, bukti di blockchain. Setiap donasi lunas di-hash (Keccak-256) dan dicatat di smart
-          contract sehingga manipulasi data dapat terdeteksi.
-        </div>
-      </footer>
+      {/* Admin punya footer gelap sendiri di kolom konten (lihat AdminLayout). */}
+      {!inAdmin && (
+        <footer className="border-t border-line bg-white">
+          <div className="flex justify-between px-4 py-4 text-[13px] text-ink">
+            <span>© {new Date().getFullYear()} BINUS Higher Education</span>
+            <span>BINUSMAYA</span>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
@@ -196,12 +297,12 @@ export function RequireUser({ admin, children }: { admin?: boolean; children: Re
   if (isLoading) return null;
   if (!me || (admin && !isAdmin)) {
     return (
-      <div className="card mx-auto max-w-lg p-8 text-center">
+      <div className="card mx-auto my-8 max-w-lg p-8 text-center">
         <h1 className="text-xl font-bold">{me && admin ? 'Khusus Admin' : 'Login dulu'}</h1>
         <p className="mt-2 text-sm text-slate-600">
           {me && admin
             ? 'Halaman ini hanya untuk admin. Akun Google Anda tidak memiliki akses admin.'
-            : 'Silakan klik "Login dengan Google" di pojok kanan atas untuk melanjutkan.'}
+            : 'Silakan klik "Login" di pojok kanan atas untuk melanjutkan.'}
         </p>
       </div>
     );

@@ -5,9 +5,9 @@ import { CheckCircle2, FileUp, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { z } from 'zod';
-import { ErrorBox, PageHeader, Spinner, SuccessBox } from '../components/ui';
+import { ErrorBox, InfoNote, PageHeader, Spinner, SuccessBox } from '../components/ui';
 import { api, get, patch, post } from '../lib/api';
-import { dateTime } from '../lib/format';
+import { dateTime, fileSize } from '../lib/format';
 import type { CampaignDetail } from '../lib/types';
 
 const schema = z.object({
@@ -35,6 +35,24 @@ const defaultDeadline = () => toDateInput(new Date(Date.now() + 30 * 86_400_000)
 export function CampaignFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  return (
+    <div className="mx-auto max-w-3xl space-y-3">
+      <p className="text-sm text-slate-500">
+        <Link to="/my/campaigns" className="text-navy hover:underline">Ruang Mahasiswa</Link> / Buat / Edit Kampanye
+      </p>
+      <PageHeader title={id ? 'Edit Kampanye' : 'Buat Kampanye'} />
+      <CampaignFormCard
+        key={id ?? 'new'}
+        id={id}
+        onCreated={(newId) => navigate(`/campaigns/${newId}/edit`, { replace: true })}
+        onSubmitted={() => navigate(`/campaigns/${id}`)}
+      />
+    </div>
+  );
+}
+
+/** Form "Buat / Edit Kampanye" (dipakai halaman form dan Ruang Mahasiswa). */
+export function CampaignFormCard({ id, onCreated, onSubmitted }: { id?: string; onCreated?: (id: string) => void; onSubmitted?: () => void }) {
   const qc = useQueryClient();
   const existing = useQuery({ queryKey: ['campaign', id], queryFn: () => get<CampaignDetail>(`/campaigns/${id}`), enabled: !!id });
   const [form, setForm] = useState<Form>({ title: '', description: '', sdgCategory: '', targetAmount: 5_000_000, deadline: defaultDeadline() });
@@ -56,7 +74,7 @@ export function CampaignFormPage() {
     onSuccess: (c) => {
       void qc.invalidateQueries();
       setSaved(true);
-      if (!id) navigate(`/campaigns/${c.id}/edit`, { replace: true });
+      if (!id) onCreated?.(c.id);
     },
   });
   const upload = useMutation({
@@ -74,7 +92,7 @@ export function CampaignFormPage() {
     mutationFn: () => post(`/campaigns/${id}/submit`),
     onSuccess: () => {
       void qc.invalidateQueries();
-      navigate(`/campaigns/${id}`);
+      onSubmitted?.();
     },
   });
 
@@ -104,90 +122,88 @@ export function CampaignFormPage() {
     save.mutate(parsed.data);
   };
 
+  const doc = c?.documents[0];
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title={id ? 'Edit campaign' : 'Buat campaign baru'}
-        subtitle="Lengkapi data, unggah proposal PDF, lalu ajukan untuk direview admin BINUS."
-      />
-      {c?.status === 'REJECTED' && <div className="mb-4"><ErrorBox error={`Ditolak: ${c.rejectionReason}`} /></div>}
-      {locked && <div className="mb-4"><ErrorBox error="Campaign sudah diajukan/aktif sehingga tidak bisa diedit." /></div>}
+    <div className="space-y-3">
+      {c?.status === 'REJECTED' && <InfoNote tone="amber">Ditolak: {c.rejectionReason}</InfoNote>}
+      {locked && <InfoNote tone="red">Kampanye sudah diajukan/aktif sehingga tidak bisa diedit.</InfoNote>}
 
-      <form className="card space-y-4 p-6" onSubmit={onSave}>
+      <form className="card space-y-4 p-4" onSubmit={onSave}>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[13px] text-ink">{c ? `${c.title} · ${c.status === 'DRAFT' ? 'belum dipublikasikan' : 'revisi'}` : 'Kampanye baru · belum dipublikasikan'}</p>
+          <span className="badge bg-[#F1F3F4] text-slate-600">{c ? (c.status === 'PENDING_REVIEW' ? 'Pending' : c.status) : 'Draft'}</span>
+        </div>
         <fieldset disabled={!!locked} className="space-y-4">
           <div>
-            <label className="label" htmlFor="title">Judul</label>
+            <label className="label" htmlFor="title">Judul kampanye *</label>
             <input id="title" className="input" value={form.title} onChange={(e) => set('title', e.target.value)} />
             {errors.title && <p className="mt-1 text-xs text-red-600">{errors.title}</p>}
           </div>
           <div>
-            <label className="label" htmlFor="description">Deskripsi & rencana penggunaan dana</label>
-            <textarea id="description" className="input min-h-[140px]" value={form.description} onChange={(e) => set('description', e.target.value)} />
+            <label className="label" htmlFor="description">Deskripsi & rencana penggunaan dana *</label>
+            <textarea id="description" className="input min-h-[76px]" value={form.description} onChange={(e) => set('description', e.target.value)} />
             {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description}</p>}
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="sm:col-span-3">
-              <label className="label" htmlFor="sdg">Kategori SDG</label>
-              <select id="sdg" className="input" value={form.sdgCategory} onChange={(e) => set('sdgCategory', e.target.value)}>
-                <option value="">Pilih…</option>
-                {SDG_CATEGORIES.map((s) => <option key={s.code} value={s.code}>SDG {s.number} · {s.label}</option>)}
-              </select>
-              {errors.sdgCategory && <p className="mt-1 text-xs text-red-600">{errors.sdgCategory}</p>}
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label" htmlFor="target">Target dana (Rp)</label>
+          <div>
+            <label className="label" htmlFor="sdg">Kategori SDG *</label>
+            <select id="sdg" className="input" value={form.sdgCategory} onChange={(e) => set('sdgCategory', e.target.value)}>
+              <option value="">Pilih…</option>
+              {SDG_CATEGORIES.map((s) => <option key={s.code} value={s.code}>SDG {s.number} · {s.label}</option>)}
+            </select>
+            {errors.sdgCategory && <p className="mt-1 text-xs text-red-600">{errors.sdgCategory}</p>}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="target">Target dana (IDR) *</label>
               <input id="target" type="number" className="input" min={LIMITS.DONATION_MIN} step={10000} value={form.targetAmount || ''} onChange={(e) => set('targetAmount', Number(e.target.value))} />
               {errors.targetAmount && <p className="mt-1 text-xs text-red-600">{errors.targetAmount}</p>}
             </div>
             <div>
-              <label className="label" htmlFor="deadline">Deadline</label>
+              <label className="label" htmlFor="deadline">Batas waktu *</label>
               <input id="deadline" type="date" className="input" min={minDeadline()} value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
-              {errors.deadline && <p className="mt-1 text-xs text-red-600">{errors.deadline}</p>}
+              {errors.deadline ? <p className="mt-1 text-xs text-red-600">{errors.deadline}</p> : <p className="mt-1 text-xs text-slate-500">Harus tanggal di masa depan.</p>}
             </div>
           </div>
+          <div>
+            <label className="label" htmlFor="proposal">Upload proposal PDF *</label>
+            {doc && (
+              <p className="mb-2 flex flex-wrap items-center gap-1 text-[13px] text-ink">
+                <FileButton linkPath={`/documents/${doc.id}/link`} className="hover:underline">{doc.originalName}</FileButton>
+                · {fileSize(doc.size)} <CheckCircle2 size={14} className="text-emerald-600" /> <span className="text-xs text-slate-500">({dateTime(doc.createdAt)})</span>
+              </p>
+            )}
+            <div className="flex gap-2">
+              <input
+                id="proposal"
+                type="file"
+                accept="application/pdf,.pdf"
+                className="input"
+                disabled={!id}
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+              {id && (
+                <button type="button" className="btn-secondary" disabled={!file || upload.isPending} onClick={() => upload.mutate()} aria-label="Unggah proposal">
+                  <FileUp size={15} /> {upload.isPending ? 'Mengunggah…' : doc ? 'Ganti' : 'Unggah'}
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              {id ? 'Wajib PDF · maksimum 4 MB.' : 'Simpan draft dulu, lalu unggah proposal (PDF · maksimum 4 MB).'}
+            </p>
+          </div>
         </fieldset>
-        <ErrorBox error={save.error} />
+        <ErrorBox error={save.error ?? upload.error ?? submit.error} />
         {saved && !save.isPending && <SuccessBox>Tersimpan sebagai draft.</SuccessBox>}
         {!locked && (
-          <div className="flex justify-end">
-            <button className="btn-primary" disabled={save.isPending}>{save.isPending ? 'Menyimpan…' : id ? 'Simpan perubahan' : 'Simpan draft'}</button>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary font-normal" disabled={save.isPending}>{save.isPending ? 'Menyimpan…' : 'Simpan draft'}</button>
+            <button type="button" className="btn-primary font-normal" disabled={!id || !doc || submit.isPending} onClick={() => submit.mutate()}>
+              <Send size={14} /> {c?.status === 'REJECTED' ? 'Ajukan ulang' : 'Kirim untuk review admin'}
+            </button>
           </div>
         )}
+        <p className="text-xs text-slate-500">Kampanye baru menerima donasi setelah disetujui dan berstatus ACTIVE.</p>
       </form>
-
-      {id && c && !locked && (
-        <div className="card mt-6 p-6">
-          <h2 className="flex items-center gap-2 font-semibold"><FileUp size={18} className="text-navy" /> Proposal (PDF, maks. 4MB)</h2>
-          {c.documents.length > 0 ? (
-            <p className="mt-2 flex items-center gap-2 text-sm text-emerald-700">
-              <CheckCircle2 size={16} /> Terunggah:
-              <FileButton linkPath={`/documents/${c.documents[0].id}/link`} className="underline">
-                {c.documents[0].originalName}
-              </FileButton>
-              <span className="text-xs text-slate-500">({dateTime(c.documents[0].createdAt)})</span>
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-slate-500">Belum ada proposal. Wajib diunggah sebelum diajukan.</p>
-          )}
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <input type="file" accept="application/pdf,.pdf" className="text-sm" onChange={(e) => setFile(e.target.files?.[0] ?? null)} aria-label="Pilih file proposal" />
-            <button className="btn-secondary" disabled={!file || upload.isPending} onClick={() => upload.mutate()}>
-              {upload.isPending ? 'Mengunggah…' : c.documents.length ? 'Ganti proposal' : 'Unggah'}
-            </button>
-          </div>
-          <p className="mt-2 text-xs text-slate-500">Butuh contoh? Pakai <code>samples/proposal-contoh.pdf</code> di folder project.</p>
-          <div className="mt-3"><ErrorBox error={upload.error} /></div>
-
-          <div className="mt-6 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-600">Setelah diajukan, campaign tidak bisa diedit sampai admin memberi keputusan.</p>
-            <button className="btn-primary" disabled={!c.documents.length || submit.isPending} onClick={() => submit.mutate()}>
-              <Send size={16} /> {c.status === 'REJECTED' ? 'Ajukan ulang' : 'Ajukan untuk review'}
-            </button>
-          </div>
-          <div className="mt-3"><ErrorBox error={submit.error} /></div>
-        </div>
-      )}
-      {id && <p className="mt-4 text-sm"><Link to={`/campaigns/${id}`} className="text-navy hover:underline">← Lihat halaman campaign</Link></p>}
     </div>
   );
 }
