@@ -5,10 +5,8 @@ import { floorToSecond } from '../../common/format';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
+import { COMMITTED, lockCampaign } from '../disbursements/disbursements.service';
 import { GatewayEvent, PAYMENT_GATEWAY, PaymentGateway, WebhookInput } from './adapters/payment-gateway';
-
-/** Status pencairan yang sudah "mengikat" dana campaign (sama dengan COMMITTED di DisbursementsService). */
-const COMMITTED_DISBURSEMENT = ['REQUESTED', 'APPROVED', 'PAID'];
 
 /**
  * Aturan refund (manual oleh admin; Pakasir tidak punya API refund):
@@ -226,9 +224,10 @@ export class PaymentsService {
       const { count } = await tx.donation.updateMany({ where: { id: donationId, status: 'PAID' }, data: { status: 'REFUNDED' } });
       if (count === 0) throw new AppError('DONATION_NOT_REFUNDABLE', 'Donasi sudah tidak berstatus PAID (mungkin sudah di-refund).');
 
+      await lockCampaign(tx, donation.campaignId);
       const campaign = await tx.campaign.findUniqueOrThrow({ where: { id: donation.campaignId } });
       const committed = await tx.disbursement.aggregate({
-        where: { campaignId: campaign.id, status: { in: COMMITTED_DISBURSEMENT } },
+        where: { campaignId: campaign.id, status: { in: COMMITTED } },
         _sum: { amount: true },
       });
       assertRefundable('PAID', donation.amount, campaign.currentAmount - (committed._sum.amount ?? 0)); // throw = rollback

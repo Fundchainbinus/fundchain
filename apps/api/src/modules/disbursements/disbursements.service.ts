@@ -8,7 +8,15 @@ import { DISBURSABLE_STATUSES } from '../campaigns/campaign-status';
 import { StorageService } from '../storage/storage.service';
 
 /** Dana yang sudah dikunci oleh pengajuan aktif/selesai. */
-const COMMITTED: DisbursementStatus[] = ['REQUESTED', 'APPROVED', 'PAID'];
+export const COMMITTED: DisbursementStatus[] = ['REQUESTED', 'APPROVED', 'PAID'];
+
+/**
+ * Kunci baris campaign sampai transaksi selesai. Dipakai oleh semua operasi yang membaca saldo
+ * lalu mengubahnya (pengajuan pencairan, refund) supaya tidak saling balapan di READ COMMITTED.
+ */
+export async function lockCampaign(tx: Db, campaignId: string) {
+  await tx.$queryRaw`SELECT id FROM campaigns WHERE id = ${campaignId} FOR UPDATE`;
+}
 
 export function assertDisbursable(status: string) {
   if (status === 'FROZEN') {
@@ -62,6 +70,7 @@ export class DisbursementsService {
     const proof = await this.storage.save(file, `disbursements/${campaignId}`, ['pdf', 'png', 'jpg']);
     return this.prisma.$transaction(async (tx) => {
       // Cek ulang di dalam transaksi supaya dua pengajuan bersamaan tidak melebihi saldo.
+      await lockCampaign(tx, campaignId);
       const fresh = await tx.campaign.findUniqueOrThrow({ where: { id: campaignId } });
       assertDisbursable(fresh.status);
       if (input.amount > (await this.available(tx, campaignId, fresh.currentAmount))) {

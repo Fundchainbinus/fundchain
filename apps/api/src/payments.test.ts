@@ -133,6 +133,7 @@ function fakeDb(opts: { donationStatus?: string; campaignAmount?: number; commit
     audit: [] as any[],
   };
   const tx = {
+    $queryRaw: async () => [],
     donation: {
       updateMany: async ({ where, data }: any) => {
         if (state.donation.id !== where.id || state.donation.status !== where.status) return { count: 0 };
