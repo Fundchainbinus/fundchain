@@ -76,7 +76,7 @@ export function SdgTag({ code }: { code: string }) {
   const s = sdg(code);
   if (!s) return null;
   return (
-    <span className="badge bg-accent-light text-amber-900" title={s.label}>
+    <span className="badge bg-accent-light text-amber-900 inline-block min-w-0 break-words whitespace-normal" title={s.label}>
       SDG {s.number} · {s.label}
     </span>
   );
