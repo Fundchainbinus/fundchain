@@ -125,7 +125,7 @@ model Payment {
   externalPaymentId String?   @unique @map("external_payment_id")
   method            String    @default("QRIS")
   amount            Int
-  status            String    @default("PENDING") // PENDING | SETTLED | FAILED | EXPIRED
+  status            String    @default("PENDING") // PENDING | SETTLED | FAILED | EXPIRED | REFUNDED
   qrString          String?   @map("qr_string")
   paymentUrl        String?   @map("payment_url")
   expiresAt         DateTime? @map("expires_at")

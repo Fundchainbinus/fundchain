@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Headers, HttpCode, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { AppError } from '../../common/app-error';
 import { type AuthedRequest, ClientIp, CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
 import { env } from '../../common/env';
@@ -18,6 +18,11 @@ class CreateDonationDto {
 
   @IsOptional() @IsBoolean()
   anonymous?: boolean;
+}
+
+class RefundDto {
+  @IsString() @MinLength(5, { message: 'Alasan refund minimal 5 karakter' }) @MaxLength(500)
+  reason!: string;
 }
 
 class SimulatePaymentDto {
@@ -80,6 +85,19 @@ export class DonationsController {
   @Get('admin/donations')
   listAll(@Query('campaignId') campaignId?: string, @Query('integrityStatus') integrityStatus?: string) {
     return this.donations.listAll({ campaignId, integrityStatus });
+  }
+
+  /** Catat refund manual (dana dikembalikan di luar sistem). Hanya donasi PAID. */
+  @Roles('ADMIN')
+  @Post('admin/donations/:id/refund')
+  @HttpCode(200)
+  refund(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RefundDto,
+    @CurrentUser() user: CurrentUserPayload,
+    @ClientIp() ip: string | null,
+  ) {
+    return this.payments.refund(id, dto.reason, user.id, ip);
   }
 
   /** Webhook payment gateway. Keaslian diverifikasi oleh adapter (signature / konfirmasi API). */

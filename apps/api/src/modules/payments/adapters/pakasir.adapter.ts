@@ -89,6 +89,16 @@ export class PakasirAdapter implements PaymentGateway {
     };
   }
 
+  /** POST {base}/api/transactioncancel { project, order_id, amount, api_key } — QR lama tidak bisa dibayar lagi. */
+  async cancelCharge(orderId: string, amount: number): Promise<void> {
+    const { baseUrl, project, apiKey } = this.cfg;
+    await this.request(`${baseUrl}/api/transactioncancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project, order_id: orderId, amount, api_key: apiKey }),
+    });
+  }
+
   private async request(url: string, init: RequestInit): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10_000);
