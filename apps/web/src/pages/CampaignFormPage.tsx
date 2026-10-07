@@ -19,7 +19,7 @@ const schema = z.object({
     .int('Target harus bilangan bulat')
     .min(LIMITS.DONATION_MIN, 'Target minimal Rp10.000')
     .max(LIMITS.TARGET_MAX, 'Target maksimal Rp1.000.000.000'),
-  deadline: z.string().refine((v) => v && new Date(v).getTime() > Date.now(), 'Deadline harus di masa depan'),
+  deadline: z.string().refine((v) => v && new Date(v).getTime() > (Date.now() + 1 * 86_400_000), 'Deadline minimal 2 hari dari hari ini'),
 });
 type Form = z.infer<typeof schema>;
 
