@@ -1,6 +1,7 @@
+import { SDG_CATEGORIES } from "@fundchain/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { useState, useMemo } from "react"; // Tambahkan import ini
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { CampaignCard } from "../components/CampaignCard";
 import {
@@ -31,8 +32,9 @@ export function MyCampaignsPage() {
   const campaigns = q.data?.campaigns || [];
 
   const sdgOptions = useMemo(() => {
-    const categories = campaigns.map((c) => c.sdgCategory).filter(Boolean);
-    return Array.from(new Set(categories)).sort();
+    // Urutkan sesuai nomor SDG (1-17), bukan alfabet kode.
+    const codes = new Set(campaigns.map((c) => c.sdgCategory));
+    return SDG_CATEGORIES.filter((s) => codes.has(s.code));
   }, [campaigns]);
 
   const filteredCampaigns = useMemo(() => {
@@ -76,9 +78,9 @@ export function MyCampaignsPage() {
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy sm:w-64"
             >
               <option value="ALL">Semua SDG ({campaigns.length})</option>
-              {sdgOptions.map((sdg) => (
-                <option key={sdg} value={sdg}>
-                  SDG {sdg}
+              {sdgOptions.map((s) => (
+                <option key={s.code} value={s.code}>
+                  SDG {s.number} · {s.label}
                 </option>
               ))}
             </select>
