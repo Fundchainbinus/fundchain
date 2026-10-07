@@ -7,6 +7,27 @@ import { AuditService } from '../audit/audit.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { GatewayEvent, PAYMENT_GATEWAY, PaymentGateway, WebhookInput } from './adapters/payment-gateway';
 
+/** Status pencairan yang sudah "mengikat" dana campaign (sama dengan COMMITTED di DisbursementsService). */
+const COMMITTED_DISBURSEMENT = ['REQUESTED', 'APPROVED', 'PAID'];
+
+/**
+ * Aturan refund (manual oleh admin; Pakasir tidak punya API refund):
+ *  - hanya donasi PAID yang bisa di-refund (REFUNDED/FAILED/EXPIRED/PENDING ditolak);
+ *  - nominal tidak boleh melebihi saldo campaign yang belum terikat pencairan.
+ */
+export function assertRefundable(status: string, amount: number, available: number) {
+  if (status !== 'PAID') {
+    throw new AppError('DONATION_NOT_REFUNDABLE', `Donasi berstatus ${status}; hanya donasi PAID yang bisa di-refund.`);
+  }
+  if (amount > available) {
+    throw new AppError(
+      'REFUND_EXCEEDS_AVAILABLE',
+      'Saldo campaign yang belum dicairkan lebih kecil dari nominal refund. Tolak/selesaikan pencairan terkait dulu.',
+      { amount, available },
+    );
+  }
+}
+
 export interface SettlementOutcome {
   received: true;
   replayed: boolean;
@@ -163,6 +184,8 @@ export class PaymentsService {
     const stale = await this.prisma.payment.findMany({
       where: { status: 'PENDING', expiresAt: { lt: new Date() } },
       select: { donationId: true, amount: true },
+      orderBy: { expiresAt: 'asc' },
+      take: 100, // batasi per tick supaya tidak melewati batas waktu serverless
     });
     for (const p of stale) {
       // Cek terakhir ke gateway supaya pembayaran di detik terakhir tidak hilang.
@@ -172,7 +195,65 @@ export class PaymentsService {
           ? latest
           : { orderId: p.donationId, externalId: null, status: 'EXPIRED', amount: p.amount, method: 'QRIS', raw: null };
       await this.applyEvent(event).catch(() => undefined);
+      // Tutup QR di gateway agar tidak bisa dibayar setelah dianggap kedaluwarsa (best-effort).
+      if (event.status === 'EXPIRED' && this.gateway.cancelCharge) {
+        await this.gateway.cancelCharge(p.donationId, p.amount).catch((e) =>
+          this.logger.warn(`cancelCharge ${p.donationId} gagal: ${(e as Error).message}`),
+        );
+      }
     }
     return stale.length;
+  }
+
+  /**
+   * Refund manual oleh admin. Dana dikembalikan di luar sistem (Pakasir tidak punya API refund);
+   * method ini hanya mencatat status + mengoreksi saldo campaign.
+   *
+   * PENTING: hash, canonicalPayload, donatedAt, dan baris blockchainTransaction TIDAK diubah.
+   * Bukti on-chain permanen; integrity checker hanya memeriksa donasi PAID sehingga donasi
+   * REFUNDED tidak akan terdeteksi TAMPERED.
+   */
+  async refund(donationId: string, reason: string, actorId: string, ip: string | null) {
+    const donation = await this.prisma.donation.findUnique({
+      where: { id: donationId },
+      include: { payment: true, blockchain: { select: { status: true } } },
+    });
+    if (!donation || !donation.payment) throw new AppError('DONATION_NOT_FOUND', 'Donasi tidak ditemukan.');
+    assertRefundable(donation.status, donation.amount, Number.MAX_SAFE_INTEGER); // cek cepat di luar transaksi
+
+    await this.prisma.$transaction(async (tx) => {
+      // Guard atomic: hanya satu refund yang bisa menang.
+      const { count } = await tx.donation.updateMany({ where: { id: donationId, status: 'PAID' }, data: { status: 'REFUNDED' } });
+      if (count === 0) throw new AppError('DONATION_NOT_REFUNDABLE', 'Donasi sudah tidak berstatus PAID (mungkin sudah di-refund).');
+
+      const campaign = await tx.campaign.findUniqueOrThrow({ where: { id: donation.campaignId } });
+      const committed = await tx.disbursement.aggregate({
+        where: { campaignId: campaign.id, status: { in: COMMITTED_DISBURSEMENT } },
+        _sum: { amount: true },
+      });
+      assertRefundable('PAID', donation.amount, campaign.currentAmount - (committed._sum.amount ?? 0)); // throw = rollback
+
+      await tx.payment.updateMany({ where: { donationId, status: 'SETTLED' }, data: { status: 'REFUNDED' } });
+      await tx.campaign.update({ where: { id: campaign.id }, data: { currentAmount: { decrement: donation.amount } } });
+      await this.audit.log(
+        {
+          actorId,
+          action: 'DONATION_REFUNDED',
+          entityType: 'Donation',
+          entityId: donationId,
+          metadata: {
+            amount: donation.amount,
+            campaignId: campaign.id,
+            reason,
+            hash: donation.hash,
+            onchainStatus: donation.blockchain?.status ?? null,
+          },
+          ipAddress: ip,
+        },
+        tx,
+      );
+    });
+    this.logger.log(`Donasi ${donationId} REFUNDED (Rp${donation.amount}) oleh admin ${actorId}`);
+    return { donationId, status: 'REFUNDED' as const };
   }
 }

@@ -38,6 +38,8 @@ export interface PaymentGateway {
   verifyWebhook(input: WebhookInput): Promise<GatewayEvent>;
   /** Fallback polling bila webhook tidak datang. */
   fetchStatus?(orderId: string, amount: number): Promise<GatewayEvent | null>;
+  /** Batalkan charge PENDING di sisi gateway (dipanggil saat expire). Best-effort. */
+  cancelCharge?(orderId: string, amount: number): Promise<void>;
 }
 
 export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');
