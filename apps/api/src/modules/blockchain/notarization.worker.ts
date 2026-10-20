@@ -13,11 +13,14 @@ import { BlockchainService } from './blockchain.service';
 
 const HOUSEKEEPING_MS = 60_000;
 const STUCK_SUBMITTED_MS = 120_000;
+/** Jeda cek ulang tx lama yang masih pending (supaya RPC tidak ditanya tiap tick). */
+const PENDING_RECHECK_MS = 15_000;
 
 /**
  * Worker notarisasi (in-process).
  * Antrean = tabel blockchain_transactions (outbox pattern) — tidak butuh Redis untuk local.
  * State: QUEUED → SUBMITTED → CONFIRMED · gagal → RETRYING (backoff 2s,4s,8s,16s) · max 5x → FAILED.
+ * Anti duplicate: job RETRYING yang tx lamanya masih pending ditunda, tidak dikirim ulang.
  * Invariant: status PAID donasi TIDAK PERNAH diubah oleh worker (BR-BC-004).
  */
 @Injectable()
@@ -122,6 +125,9 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
         return;
       }
 
+      // Anti duplicate: tx lama (mis. RPC putus saat menunggu receipt) bisa masih di mempool.
+      if (job.txHash && (await this.previousTxStillPending(job))) return;
+
       // Klaim atomic: di serverless beberapa instance bisa memproses antrean bersamaan.
       // Hanya pemenang klaim yang mengirim tx, sehingga tidak ada tx dobel.
       const claim = await this.prisma.blockchainTransaction.updateMany({
@@ -148,6 +154,35 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
         await this.retry(job, revert ?? (e as Error).message);
       }
     }
+  }
+
+  /**
+   * true  → tx lama masih pending / belum bisa dicek: tunda, jangan kirim tx baru.
+   * false → tx lama dropped atau sudah di-mine tanpa mencatat hash: aman kirim ulang.
+   */
+  private async previousTxStillPending(job: BlockchainTransaction): Promise<boolean> {
+    let previous: { blockNumber: number | null } | null;
+    try {
+      previous = await this.blockchain.getProvider().getTransaction(job.txHash!);
+    } catch (e) {
+      this.logger.warn(`Status tx ${job.txHash} belum bisa dicek, kirim ulang ditunda: ${(e as Error).message}`);
+      await this.postpone(job);
+      return true;
+    }
+    if (previous && previous.blockNumber == null) {
+      this.logger.warn(`Tx ${job.txHash} donasi ${job.donationId} masih pending, tidak dikirim ulang`);
+      await this.postpone(job);
+      return true;
+    }
+    return false;
+  }
+
+  /** Tunda tanpa mengubah status & retryCount. */
+  private async postpone(job: BlockchainTransaction) {
+    await this.prisma.blockchainTransaction.update({
+      where: { id: job.id },
+      data: { nextAttemptAt: new Date(Date.now() + PENDING_RECHECK_MS) },
+    });
   }
 
   private async confirm(
