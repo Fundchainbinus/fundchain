@@ -1,0 +1,11 @@
+# Dibaca oleh GitHub for Atlassian: memetakan nama environment deployment Vercel
+# ke environment Jira supaya muncul di halaman Deployments project BFD.
+# Deployment hanya tercatat di Jira kalau commit/branch/PR-nya menyebut issue key (mis. BFD-48).
+deployments:
+  environmentMapping:
+    development:
+      - "Development*"
+    staging:
+      - "Preview*"
+    production:
+      - "Production*"
