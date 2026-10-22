@@ -142,6 +142,18 @@ Salin `apps/api/.env.example` → `apps/api/.env` (file ini tidak di-commit). Va
 2. Di `apps/api/.env`: `BLOCKCHAIN_NETWORK=sepolia`, `CHAIN_ID=11155111`, `BLOCKCHAIN_RPC_URL=<rpc sepolia>`, `RELAYER_PRIVATE_KEY=<kunci relayer>`, `BLOCKCHAIN_CONFIRMATIONS=2`.
 3. Isi relayer dengan Sepolia ETH dari faucet. Link Etherscan otomatis muncul di UI.
 
+## Kontribusi & Jira
+
+Repo ini terhubung ke Jira (`fundchain.atlassian.net`, project **BFD**) lewat GitHub for Atlassian. Branch, commit, dan PR otomatis muncul di panel _Development_ issue Jira **kalau ada key issue-nya** (`BFD-<nomor>`, huruf besar):
+
+| Tempat   | Contoh                                          |
+| -------- | ----------------------------------------------- |
+| Branch   | `feat/BFD-56-campaign-filter`                   |
+| Commit   | `BFD-56 feat(web): filter campaign berdasar SDG` |
+| Judul PR | `BFD-56 feat(web): filter campaign berdasar SDG` |
+
+Satu PR bisa menyebut beberapa key (`BFD-56 BFD-57 ...`). Kalau lupa, cukup edit judul PR-nya; Jira akan menautkan ulang.
+
 ## Test
 
 ```bash
