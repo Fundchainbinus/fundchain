@@ -1,5 +1,5 @@
 import type { BlockchainTransaction } from '@prisma/client';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Dependency worker diganti stub: test tidak menyentuh DB, RPC, maupun Vercel.
 vi.mock('./common/prisma.service', () => ({ PrismaService: class {} }));
@@ -61,9 +61,16 @@ function matches(job: Job, where: Record<string, any>): boolean {
 function createFakePrisma() {
   const jobs = new Map<string, Job>();
   const donations = new Map<string, { id: string; status: string; hash: string | null }>();
+  const auditLogs: { action: string; entityId?: string | null; metadata?: any }[] = [];
   const prisma: any = {
     jobs,
     donations,
+    auditLogs,
+    auditLog: {
+      findMany: vi.fn(async ({ where }: any) =>
+        auditLogs.filter((l) => l.action === where.action && where.entityId.in.includes(l.entityId)),
+      ),
+    },
     blockchainTransaction: {
       findMany: vi.fn(async ({ where, take }: any) => {
         const rows = [...jobs.values()].filter((j) => matches(j, where)).map((j) => ({ ...j }));
@@ -136,7 +143,7 @@ function createFakeChain() {
 function setup(jobOver: Partial<Job> = {}, donationStatus = 'PAID') {
   const prisma = createFakePrisma();
   const chain = createFakeChain();
-  const audit = { log: vi.fn(async () => undefined) };
+  const audit = { log: vi.fn(async (entry: any) => void prisma.auditLogs.push(entry)) };
   const integrity = { verifyDonation: vi.fn(async () => undefined), verifyStale: vi.fn(async () => undefined) };
   const campaigns = { completeExpired: vi.fn(async () => 0), softDeleteFrozen: vi.fn(async () => 0) };
   const payments = { expireStale: vi.fn(async () => 0) };
@@ -169,7 +176,7 @@ describe('NotarizationWorker: jalur sukses', () => {
     expect(chain.writer.notarize).toHaveBeenCalledTimes(1);
     expect(chain.writer.notarize).toHaveBeenCalledWith(KEY, HASH);
     const tx = await chain.writer.notarize.mock.results[0].value;
-    expect(tx.wait).toHaveBeenCalledWith(2);
+    expect(tx.wait).toHaveBeenCalledWith(2, 45_000);
     expect(job.status).toBe('CONFIRMED');
     expect(job.txHash).toBe(tx.hash);
     expect(job.blockNumber).toBe(101);
@@ -411,5 +418,168 @@ describe('NotarizationWorker: invariant status donasi', () => {
     expect(job.status).toBe('FAILED');
     expect(prisma.donations.get('don-1').status).toBe('PAID');
     expect(prisma.donation.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('NotarizationWorker: tx lambat tidak mengunci antrean', () => {
+  function addJob(prisma: any, n: number) {
+    const key = '0x' + String(n).repeat(64).slice(0, 64);
+    prisma.jobs.set(`job-${n}`, makeJob({ id: `job-${n}`, donationId: `don-${n}`, onchainKey: key }));
+    prisma.donations.set(`don-${n}`, { id: `don-${n}`, status: 'PAID', hash: HASH });
+    return prisma.jobs.get(`job-${n}`) as Job;
+  }
+
+  it('receipt tidak datang dalam batas waktu -> job tetap SUBMITTED, job berikutnya tetap diproses', async () => {
+    const { worker, chain, prisma, job } = setup();
+    const second = addJob(prisma, 2);
+    chain.writer.notarize.mockImplementationOnce(async () => ({
+      hash: '0xlambat',
+      wait: async () => {
+        throw { code: 'TIMEOUT' };
+      },
+    }));
+
+    await worker.tick();
+
+    expect(job.status).toBe('SUBMITTED');
+    expect(job.txHash).toBe('0xlambat');
+    expect(job.retryCount).toBe(0);
+    expect(second.status).toBe('CONFIRMED');
+    expect(chain.writer.notarize).toHaveBeenCalledTimes(2);
+  });
+
+  it('tx yang timeout dikonfirmasi tick berikutnya begitu receipt cukup konfirmasi', async () => {
+    const { worker, chain, job } = setup({
+      status: 'SUBMITTED',
+      txHash: '0xlambat',
+      submittedAt: new Date(Date.now() - 30_000),
+    });
+    chain.provider.getTransactionReceipt.mockResolvedValue({ status: 1, blockNumber: 77, confirmations: async () => 2 });
+
+    await worker.tick();
+
+    expect(job.status).toBe('CONFIRMED');
+    expect(job.blockNumber).toBe(77);
+    expect(chain.writer.notarize).not.toHaveBeenCalled();
+  });
+
+  it('error selain timeout saat menunggu receipt tetap masuk RETRYING', async () => {
+    const { worker, chain, job } = setup();
+    chain.writer.notarize.mockImplementationOnce(async () => ({
+      hash: '0xputus',
+      wait: async () => {
+        throw new Error('connection reset');
+      },
+    }));
+
+    await worker.tick();
+
+    expect(job.status).toBe('RETRYING');
+    expect(job.retryCount).toBe(1);
+  });
+});
+
+describe('NotarizationWorker: alert notarisasi macet > 10 menit', () => {
+  const OLD = () => new Date(Date.now() - 11 * 60_000);
+  const stuckLogs = (prisma: any) => prisma.auditLogs.filter((l: any) => l.action === 'BLOCKCHAIN_TX_STUCK');
+
+  const realFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    process.env.ALERT_WEBHOOK_URL = 'https://discord.test/webhook';
+    (globalThis as any).fetch = vi.fn(async () => ({ ok: true, status: 204 }));
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.ALERT_WEBHOOK_URL;
+  });
+
+  it('belum CONFIRMED > 10 menit -> audit BLOCKCHAIN_TX_STUCK + alert ke webhook', async () => {
+    const { worker, prisma } = setup({
+      status: 'RETRYING',
+      retryCount: 2,
+      createdAt: OLD(),
+      lastError: 'network timeout',
+      nextAttemptAt: new Date(Date.now() + 60_000),
+    });
+
+    await worker.tick();
+
+    const logs = stuckLogs(prisma);
+    expect(logs).toHaveLength(1);
+    expect(logs[0].entityId).toBe('don-1');
+    expect(logs[0].metadata.status).toBe('RETRYING');
+    expect(logs[0].metadata.ageMinutes).toBeGreaterThanOrEqual(11);
+    const fetchMock = (globalThis as any).fetch;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.content).toContain('don-1');
+    expect(body.content).toContain('network timeout');
+  });
+
+  it('tetap terdeteksi walaupun RPC sedang mati', async () => {
+    const { worker, chain, prisma } = setup({ createdAt: OLD() });
+    chain.ready = false;
+
+    await worker.tick();
+
+    expect(stuckLogs(prisma)).toHaveLength(1);
+    expect(chain.writer.notarize).not.toHaveBeenCalled();
+  });
+
+  it('alert hanya sekali per donasi', async () => {
+    const { worker, prisma } = setup({ status: 'RETRYING', createdAt: OLD(), nextAttemptAt: new Date(Date.now() + 60_000) });
+
+    await worker.tick();
+    (worker as any).lastStuckCheck = 0;
+    await worker.tick();
+    (worker as any).lastStuckCheck = 0;
+    await worker.tick();
+
+    expect(stuckLogs(prisma)).toHaveLength(1);
+    expect((globalThis as any).fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('job yang belum 10 menit tidak di-alert', async () => {
+    const { worker, chain, prisma } = setup({ createdAt: new Date(Date.now() - 5 * 60_000) });
+    chain.ready = false;
+
+    await worker.tick();
+
+    expect(stuckLogs(prisma)).toHaveLength(0);
+    expect((globalThis as any).fetch).not.toHaveBeenCalled();
+  });
+
+  it('job CONFIRMED / FAILED lama tidak di-alert', async () => {
+    const { worker, prisma } = setup({ status: 'FAILED', createdAt: OLD() });
+    prisma.jobs.set('job-2', makeJob({ id: 'job-2', donationId: 'don-2', status: 'CONFIRMED', createdAt: OLD() }));
+
+    await worker.tick();
+
+    expect(stuckLogs(prisma)).toHaveLength(0);
+  });
+
+  it('webhook gagal tidak menghentikan worker', async () => {
+    const { worker, prisma, job } = setup({ createdAt: OLD() });
+    (globalThis as any).fetch = vi.fn(async () => {
+      throw new Error('discord down');
+    });
+
+    await worker.tick();
+
+    expect(stuckLogs(prisma)).toHaveLength(1);
+    expect(job.status).toBe('CONFIRMED');
+  });
+
+  it('tanpa ALERT_WEBHOOK_URL alert cukup tercatat di audit & log', async () => {
+    process.env.ALERT_WEBHOOK_URL = '';
+    const { worker, chain, prisma } = setup({ createdAt: OLD() });
+    chain.ready = false;
+
+    await worker.tick();
+
+    expect(stuckLogs(prisma)).toHaveLength(1);
+    expect((globalThis as any).fetch).not.toHaveBeenCalled();
   });
 });
