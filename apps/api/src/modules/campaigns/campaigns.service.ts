@@ -333,7 +333,10 @@ export class CampaignsService {
       throw new AppError('CAMPAIGN_INVALID_STATUS', 'Hanya campaign FROZEN yang bisa di-unfreeze.');
     }
     // Pencairan tetap terkunci selama data belum dipulihkan & diverifikasi ulang.
-    const tampered = await this.prisma.donation.count({ where: { campaignId: id, integrityStatus: 'TAMPERED' } });
+    // Donasi yang sudah di-refund tidak lagi mengunci (dananya sudah keluar dari campaign).
+    const tampered = await this.prisma.donation.count({
+      where: { campaignId: id, status: 'PAID', integrityStatus: 'TAMPERED' },
+    });
     if (tampered > 0) {
       throw new AppError(
         'CAMPAIGN_FROZEN',

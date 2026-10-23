@@ -138,6 +138,15 @@ describe('hash checker otomatis', () => {
     expect(donation.lastCheckedAt).toBeInstanceOf(Date);
   });
 
+  it('donasi yang gagal dicek digeser ke belakang antrean (tidak menutup donasi lain)', async () => {
+    const { service, chain, prisma } = setupIntegrity();
+    chain.readOnchainHash.mockResolvedValueOnce('0x' + '0'.repeat(64)); // hash tidak ada di chain
+    const now = new Date('2026-10-23T12:00:00.000Z');
+    const r = await service.verifyStale(now);
+    expect(r).toMatchObject({ checked: 1, failed: 1 });
+    expect(prisma.donation.update).toHaveBeenCalledWith({ where: { id: 'don-1' }, data: { lastCheckedAt: now } });
+  });
+
   it('RPC mati → berhenti dan dicoba lagi di putaran berikutnya', async () => {
     const { service, chain } = setupIntegrity();
     const { AppError } = await import('./common/app-error');
@@ -236,6 +245,13 @@ describe('auto-freeze & soft-delete campaign', () => {
       2,
     );
     await expect(service.unfreeze('camp-1', admin, 'data sudah dipulihkan', null)).rejects.toMatchObject({ code: 'CAMPAIGN_FROZEN' });
+  });
+
+  it('donasi TAMPERED yang sudah di-refund tidak mengunci unfreeze', async () => {
+    const { service } = setupCampaigns({ id: 'camp-1', status: 'FROZEN', deadline: new Date('2099-01-01'), frozenAt: new Date(), deletedAt: null });
+    await service.unfreeze('camp-1', admin, 'donasi tamper sudah di-refund', null);
+    const where = (service as any).prisma.donation.count.mock.calls[0][0].where;
+    expect(where).toEqual({ campaignId: 'camp-1', status: 'PAID', integrityStatus: 'TAMPERED' });
   });
 
   it('unfreeze setelah data pulih membersihkan frozenAt & soft-delete', async () => {

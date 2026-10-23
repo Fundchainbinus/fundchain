@@ -199,6 +199,8 @@ export class IntegrityService {
         if (e instanceof AppError && e.code === 'BLOCKCHAIN_RPC_ERROR') throw e; // RPC down → coba lagi tick berikutnya
         failed++;
         this.logger.warn(`Cek terjadwal donasi ${id} gagal: ${(e as Error).message}`);
+        // Geser ke belakang antrean supaya donasi bermasalah tidak menutup donasi lain tiap putaran.
+        await this.prisma.donation.update({ where: { id }, data: { lastCheckedAt: now } }).catch(() => undefined);
       }
     }
     if (due.length) {
