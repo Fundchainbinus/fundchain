@@ -101,7 +101,7 @@ export class DonationsController {
     return this.donations.listAll({ campaignId, integrityStatus });
   }
 
-  /** Catat refund manual (dana dikembalikan di luar sistem). Hanya donasi PAID. */
+  /** Catat refund manual (dana dikembalikan di luar sistem). Hanya donasi PAID di campaign FROZEN. */
   @Roles('ADMIN')
   @Post('admin/donations/:id/refund')
   @HttpCode(200)
