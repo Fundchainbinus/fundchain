@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MOCK_SIGNATURE_HEADER, MockPaymentAdapter, signMockBody } from './modules/payments/adapters/mock.adapter';
 import { PakasirAdapter } from './modules/payments/adapters/pakasir.adapter';
-import { PaymentsService, assertRefundable } from './modules/payments/payments.service';
+import { PaymentsService, assertCampaignFrozen, assertRefundable } from './modules/payments/payments.service';
 
 const code = (c: string) => expect.objectContaining({ code: c });
 
@@ -18,6 +18,18 @@ describe('assertRefundable', () => {
 
   it('menolak bila saldo yang belum terikat pencairan kurang', () => {
     expect(() => assertRefundable('PAID', 50_001, 50_000)).toThrowError(code('REFUND_EXCEEDS_AVAILABLE'));
+  });
+});
+
+describe('assertCampaignFrozen', () => {
+  it('menerima campaign FROZEN', () => {
+    expect(() => assertCampaignFrozen('FROZEN')).not.toThrow();
+  });
+
+  it('menolak campaign selain FROZEN', () => {
+    for (const s of ['DRAFT', 'PENDING_REVIEW', 'ACTIVE', 'COMPLETED', 'REJECTED']) {
+      expect(() => assertCampaignFrozen(s)).toThrowError(code('REFUND_CAMPAIGN_NOT_FROZEN'));
+    }
   });
 });
 
@@ -125,11 +137,11 @@ describe('PakasirAdapter (fetch di-stub)', () => {
 });
 
 /** Prisma palsu in-memory: cukup untuk menguji alur refund termasuk rollback. */
-function fakeDb(opts: { donationStatus?: string; campaignAmount?: number; committed?: number }) {
+function fakeDb(opts: { donationStatus?: string; campaignAmount?: number; committed?: number; campaignStatus?: string }) {
   const state = {
     donation: { id: 'd1', campaignId: 'c1', amount: 50_000, status: opts.donationStatus ?? 'PAID', hash: '0xabc', canonicalPayload: '{"x":1}' },
     payment: { donationId: 'd1', status: 'SETTLED' },
-    campaign: { id: 'c1', currentAmount: opts.campaignAmount ?? 200_000 },
+    campaign: { id: 'c1', currentAmount: opts.campaignAmount ?? 200_000, status: opts.campaignStatus ?? 'FROZEN', frozenReason: 'Donasi TAMPERED' },
     audit: [] as any[],
   };
   const tx = {
@@ -191,6 +203,23 @@ describe('PaymentsService.refund', () => {
     await service.refund('d1', 'Salah transfer', 'admin1', null);
     await expect(service.refund('d1', 'Salah transfer', 'admin1', null)).rejects.toMatchObject({ code: 'DONATION_NOT_REFUNDABLE' });
     expect(state.campaign.currentAmount).toBe(150_000);
+  });
+
+  it('menolak refund bila campaign tidak FROZEN; status, saldo, dan audit tidak berubah (rollback)', async () => {
+    for (const campaignStatus of ['ACTIVE', 'COMPLETED']) {
+      const { state, service } = fakeDb({ campaignStatus });
+      await expect(service.refund('d1', 'Salah transfer', 'admin1', null)).rejects.toMatchObject({ code: 'REFUND_CAMPAIGN_NOT_FROZEN' });
+      expect(state.donation.status).toBe('PAID');
+      expect(state.payment.status).toBe('SETTLED');
+      expect(state.campaign.currentAmount).toBe(200_000);
+      expect(state.audit).toHaveLength(0);
+    }
+  });
+
+  it('audit refund mencatat status campaign FROZEN dan alasannya', async () => {
+    const { state, service } = fakeDb({});
+    await service.refund('d1', 'Donasi TAMPERED', 'admin1', null);
+    expect(state.audit[0].metadata).toMatchObject({ campaignStatus: 'FROZEN', frozenReason: 'Donasi TAMPERED' });
   });
 
   it('menolak donasi yang belum PAID', async () => {

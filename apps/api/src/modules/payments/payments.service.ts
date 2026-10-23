@@ -26,6 +26,18 @@ export function assertRefundable(status: string, amount: number, available: numb
   }
 }
 
+/**
+ * Refund khusus campaign FROZEN: refund adalah jalur penyelesaian saat campaign dibekukan
+ * karena masalah integritas. Di campaign ACTIVE/COMPLETED refund ditolak.
+ */
+export function assertCampaignFrozen(campaignStatus: string) {
+  if (campaignStatus !== 'FROZEN') {
+    throw new AppError('REFUND_CAMPAIGN_NOT_FROZEN', `Campaign berstatus ${campaignStatus}; refund hanya untuk campaign FROZEN.`, {
+      campaignStatus,
+    });
+  }
+}
+
 export interface SettlementOutcome {
   received: true;
   replayed: boolean;
@@ -204,8 +216,8 @@ export class PaymentsService {
   }
 
   /**
-   * Refund manual oleh admin. Dana dikembalikan di luar sistem (Pakasir tidak punya API refund);
-   * method ini hanya mencatat status + mengoreksi saldo campaign.
+   * Refund manual oleh admin, KHUSUS campaign FROZEN. Dana dikembalikan di luar sistem
+   * (Pakasir tidak punya API refund); method ini hanya mencatat status + mengoreksi saldo campaign.
    *
    * PENTING: hash, canonicalPayload, donatedAt, dan baris blockchainTransaction TIDAK diubah.
    * Bukti on-chain permanen; integrity checker hanya memeriksa donasi PAID sehingga donasi
@@ -226,6 +238,7 @@ export class PaymentsService {
 
       await lockCampaign(tx, donation.campaignId);
       const campaign = await tx.campaign.findUniqueOrThrow({ where: { id: donation.campaignId } });
+      assertCampaignFrozen(campaign.status); // di dalam transaksi + setelah lock: status tidak bisa berubah di tengah jalan; throw = rollback
       const committed = await tx.disbursement.aggregate({
         where: { campaignId: campaign.id, status: { in: COMMITTED } },
         _sum: { amount: true },
@@ -243,6 +256,8 @@ export class PaymentsService {
           metadata: {
             amount: donation.amount,
             campaignId: campaign.id,
+            campaignStatus: campaign.status,
+            frozenReason: campaign.frozenReason ?? null,
             reason,
             hash: donation.hash,
             onchainStatus: donation.blockchain?.status ?? null,
