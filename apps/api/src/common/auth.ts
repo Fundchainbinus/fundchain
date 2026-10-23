@@ -42,6 +42,11 @@ export const ClientIp = createParamDecorator((_data: unknown, ctx: ExecutionCont
   return ctx.switchToHttp().getRequest<Request>().ip ?? null;
 });
 
+/** User-Agent pemanggil, dipotong supaya audit log tidak bisa dibanjiri header panjang. */
+export const ClientUserAgent = createParamDecorator((_data: unknown, ctx: ExecutionContext) => {
+  return ctx.switchToHttp().getRequest<Request>().get('user-agent')?.slice(0, 500) ?? null;
+});
+
 @Injectable()
 export class ActingUserGuard implements CanActivate {
   constructor(

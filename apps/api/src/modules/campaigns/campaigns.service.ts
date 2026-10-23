@@ -3,6 +3,7 @@ import { CAMPAIGN_STATUSES, LIMITS, PUBLIC_CAMPAIGN_STATUSES, type CampaignStatu
 import { Prisma } from '@prisma/client';
 import { AppError } from '../../common/app-error';
 import type { CurrentUserPayload } from '../../common/auth';
+import { env } from '../../common/env';
 import { Db, PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../storage/storage.service';
@@ -55,6 +56,7 @@ export class CampaignsService {
       where: {
         creatorId: mine ? user!.id : undefined,
         status: statuses.length ? { in: statuses } : undefined,
+        deletedAt: adminScope ? undefined : null,
         sdgCategory: query.sdg || undefined,
         OR: query.q
           ? [
@@ -95,6 +97,7 @@ export class CampaignsService {
     if (!PUBLIC_CAMPAIGN_STATUSES.includes(campaign.status as CampaignStatus) && !isOwner && !isAdmin) {
       throw new AppError('CAMPAIGN_NOT_FOUND', 'Campaign tidak ditemukan.');
     }
+    if (campaign.deletedAt && !isAdmin) throw new AppError('CAMPAIGN_NOT_FOUND', 'Campaign tidak ditemukan.');
 
     const [integrity, disbursed, donorCount] = await Promise.all([
       this.prisma.donation.groupBy({
@@ -294,12 +297,15 @@ export class CampaignsService {
   }
 
   /** Bekukan campaign. Dipanggil admin manual atau sistem (integrity TAMPERED). */
-  async freeze(db: Db, id: string, reason: string, actorId: string | null, ip: string | null = null) {
+  async freeze(db: Db, id: string, reason: string, actorId: string | null, ip: string | null = null, userAgent: string | null = null) {
     const campaign = await db.campaign.findUnique({ where: { id } });
     if (!campaign) throw new AppError('CAMPAIGN_NOT_FOUND', 'Campaign tidak ditemukan.');
     if (campaign.status === 'FROZEN') return { campaign, changed: false };
     assertTransition(campaign.status, 'FROZEN');
-    const updated = await this.transition(db, id, campaign.status as CampaignStatus, 'FROZEN', { frozenReason: reason });
+    const updated = await this.transition(db, id, campaign.status as CampaignStatus, 'FROZEN', {
+      frozenReason: reason,
+      frozenAt: new Date(),
+    });
     await this.audit.log(
       {
         actorId,
@@ -308,37 +314,80 @@ export class CampaignsService {
         entityId: id,
         metadata: { reason, previousStatus: campaign.status },
         ipAddress: ip,
+        userAgent,
       },
       db,
     );
     return { campaign: updated, changed: true };
   }
 
-  async adminFreeze(id: string, admin: CurrentUserPayload, reason: string, ip: string | null) {
-    return this.prisma.$transaction(async (tx) => (await this.freeze(tx, id, `Manual: ${reason}`, admin.id, ip)).campaign);
+  async adminFreeze(id: string, admin: CurrentUserPayload, reason: string, ip: string | null, userAgent: string | null = null) {
+    return this.prisma.$transaction(
+      async (tx) => (await this.freeze(tx, id, `Manual: ${reason}`, admin.id, ip, userAgent)).campaign,
+    );
   }
 
-  async unfreeze(id: string, admin: CurrentUserPayload, reason: string, ip: string | null) {
+  async unfreeze(id: string, admin: CurrentUserPayload, reason: string, ip: string | null, userAgent: string | null = null) {
     const campaign = await this.findOrThrow(id);
     if (campaign.status !== 'FROZEN') {
       throw new AppError('CAMPAIGN_INVALID_STATUS', 'Hanya campaign FROZEN yang bisa di-unfreeze.');
     }
+    // Pencairan tetap terkunci selama data belum dipulihkan & diverifikasi ulang.
+    const tampered = await this.prisma.donation.count({ where: { campaignId: id, integrityStatus: 'TAMPERED' } });
+    if (tampered > 0) {
+      throw new AppError(
+        'CAMPAIGN_FROZEN',
+        `Masih ada ${tampered} donasi TAMPERED. Pulihkan datanya lalu jalankan verifikasi ulang sebelum unfreeze.`,
+      );
+    }
     const to: CampaignStatus = campaign.deadline <= new Date() ? 'COMPLETED' : 'ACTIVE';
     return this.prisma.$transaction(async (tx) => {
-      const updated = await this.transition(tx, id, 'FROZEN', to, { frozenReason: null });
+      const updated = await this.transition(tx, id, 'FROZEN', to, { frozenReason: null, frozenAt: null, deletedAt: null });
       await this.audit.log(
         {
           actorId: admin.id,
           action: 'CAMPAIGN_UNFROZEN',
           entityType: 'Campaign',
           entityId: id,
-          metadata: { reason, newStatus: to },
+          metadata: { reason, newStatus: to, restoredFromSoftDelete: campaign.deletedAt !== null },
           ipAddress: ip,
+          userAgent,
         },
         tx,
       );
       return updated;
     });
+  }
+
+  /**
+   * Soft-delete: campaign FROZEN lebih dari N hari disembunyikan dari dashboard publik & pemilik.
+   * Data tetap ada (admin masih bisa melihat & unfreeze) — jejak audit tidak boleh hilang.
+   */
+  async softDeleteFrozen(now = new Date()) {
+    const cutoff = new Date(now.getTime() - env().integrity.frozenRetentionDays * 24 * 60 * 60 * 1000);
+    const stale = await this.prisma.campaign.findMany({
+      where: { status: 'FROZEN', deletedAt: null, frozenAt: { lte: cutoff } },
+      select: { id: true, frozenAt: true },
+    });
+    for (const { id, frozenAt } of stale) {
+      await this.prisma.$transaction(async (tx) => {
+        const { count } = await tx.campaign.updateMany({
+          where: { id, status: 'FROZEN', deletedAt: null },
+          data: { deletedAt: now },
+        });
+        if (count === 0) return; // sudah di-unfreeze di tengah jalan
+        await this.audit.log(
+          {
+            action: 'CAMPAIGN_SOFT_DELETED',
+            entityType: 'Campaign',
+            entityId: id,
+            metadata: { frozenAt: frozenAt?.toISOString(), retentionDays: env().integrity.frozenRetentionDays },
+          },
+          tx,
+        );
+      });
+    }
+    return stale.length;
   }
 
   /** ACTIVE yang deadline-nya lewat → COMPLETED (dijalankan worker). */

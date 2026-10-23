@@ -2,7 +2,7 @@ import { Controller, Get, Headers, HttpCode, Param, ParseUUIDPipe, Post } from '
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { timingSafeEqual } from 'node:crypto';
 import { AppError } from '../../common/app-error';
-import { ClientIp, CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
+import { ClientIp, ClientUserAgent, CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { env } from '../../common/env';
@@ -51,24 +51,38 @@ export class IntegrityController {
   @Throttle(VERIFY_LIMIT)
   @Post('admin/donations/:id/verify')
   @HttpCode(200)
-  verifyDonation(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() admin: CurrentUserPayload, @ClientIp() ip: string | null) {
-    return this.integrity.verifyDonation(id, admin.id, ip);
+  verifyDonation(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() admin: CurrentUserPayload,
+    @ClientIp() ip: string | null,
+    @ClientUserAgent() userAgent: string | null,
+  ) {
+    return this.integrity.verifyDonation(id, admin.id, { ip, userAgent, source: 'MANUAL' });
   }
 
   @Roles('ADMIN')
   @Throttle(VERIFY_LIMIT)
   @Post('admin/campaigns/:id/verify')
   @HttpCode(200)
-  verifyCampaign(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() admin: CurrentUserPayload, @ClientIp() ip: string | null) {
-    return this.integrity.verifyMany(admin.id, id, ip);
+  verifyCampaign(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() admin: CurrentUserPayload,
+    @ClientIp() ip: string | null,
+    @ClientUserAgent() userAgent: string | null,
+  ) {
+    return this.integrity.verifyMany(admin.id, id, { ip, userAgent, source: 'MANUAL' });
   }
 
   @Roles('ADMIN')
   @Throttle(VERIFY_LIMIT)
   @Post('admin/integrity/verify-all')
   @HttpCode(200)
-  verifyAll(@CurrentUser() admin: CurrentUserPayload, @ClientIp() ip: string | null) {
-    return this.integrity.verifyMany(admin.id, undefined, ip);
+  verifyAll(
+    @CurrentUser() admin: CurrentUserPayload,
+    @ClientIp() ip: string | null,
+    @ClientUserAgent() userAgent: string | null,
+  ) {
+    return this.integrity.verifyMany(admin.id, undefined, { ip, userAgent, source: 'MANUAL' });
   }
 
   /** Antrekan ulang notarisasi yang FAILED. Hash yang dikirim tetap hash saat settlement. */
@@ -79,6 +93,7 @@ export class IntegrityController {
     @Param('donationId', ParseUUIDPipe) donationId: string,
     @CurrentUser() admin: CurrentUserPayload,
     @ClientIp() ip: string | null,
+    @ClientUserAgent() userAgent: string | null,
   ) {
     const { count } = await this.prisma.blockchainTransaction.updateMany({
       where: { donationId, status: 'FAILED' },
@@ -91,6 +106,7 @@ export class IntegrityController {
       entityType: 'Donation',
       entityId: donationId,
       ipAddress: ip,
+      userAgent,
     });
     this.worker.kick();
     return { donationId, status: 'QUEUED' };

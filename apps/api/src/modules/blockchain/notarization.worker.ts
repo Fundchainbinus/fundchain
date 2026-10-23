@@ -15,6 +15,8 @@ const HOUSEKEEPING_MS = 60_000;
 const STUCK_SUBMITTED_MS = 120_000;
 /** Jeda cek ulang tx lama yang masih pending (supaya RPC tidak ditanya tiap tick). */
 const PENDING_RECHECK_MS = 15_000;
+/** Jeda antar putaran hash checker otomatis; donasi mana yang dicek diatur INTEGRITY_CHECK_INTERVAL_MS. */
+const INTEGRITY_SWEEP_MS = 60_000;
 
 /**
  * Worker notarisasi (in-process).
@@ -29,6 +31,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
   private timer?: NodeJS.Timeout;
   private running = false;
   private lastHousekeeping = 0;
+  private lastIntegritySweep = 0;
   private chainReady = false;
   private lastNotReadyReason = '';
 
@@ -103,6 +106,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
         take: 5,
       });
       for (const job of due) await this.process(job);
+      await this.integritySweep();
     } catch (e) {
       this.logger.error(`Tick gagal: ${(e as Error).message}`);
     } finally {
@@ -213,7 +217,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     });
     this.logger.log(`Donasi ${job.donationId} CONFIRMED${r.blockNumber ? ` di block ${r.blockNumber}` : ''}`);
     // Verifikasi pasca-notarisasi: baca balik hash on-chain dan bandingkan dengan data DB.
-    await this.integrity.verifyDonation(job.donationId, null).catch((e) => {
+    await this.integrity.verifyDonation(job.donationId, null, { source: 'NOTARIZATION' }).catch((e) => {
       this.logger.warn(`Verifikasi awal ${job.donationId} gagal: ${(e as Error).message}`);
     });
   }
@@ -332,6 +336,18 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     this.lastHousekeeping = Date.now();
     const expired = await this.payments.expireStale().catch(() => 0);
     const completed = await this.campaigns.completeExpired().catch(() => 0);
-    if (expired || completed) this.logger.log(`Housekeeping: ${expired} pembayaran expired, ${completed} campaign selesai`);
+    const softDeleted = await this.campaigns.softDeleteFrozen().catch(() => 0);
+    if (expired || completed || softDeleted) {
+      this.logger.log(
+        `Housekeeping: ${expired} pembayaran expired, ${completed} campaign selesai, ${softDeleted} campaign FROZEN disembunyikan`,
+      );
+    }
+  }
+
+  /** Hash checker otomatis: hanya jalan saat chain siap (butuh RPC untuk membaca hash on-chain). */
+  private async integritySweep() {
+    if (Date.now() - this.lastIntegritySweep < INTEGRITY_SWEEP_MS) return;
+    this.lastIntegritySweep = Date.now();
+    await this.integrity.verifyStale();
   }
 }

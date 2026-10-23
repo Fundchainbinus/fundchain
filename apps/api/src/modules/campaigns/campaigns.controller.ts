@@ -16,7 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { LIMITS } from '@fundchain/shared';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
-import { ClientIp, CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
+import { ClientIp, ClientUserAgent, CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
 import { createSignedQuery, verifySignedQuery } from '../../common/signed-link';
 import { AuditService } from '../audit/audit.service';
 import { CreateCampaignDto, ListCampaignsQuery, ReasonDto, UpdateCampaignDto } from './campaigns.dto';
@@ -147,8 +147,9 @@ export class AdminCampaignsController {
     @Body() dto: ReasonDto,
     @CurrentUser() admin: CurrentUserPayload,
     @ClientIp() ip: string | null,
+    @ClientUserAgent() userAgent: string | null,
   ) {
-    return this.campaigns.adminFreeze(id, admin, dto.reason, ip);
+    return this.campaigns.adminFreeze(id, admin, dto.reason, ip, userAgent);
   }
 
   @Post(':id/unfreeze')
@@ -157,7 +158,8 @@ export class AdminCampaignsController {
     @Body() dto: ReasonDto,
     @CurrentUser() admin: CurrentUserPayload,
     @ClientIp() ip: string | null,
+    @ClientUserAgent() userAgent: string | null,
   ) {
-    return this.campaigns.unfreeze(id, admin, dto.reason, ip);
+    return this.campaigns.unfreeze(id, admin, dto.reason, ip, userAgent);
   }
 }

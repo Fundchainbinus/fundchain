@@ -49,6 +49,10 @@ model Campaign {
   status          String   @default("DRAFT")
   rejectionReason String?  @map("rejection_reason")
   frozenReason    String?  @map("frozen_reason")
+  /// Kapan campaign terakhir masuk FROZEN — dasar soft-delete otomatis.
+  frozenAt        DateTime? @map("frozen_at")
+  /// Soft-delete: campaign FROZEN yang tidak dipulihkan disembunyikan dari dashboard (bukan dihapus).
+  deletedAt       DateTime? @map("deleted_at")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -197,6 +201,7 @@ model AuditLog {
   /// JSON string
   metadata   String   @default("{}")
   ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
   createdAt  DateTime @default(now()) @map("created_at")
 
   actor User? @relation(fields: [actorId], references: [id])
