@@ -170,6 +170,8 @@ export class DonationsService {
   }
 
   async listForCampaign(campaignId: string, limit = 50) {
+    const campaign = await this.prisma.campaign.findUnique({ where: { id: campaignId }, select: { deletedAt: true } });
+    if (!campaign || campaign.deletedAt) throw new AppError('CAMPAIGN_NOT_FOUND', 'Campaign tidak ditemukan.');
     const donations = await this.prisma.donation.findMany({
       where: { campaignId, status: 'PAID' },
       include: { donor: { select: { name: true, integritySubjectId: true } }, blockchain: true },

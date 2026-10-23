@@ -137,8 +137,8 @@ function setup(jobOver: Partial<Job> = {}, donationStatus = 'PAID') {
   const prisma = createFakePrisma();
   const chain = createFakeChain();
   const audit = { log: vi.fn(async () => undefined) };
-  const integrity = { verifyDonation: vi.fn(async () => undefined) };
-  const campaigns = { completeExpired: vi.fn(async () => 0) };
+  const integrity = { verifyDonation: vi.fn(async () => undefined), verifyStale: vi.fn(async () => undefined) };
+  const campaigns = { completeExpired: vi.fn(async () => 0), softDeleteFrozen: vi.fn(async () => 0) };
   const payments = { expireStale: vi.fn(async () => 0) };
   const job = makeJob(jobOver);
   prisma.jobs.set(job.id, job);

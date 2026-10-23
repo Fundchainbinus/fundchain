@@ -8,6 +8,7 @@ export interface AuditEntry {
   entityId?: string | null;
   metadata?: Record<string, unknown>;
   ipAddress?: string | null;
+  userAgent?: string | null;
 }
 
 @Injectable()
@@ -24,6 +25,7 @@ export class AuditService {
         entityId: entry.entityId ?? null,
         metadata: JSON.stringify(entry.metadata ?? {}),
         ipAddress: entry.ipAddress ?? null,
+        userAgent: entry.userAgent ?? null,
       },
     });
   }

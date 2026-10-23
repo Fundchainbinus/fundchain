@@ -42,6 +42,14 @@ export function env() {
       relayerPrivateKey: e.RELAYER_PRIVATE_KEY || '',
       confirmations: int(e.BLOCKCHAIN_CONFIRMATIONS, 1),
     },
+    integrity: {
+      /** Hash checker otomatis: donasi yang terakhir dicek lebih lama dari ini akan dicek ulang. */
+      checkIntervalMs: int(e.INTEGRITY_CHECK_INTERVAL_MS, 60 * 60 * 1000),
+      /** Maksimal donasi per putaran (menjaga durasi fungsi serverless & kuota RPC). */
+      batchSize: int(e.INTEGRITY_CHECK_BATCH, 50),
+      /** Campaign FROZEN yang tidak dipulihkan disembunyikan (soft-delete) setelah N hari. */
+      frozenRetentionDays: int(e.FROZEN_SOFT_DELETE_DAYS, 30),
+    },
     worker: {
       enabled: bool(e.WORKER_ENABLED, true),
       /** interval = polling terus (server biasa); on-demand = dipicu request/cron (serverless). */

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Headers, HttpCode, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { AppError } from '../../common/app-error';
@@ -9,6 +9,7 @@ import { MOCK_SIGNATURE_HEADER, signMockBody } from '../payments/adapters/mock.a
 import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../../common/prisma.service';
 import { NotarizationWorker } from '../blockchain/notarization.worker';
+import { IntegrityService } from '../integrity/integrity.service';
 import { DonationsService } from './donations.service';
 
 class CreateDonationDto {
@@ -37,6 +38,7 @@ export class DonationsController {
     private readonly payments: PaymentsService,
     private readonly prisma: PrismaService,
     private readonly worker: NotarizationWorker,
+    private readonly integrity: IntegrityService,
   ) {}
 
   /** Serverless: picu worker notarisasi bila ada pekerjaan blockchain yang tertunda. */
@@ -74,6 +76,18 @@ export class DonationsController {
   async blockchain(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: CurrentUserPayload) {
     const d = await this.donations.detail(id, user);
     return { donationId: d.id, hash: d.hash, integrityStatus: d.integrityStatus, ...d.blockchain };
+  }
+
+  /**
+   * Data halaman "Bukti Donasi": hash DB, hash on-chain, txHash, timestamp, link Etherscan.
+   * Membaca RPC tiap panggilan → dibatasi lebih ketat dari endpoint publik lain.
+   */
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Get('donations/:id/proof')
+  async proof(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: CurrentUserPayload) {
+    await this.donations.detail(id, user); // aturan akses sama dengan detail donasi
+    return this.integrity.proof(id);
   }
 
   @Get('me/donations')
