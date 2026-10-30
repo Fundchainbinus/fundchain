@@ -3,6 +3,7 @@ import { HARDHAT_CHAIN_ID, LIMITS } from '@fundchain/shared';
 import type { BlockchainTransaction } from '@prisma/client';
 import { waitUntil } from '@vercel/functions';
 import type { ContractTransactionResponse } from 'ethers';
+import { sendAlert } from '../../common/alert';
 import { env } from '../../common/env';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -17,12 +18,16 @@ const STUCK_SUBMITTED_MS = 120_000;
 const PENDING_RECHECK_MS = 15_000;
 /** Jeda antar putaran hash checker otomatis; donasi mana yang dicek diatur INTEGRITY_CHECK_INTERVAL_MS. */
 const INTEGRITY_SWEEP_MS = 60_000;
+/** Jeda antar pengecekan notarisasi macet (alert dikirim sekali per donasi). */
+const STUCK_CHECK_MS = 60_000;
 
 /**
  * Worker notarisasi (in-process).
  * Antrean = tabel blockchain_transactions (outbox pattern) — tidak butuh Redis untuk local.
  * State: QUEUED → SUBMITTED → CONFIRMED · gagal → RETRYING (backoff 2s,4s,8s,16s) · max 5x → FAILED.
  * Anti duplicate: job RETRYING yang tx lamanya masih pending ditunda, tidak dikirim ulang.
+ * Tunggu receipt dibatasi waktu: tx lambat tidak mengunci antrean & hash checker; sisanya lewat recoverStuck().
+ * Belum CONFIRMED > STUCK_TX_ALERT_MS → audit BLOCKCHAIN_TX_STUCK + alert (sekali per donasi).
  * Invariant: status PAID donasi TIDAK PERNAH diubah oleh worker (BR-BC-004).
  */
 @Injectable()
@@ -32,6 +37,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
   private running = false;
   private lastHousekeeping = 0;
   private lastIntegritySweep = 0;
+  private lastStuckCheck = 0;
   private chainReady = false;
   private lastNotReadyReason = '';
 
@@ -83,6 +89,8 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     this.running = true;
     try {
       await this.housekeeping();
+      // Sebelum cek RPC: antrean yang macet karena RPC mati juga harus terdeteksi.
+      await this.alertStuck();
       const health = await this.blockchain.health();
       if (!health.ready) {
         if (health.reason !== this.lastNotReadyReason) {
@@ -145,7 +153,18 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
       await this.prisma.blockchainTransaction.update({ where: { id: job.id }, data: { txHash: tx.hash } });
       this.logger.log(`Tx terkirim untuk donasi ${job.donationId}: ${tx.hash}`);
 
-      const receipt = await tx.wait(env().blockchain.confirmations);
+      const { confirmations, confirmWaitMs } = env().blockchain;
+      let receipt: Awaited<ReturnType<ContractTransactionResponse['wait']>>;
+      try {
+        receipt = await tx.wait(confirmations, confirmWaitMs);
+      } catch (e) {
+        if ((e as { code?: string })?.code !== 'TIMEOUT') throw e;
+        // Tx sudah terkirim & txHash tersimpan; job tetap SUBMITTED dan dikonfirmasi recoverStuck().
+        this.logger.warn(
+          `Receipt tx ${tx.hash} donasi ${job.donationId} belum ada setelah ${confirmWaitMs / 1000}s, lanjut antrean berikutnya`,
+        );
+        return;
+      }
       if (!receipt || receipt.status !== 1) throw new Error('Transaksi gagal di chain');
       await this.confirm(job, { txHash: tx.hash, blockNumber: receipt.blockNumber, contractAddress, already: false });
     } catch (e) {
@@ -342,6 +361,45 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
         `Housekeeping: ${expired} pembayaran expired, ${completed} campaign selesai, ${softDeleted} campaign FROZEN disembunyikan`,
       );
     }
+  }
+
+  /** Notarisasi yang belum CONFIRMED terlalu lama: catat ke audit & kirim alert, sekali per donasi. */
+  private async alertStuck() {
+    if (Date.now() - this.lastStuckCheck < STUCK_CHECK_MS) return;
+    this.lastStuckCheck = Date.now();
+    const thresholdMs = env().alerts.stuckTxMs;
+    const { chainId, network } = this.blockchain.target();
+    const jobs = await this.prisma.blockchainTransaction.findMany({
+      where: { status: { in: ['QUEUED', 'SUBMITTED', 'RETRYING'] }, createdAt: { lt: new Date(Date.now() - thresholdMs) }, chainId },
+      orderBy: { createdAt: 'asc' },
+      take: 20,
+    });
+    if (!jobs.length) return;
+
+    const alerted = await this.prisma.auditLog.findMany({
+      where: { action: 'BLOCKCHAIN_TX_STUCK', entityId: { in: jobs.map((j) => j.donationId) } },
+      select: { entityId: true },
+    });
+    const done = new Set(alerted.map((a) => a.entityId));
+    const fresh = jobs.filter((j) => !done.has(j.donationId));
+    if (!fresh.length) return;
+
+    const lines: string[] = [];
+    for (const job of fresh) {
+      const ageMinutes = Math.floor((Date.now() - job.createdAt.getTime()) / 60_000);
+      await this.audit.log({
+        action: 'BLOCKCHAIN_TX_STUCK',
+        entityType: 'Donation',
+        entityId: job.donationId,
+        metadata: { status: job.status, txHash: job.txHash, retryCount: job.retryCount, ageMinutes, lastError: job.lastError },
+      });
+      const tx = job.txHash ? ` · tx ${job.txHash}` : '';
+      const error = job.lastError ? ` · ${job.lastError.slice(0, 120)}` : '';
+      lines.push(`- ${job.donationId} · ${job.status} · ${ageMinutes} menit${tx}${error}`);
+    }
+    await sendAlert(
+      [`⚠️ ${fresh.length} notarisasi belum CONFIRMED lebih dari ${Math.round(thresholdMs / 60_000)} menit (${network})`, ...lines].join('\n'),
+    );
   }
 
   /** Hash checker otomatis: hanya jalan saat chain siap (butuh RPC untuk membaca hash on-chain). */

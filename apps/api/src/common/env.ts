@@ -41,6 +41,14 @@ export function env() {
       contractAddress: e.CONTRACT_ADDRESS || '',
       relayerPrivateKey: e.RELAYER_PRIVATE_KEY || '',
       confirmations: int(e.BLOCKCHAIN_CONFIRMATIONS, 1),
+      /** Batas tunggu receipt per tx; lewat batas, konfirmasi diteruskan recoverStuck() supaya antrean tidak terkunci. */
+      confirmWaitMs: int(e.BLOCKCHAIN_CONFIRM_WAIT_MS, 45_000),
+    },
+    alerts: {
+      /** Discord webhook untuk alert operasional (kosong = hanya log). */
+      webhookUrl: e.ALERT_WEBHOOK_URL || '',
+      /** Notarisasi yang belum CONFIRMED lebih lama dari ini sejak masuk antrean dianggap macet. */
+      stuckTxMs: int(e.STUCK_TX_ALERT_MS, 10 * 60 * 1000),
     },
     integrity: {
       /** Hash checker otomatis: donasi yang terakhir dicek lebih lama dari ini akan dicek ulang. */
