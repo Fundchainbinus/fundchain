@@ -54,6 +54,12 @@ export class DisbursementsController {
     return this.disbursements.listForCampaign(campaignId, user);
   }
 
+  @Public()
+  @Get('campaigns/:id/milestones')
+  milestones(@Param('id', ParseUUIDPipe) campaignId: string) {
+    return this.disbursements.milestones(campaignId);
+  }
+
   @Get('disbursements/:id/proof')
   async proof(
     @Param('id', ParseUUIDPipe) id: string,
