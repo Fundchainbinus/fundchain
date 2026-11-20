@@ -1,4 +1,5 @@
 import { FileButton } from '../components/FileButton';
+import { MilestoneProgress } from '../components/MilestoneProgress';
 import { LIMITS } from '@fundchain/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, CreditCard, ExternalLink, HandCoins, Pencil, Send, ShieldCheck, Snowflake, Sun } from 'lucide-react';
@@ -343,6 +344,7 @@ export function CampaignDetailPage() {
                     </div>
                   ))}
                 </dl>
+                <MilestoneProgress target={c.targetAmount} funds={c.funds} disbursements={disbursements.data ?? []} />
                 {disbursements.data && disbursements.data.length > 0 ? (
                   <div className="overflow-x-auto rounded-md border border-slate-200">
                     <table className="tbl">
