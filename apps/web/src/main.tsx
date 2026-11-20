@@ -11,6 +11,7 @@ import { DonationProofPage } from './pages/DonationProofPage';
 import { HomePage } from './pages/HomePage';
 import { MyCampaignsPage, MyDonationsPage } from './pages/MyPages';
 import { PaymentPage } from './pages/PaymentPage';
+import { PointsPage } from './pages/PointsPage';
 import {
   AdminAuditPage,
   AdminDashboardPage,
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
       { path: '/donations/:id/pay', element: user(<PaymentPage />) },
       { path: '/my/campaigns', element: user(<MyCampaignsPage />) },
       { path: '/my/donations', element: user(<MyDonationsPage />) },
+      { path: '/my/points', element: user(<PointsPage />) },
       // Admin
       {
         path: '/admin',

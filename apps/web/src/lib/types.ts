@@ -105,6 +105,26 @@ export interface MyDonation {
   txHash: string | null;
 }
 
+/** Satu baris perolehan poin comserve dari sebuah donasi PAID. */
+export interface PointsEntry {
+  donationId: string;
+  campaign: { id: string; title: string };
+  amount: number;
+  points: number;
+  earnedAt: string;
+}
+
+/**
+ * Kontrak usulan GET /me/points (BFD-98 belum ada di BE).
+ * `source: 'mock'` berarti dihitung di FE dari /me/donations.
+ */
+export interface PointsSummary {
+  total: number;
+  entries: PointsEntry[];
+  rule: string;
+  source: 'api' | 'mock';
+}
+
 export interface Disbursement {
   id: string;
   amount: number;

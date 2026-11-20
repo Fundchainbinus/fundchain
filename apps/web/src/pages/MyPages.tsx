@@ -234,7 +234,7 @@ export function MyCampaignsPage() {
               <MyCampaignsCard campaigns={campaigns} onEdit={edit} />
             )}
           </section>
-          <Panel title="Donasi Saya">
+          <Panel title="Donasi Saya" aside={<Link to="/my/points" className="btn-secondary btn-sm">Poin Comserve</Link>}>
             {donationsQ.isLoading ? <Spinner /> : donationsQ.error ? <ErrorBox error={donationsQ.error} /> : <MyDonationsCard donations={donationsQ.data ?? []} />}
           </Panel>
         </div>
@@ -270,7 +270,11 @@ export function MyDonationsPage() {
   const q = useQuery({ queryKey: ["me", "donations"], queryFn: () => get<MyDonation[]>("/me/donations") });
   return (
     <div className="space-y-6">
-      <PageHeader title="Donasi Saya" subtitle="Riwayat donasi beserta status pencatatan blockchain." />
+      <PageHeader
+        title="Donasi Saya"
+        subtitle="Riwayat donasi beserta status pencatatan blockchain."
+        actions={<Link to="/my/points" className="btn-secondary btn-sm">Poin Comserve</Link>}
+      />
       <Panel>{q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : <MyDonationsCard donations={q.data ?? []} />}</Panel>
     </div>
   );
