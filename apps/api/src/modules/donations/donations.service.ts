@@ -7,6 +7,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { PaymentsService } from '../payments/payments.service';
+import { computePoints } from './points';
 
 @Injectable()
 export class DonationsService {
@@ -210,6 +211,22 @@ export class DonationsService {
       blockchainStatus: d.blockchain?.status ?? null,
       txHash: d.blockchain?.txHash ?? null,
     }));
+  }
+
+  /** Poin comserve milik donatur yang login (BFD-98). */
+  async pointsMine(user: CurrentUserPayload) {
+    const donations = await this.prisma.donation.findMany({
+      where: { donorId: user.id, status: 'PAID' },
+      select: {
+        id: true,
+        amount: true,
+        status: true,
+        donatedAt: true,
+        createdAt: true,
+        campaign: { select: { id: true, title: true } },
+      },
+    });
+    return computePoints(donations);
   }
 
   /** Daftar donasi untuk admin (integrity checker). */

@@ -95,6 +95,11 @@ export class DonationsController {
     return this.donations.listMine(user);
   }
 
+  @Get('me/points')
+  points(@CurrentUser() user: CurrentUserPayload) {
+    return this.donations.pointsMine(user);
+  }
+
   @Roles('ADMIN')
   @Get('admin/donations')
   listAll(@Query('campaignId') campaignId?: string, @Query('integrityStatus') integrityStatus?: string) {

@@ -18,6 +18,43 @@ export async function lockCampaign(tx: Db, campaignId: string) {
   await tx.$queryRaw`SELECT id FROM campaigns WHERE id = ${campaignId} FOR UPDATE`;
 }
 
+/** Milestone yang masih berjalan: diajukan atau disetujui tapi belum dibayar. */
+export const OPEN: DisbursementStatus[] = ['REQUESTED', 'APPROVED'];
+
+/**
+ * Pencairan bertahap (BFD-97): milestone berikutnya baru boleh diajukan setelah
+ * milestone sebelumnya selesai (PAID) atau ditolak.
+ */
+export function assertNoOpenMilestone(openCount: number) {
+  if (openCount > 0) {
+    throw new AppError(
+      'DISBURSEMENT_IN_PROGRESS',
+      'Masih ada pencairan yang diproses. Ajukan milestone berikutnya setelah pencairan sebelumnya dibayar atau ditolak.',
+    );
+  }
+}
+
+type MilestoneRow = {
+  id: string;
+  description: string;
+  amount: number;
+  status: string;
+  requestedAt: Date;
+  approvedAt: Date | null;
+  paidAt: Date | null;
+};
+
+/** Ringkasan milestone pencairan: urut waktu pengajuan, pengajuan yang ditolak tidak dihitung sebagai tahap. */
+export function buildMilestones(rows: MilestoneRow[]) {
+  const steps = rows
+    .filter((d) => d.status !== 'REJECTED')
+    .sort((a, b) => a.requestedAt.getTime() - b.requestedAt.getTime())
+    .map((d, i) => ({ step: i + 1, ...d }));
+  const completed = steps.filter((s) => s.status === 'PAID').length;
+  const current = steps.find((s) => (OPEN as string[]).includes(s.status)) ?? null;
+  return { steps, completed, total: steps.length, current, canRequestNext: current === null };
+}
+
 export function assertDisbursable(status: string) {
   if (status === 'FROZEN') {
     throw new AppError('CAMPAIGN_FROZEN', 'Campaign dibekukan karena masalah integritas — pencairan terkunci.');
@@ -43,6 +80,21 @@ export class DisbursementsService {
     return currentAmount - (agg._sum.amount ?? 0);
   }
 
+  openCount(db: Db, campaignId: string) {
+    return db.disbursement.count({ where: { campaignId, status: { in: OPEN } } });
+  }
+
+  /** Ringkasan milestone publik untuk satu campaign (BFD-97). */
+  async milestones(campaignId: string) {
+    const campaign = await this.prisma.campaign.findUnique({ where: { id: campaignId }, select: { id: true } });
+    if (!campaign) throw new AppError('CAMPAIGN_NOT_FOUND', 'Campaign tidak ditemukan.');
+    const rows = await this.prisma.disbursement.findMany({
+      where: { campaignId },
+      select: { id: true, description: true, amount: true, status: true, requestedAt: true, approvedAt: true, paidAt: true },
+    });
+    return buildMilestones(rows);
+  }
+
   async create(
     campaignId: string,
     input: { amount: number; description: string },
@@ -63,6 +115,7 @@ export class DisbursementsService {
     if (!input.description || input.description.trim().length < LIMITS.REASON_MIN) {
       throw new AppError('VALIDATION_ERROR', `Deskripsi minimal ${LIMITS.REASON_MIN} karakter.`);
     }
+    assertNoOpenMilestone(await this.openCount(this.prisma, campaignId));
     if (input.amount > (await this.available(this.prisma, campaignId, campaign.currentAmount))) {
       throw new AppError('DISBURSEMENT_AMOUNT_EXCEEDS', 'Nominal melebihi sisa dana yang dapat dicairkan.');
     }
@@ -73,6 +126,7 @@ export class DisbursementsService {
       await lockCampaign(tx, campaignId);
       const fresh = await tx.campaign.findUniqueOrThrow({ where: { id: campaignId } });
       assertDisbursable(fresh.status);
+      assertNoOpenMilestone(await this.openCount(tx, campaignId));
       if (input.amount > (await this.available(tx, campaignId, fresh.currentAmount))) {
         throw new AppError('DISBURSEMENT_AMOUNT_EXCEEDS', 'Nominal melebihi sisa dana yang dapat dicairkan.');
       }

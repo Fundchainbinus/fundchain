@@ -68,6 +68,8 @@ export const LIMITS = {
   FILE_MAX_BYTES: 4 * 1024 * 1024,
   PAYMENT_EXPIRY_MINUTES: 15,
   NOTARIZE_MAX_ATTEMPTS: 5,
+  /** Poin comserve donatur: 1 poin per kelipatan nominal ini dari donasi PAID (BFD-98). */
+  RUPIAH_PER_POINT: 10_000,
 } as const;
 
 /** ABI minimal DonationRegistry (human-readable, ethers v6). */
