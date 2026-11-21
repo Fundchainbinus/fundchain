@@ -1,7 +1,9 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, ExternalLink, FileText, RefreshCw, ShieldCheck, Terminal } from 'lucide-react';
+import { LIMITS } from '@fundchain/shared';
 import { useState } from 'react';
 import { Link, Outlet } from 'react-router-dom';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { FileButton } from '../../components/FileButton';
 import {
   CampaignBadge,
@@ -174,8 +176,10 @@ function ReviewPanel({ id }: { id: string }) {
   const qc = useQueryClient();
   const detail = useQuery({ queryKey: ['campaign', id], queryFn: () => get<CampaignDetail>(`/campaigns/${id}`) });
   const [reason, setReason] = useState('');
+  const [confirmApprove, setConfirmApprove] = useState(false);
   const done = () => {
     setReason('');
+    setConfirmApprove(false);
     void qc.invalidateQueries();
   };
   const approve = useMutation({ mutationFn: () => post(`/admin/campaigns/${id}/approve`), onSuccess: done });
@@ -210,21 +214,38 @@ function ReviewPanel({ id }: { id: string }) {
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
-            <p className="mt-1 text-xs text-slate-500">Wajib diisi (min. 10 karakter) saat menolak; alasan terlihat oleh pembuat kampanye.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Wajib diisi (min. {LIMITS.REASON_MIN} karakter) saat menolak; alasan terlihat oleh pembuat kampanye.
+            </p>
           </div>
           <ErrorBox error={approve.error ?? reject.error} />
           <div className="flex flex-wrap gap-2">
-            <button className="btn-primary btn-sm" onClick={() => approve.mutate()} disabled={approve.isPending || reject.isPending}>
+            <button className="btn-primary btn-sm" onClick={() => setConfirmApprove(true)} disabled={approve.isPending || reject.isPending}>
               <CheckCircle2 size={14} /> Setujui kampanye
             </button>
             <button
               className="btn-secondary btn-sm"
               onClick={() => reject.mutate()}
-              disabled={reason.trim().length < 10 || approve.isPending || reject.isPending}
+              disabled={reason.trim().length < LIMITS.REASON_MIN || approve.isPending || reject.isPending}
             >
               Tolak dengan alasan
             </button>
           </div>
+          <ConfirmDialog
+            open={confirmApprove}
+            title="Setujui kampanye?"
+            confirmLabel="Ya, setujui"
+            pending={approve.isPending}
+            error={approve.error}
+            onCancel={() => {
+              approve.reset();
+              setConfirmApprove(false);
+            }}
+            onConfirm={() => approve.mutate()}
+          >
+            Kampanye <b className="text-ink">{c.title}</b> dengan target <b className="text-ink">{rupiah(c.targetAmount)}</b> akan
+            berstatus Active dan langsung bisa menerima donasi.
+          </ConfirmDialog>
         </>
       ) : (
         <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -494,15 +515,22 @@ export function AdminDisbursementsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [proofError, setProofError] = useState<string | null>(null);
+  // Snapshot judul & nominal saat dialog dibuka; `selected` bisa bergeser setelah data dimuat ulang.
+  const [confirm, setConfirm] = useState<{ id: string; action: 'approve' | 'mark-paid'; title: string; amount: number; requester: string } | null>(null);
   const q = useQuery({ queryKey: ['admin', 'disbursements'], queryFn: () => get<AdminDisbursement[]>('/admin/disbursements') });
   const act = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' | 'mark-paid' }) =>
       post(`/admin/disbursements/${id}/${action}`, action === 'reject' ? { reason: reason.trim() } : undefined),
     onSuccess: () => {
       setReason('');
+      setConfirm(null);
       void qc.invalidateQueries();
     },
   });
+  const askConfirm = (d: AdminDisbursement, action: 'approve' | 'mark-paid') => {
+    act.reset();
+    setConfirm({ id: d.id, action, title: d.campaign.title, amount: d.amount, requester: d.requester.name });
+  };
   const all = q.data ?? [];
   const list = all.filter((d) => d.status === status);
   const selected = list.find((d) => d.id === selectedId) ?? list[0];
@@ -589,7 +617,9 @@ export function AdminDisbursementsPage() {
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                     />
-                    <p className="mt-1 text-xs text-slate-500">Wajib untuk penolakan (min. 10 karakter). Kampanye Frozen tidak dapat dicairkan.</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Wajib untuk penolakan (min. {LIMITS.REASON_MIN} karakter). Kampanye Frozen tidak dapat dicairkan.
+                    </p>
                   </div>
                 )}
               </div>
@@ -599,19 +629,19 @@ export function AdminDisbursementsPage() {
                 </button>
                 {selected.status === 'REQUESTED' ? (
                   <div className="flex gap-2">
-                    <button className="btn-primary btn-sm flex-1" disabled={act.isPending} onClick={() => act.mutate({ id: selected.id, action: 'approve' })}>
+                    <button className="btn-primary btn-sm flex-1" disabled={act.isPending} onClick={() => askConfirm(selected, 'approve')}>
                       Setujui
                     </button>
                     <button
                       className="btn-secondary btn-sm flex-1"
-                      disabled={act.isPending || reason.trim().length < 10}
+                      disabled={act.isPending || reason.trim().length < LIMITS.REASON_MIN}
                       onClick={() => act.mutate({ id: selected.id, action: 'reject' })}
                     >
                       Tolak
                     </button>
                   </div>
                 ) : (
-                  <button className="btn-primary btn-sm" disabled={act.isPending} onClick={() => act.mutate({ id: selected.id, action: 'mark-paid' })}>
+                  <button className="btn-primary btn-sm" disabled={act.isPending} onClick={() => askConfirm(selected, 'mark-paid')}>
                     Tandai transfer dibayar
                   </button>
                 )}
@@ -623,6 +653,30 @@ export function AdminDisbursementsPage() {
           )}
         </>
       )}
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.action === 'mark-paid' ? 'Tandai transfer dibayar?' : 'Setujui pencairan?'}
+        confirmLabel={confirm?.action === 'mark-paid' ? 'Ya, tandai dibayar' : 'Ya, setujui'}
+        pending={act.isPending}
+        error={act.error}
+        onCancel={() => {
+          act.reset();
+          setConfirm(null);
+        }}
+        onConfirm={() => confirm && act.mutate({ id: confirm.id, action: confirm.action })}
+      >
+        {confirm?.action === 'mark-paid' ? (
+          <>
+            Pastikan transfer <b className="text-ink">{rupiah(confirm.amount)}</b> untuk kampanye <b className="text-ink">{confirm.title}</b> (
+            {confirm.requester}) sudah benar-benar dikirim. Status menjadi Paid dan tidak dapat dibatalkan.
+          </>
+        ) : confirm ? (
+          <>
+            Pencairan <b className="text-ink">{rupiah(confirm.amount)}</b> untuk kampanye <b className="text-ink">{confirm.title}</b> (
+            {confirm.requester}) akan disetujui dan menunggu transfer.
+          </>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }
