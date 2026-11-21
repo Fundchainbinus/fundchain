@@ -122,7 +122,7 @@ Saat CONFIRMED dari receipt, worker menyimpan kolom berikut (nullable, `DECIMAL(
 - `effective_gas_price` (receipt ethers v6 `gasPrice`)
 - `fee_wei` = `gas_used × effective_gas_price`
 
-Ketiganya juga tercatat di metadata audit `BLOCKCHAIN_NOTARIZED`. Konfirmasi tanpa receipt (hash sudah on-chain dari percobaan yang hash tx-nya tidak tercatat) menyimpan null.
+`gasUsed` dan `feeWei` juga tercatat di metadata audit `BLOCKCHAIN_NOTARIZED`. Konfirmasi tanpa receipt sukses milik job tersebut menyimpan null. Contohnya: hash sudah on-chain dari percobaan yang hash tx-nya tidak tercatat, atau receipt tx job ini revert.
 
 Agregat ada di `GET /api/v1/admin/stats` → `chain.fees`, berupa dua query `aggregate` untuk chain aktif:
 

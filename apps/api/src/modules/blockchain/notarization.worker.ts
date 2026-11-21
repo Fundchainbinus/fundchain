@@ -193,8 +193,10 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
       // Idempotency: kalau sudah ada di chain (mis. crash setelah kirim tx), anggap sukses.
       if (await reader.isNotarized(job.onchainKey)) {
         // Tx kita sendiri yang sudah masuk blok: tetap tunggu N konfirmasi & ambil biaya gas dari receipt-nya.
-        const receipt = job.txHash ? await this.blockchain.getProvider().getTransactionReceipt(job.txHash).catch(() => null) : null;
-        if (receipt && receipt.status === 1 && (await this.confirmationsOf(receipt)) < this.requiredConfirmations()) {
+        // Receipt revert (status 0) bukan tx yang mencatat hash: blok & biayanya tidak dipakai.
+        const fetched = job.txHash ? await this.blockchain.getProvider().getTransactionReceipt(job.txHash).catch(() => null) : null;
+        const receipt = fetched?.status === 1 ? fetched : null;
+        if (receipt && (await this.confirmationsOf(receipt)) < this.requiredConfirmations()) {
           await this.postpone(job);
           return;
         }
@@ -488,11 +490,13 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
       const notarized = await this.blockchain.contract().isNotarized(job.onchainKey).catch(() => null);
       if (notarized === null) continue;
       if (notarized) {
-        const receipt = job.txHash
+        const fetched = job.txHash
           ? await this.blockchain.getProvider().getTransactionReceipt(job.txHash).catch(() => null)
           : null;
+        // Receipt revert (status 0) bukan tx yang mencatat hash: blok & biayanya tidak dipakai.
+        const receipt = fetched?.status === 1 ? fetched : null;
         // Receipt tx kita ada tapi konfirmasi belum cukup: tunggu (BFD-48), jangan CONFIRMED lebih awal.
-        if (receipt && receipt.status === 1 && (await this.confirmationsOf(receipt)) < this.requiredConfirmations()) continue;
+        if (receipt && (await this.confirmationsOf(receipt)) < this.requiredConfirmations()) continue;
         await this.confirm(
           job,
           {

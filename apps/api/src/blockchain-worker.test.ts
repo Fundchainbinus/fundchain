@@ -505,6 +505,25 @@ describe('BFD-92: biaya gas disimpan saat CONFIRMED', () => {
     expect(job.feeWei).toBeNull();
   });
 
+  it('hash on-chain dari tx lain, receipt tx job ini revert (status 0) -> CONFIRMED tanpa blok/biaya tx yang revert', async () => {
+    const { worker, chain, job } = setup({ status: 'RETRYING', txHash: '0xrevert', retryCount: 1, blockNumber: null });
+    chain.notarized.add(KEY);
+    chain.provider.getTransactionReceipt.mockResolvedValue({
+      status: 0,
+      blockNumber: 66,
+      gasUsed: 30_000n,
+      gasPrice: 9n,
+      confirmations: async () => 10,
+    });
+
+    await worker.tick();
+
+    expect(job.status).toBe('CONFIRMED');
+    expect(job.blockNumber).toBeNull();
+    expect(job.feeWei).toBeNull();
+    expect(chain.writer.notarize).not.toHaveBeenCalled();
+  });
+
   it('gasFields: receipt tanpa field gas -> null, tidak melempar', () => {
     expect(gasFields(null)).toEqual({ gasUsed: null, effectiveGasPrice: null, feeWei: null });
     expect(gasFields({ gasUsed: 21_000n })).toEqual({ gasUsed: '21000', effectiveGasPrice: null, feeWei: null });

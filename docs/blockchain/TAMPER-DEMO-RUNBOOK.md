@@ -28,6 +28,15 @@ Panduan untuk QA Gate 2 dan gladi bersih Demo Day. Skenario yang dibuktikan:
 
 Pesan penolakan tidak pernah mencetak URL atau password database.
 
+Contoh perintah di dokumen ini memakai sintaks bash/Git Bash (`VAR=nilai perintah`). Di PowerShell, set variabel lebih dulu:
+
+```powershell
+$env:ALLOW_DEMO_TAMPER = 'true'
+$env:DATABASE_URL = '<URL database demo>'   # override .env; jangan URL production
+pnpm --filter @fundchain/api demo:tamper <donationId> 900000 --check
+Remove-Item Env:ALLOW_DEMO_TAMPER            # matikan lagi setelah demo
+```
+
 > PERINGATAN: `apps/api/.env` lokal bisa menunjuk database **production**. Untuk demo, override `DATABASE_URL` di shell ke database demo (mis. stack `bc-local`: `postgresql://...@127.0.0.1:5433/fundchain_bc_dev`).
 
 ## Persiapan (H-1)

@@ -1,10 +1,21 @@
-import { Prisma } from '@prisma/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // BFD-92: agregat biaya gas di BlockchainService. Prisma tiruan; tidak ada DB / RPC.
 vi.mock('./common/prisma.service', () => ({ PrismaService: class {} }));
 
 import { BlockchainService, toWei } from './modules/blockchain/blockchain.service';
+
+/** Tiruan Prisma.Decimal: toString() bisa notasi eksponen untuk angka besar, toFixed(0) tidak. */
+class FakeDecimal {
+  constructor(private readonly digits: string) {}
+  toFixed(_dp: number) {
+    return this.digits;
+  }
+  toString() {
+    return this.digits.length > 21 ? `${this.digits[0]}.${this.digits.slice(1)}e+${this.digits.length - 1}` : this.digits;
+  }
+}
+const dec = (v: string) => new FakeDecimal(v);
 
 const SEPOLIA = 11155111;
 const savedEnv = { ...process.env };
@@ -33,9 +44,9 @@ describe('BlockchainService.feeStats', () => {
     const { service, aggregate } = setup({
       all: {
         _count: { _all: 4 },
-        _sum: { feeWei: new Prisma.Decimal('400000000000000'), gasUsed: new Prisma.Decimal('200000') },
+        _sum: { feeWei: dec('400000000000000'), gasUsed: dec('200000') },
       },
-      recent: { _count: { _all: 1 }, _sum: { feeWei: new Prisma.Decimal('100000000000000') } },
+      recent: { _count: { _all: 1 }, _sum: { feeWei: dec('100000000000000') } },
     });
     const now = new Date('2026-11-21T12:00:00Z');
 
@@ -71,7 +82,7 @@ describe('BlockchainService.feeStats', () => {
 
 describe('toWei', () => {
   it('Decimal besar tidak kehilangan presisi / notasi eksponen', () => {
-    expect(toWei(new Prisma.Decimal('123456789012345678901234567890'))).toBe(123456789012345678901234567890n);
+    expect(toWei(dec('123456789012345678901234567890'))).toBe(123456789012345678901234567890n);
     expect(toWei('42')).toBe(42n);
     expect(toWei(null)).toBe(0n);
   });
