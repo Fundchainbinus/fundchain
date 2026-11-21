@@ -37,6 +37,9 @@ function GoogleAuthButton() {
   };
 
   const logout = () => {
+    // Fire-and-forget: header dikirim eksplisit karena token dihapus sebelum interceptor axios jalan.
+    const token = useSession.getState().token;
+    if (token) void post('/auth/logout', undefined, { Authorization: `Bearer ${token}` }).catch(() => undefined);
     setToken(null);
     qc.clear();
   };

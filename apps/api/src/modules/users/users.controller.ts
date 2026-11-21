@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { IsString, MaxLength, MinLength } from 'class-validator';
 import { AppError } from '../../common/app-error';
-import { CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
+import { ClientIp, ClientUserAgent, CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
 import { env } from '../../common/env';
 import { PrismaService } from '../../common/prisma.service';
 import { createSessionToken } from '../../common/session-token';
@@ -50,6 +51,7 @@ export class UsersController {
    * audience & email, membuat/menemukan user, lalu menerbitkan token sesi.
    */
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // BFD-24: lebih ketat dari limit global (300/menit)
   @Post('auth/google')
   async loginGoogle(@Body() dto: GoogleLoginDto) {
     const cfg = env();
@@ -90,9 +92,26 @@ export class UsersController {
     };
   }
 
-  @Get('me')
+  /** Profil user yang sedang login. `/me` dipertahankan untuk kompatibilitas. */
+  @Get(['auth/me', 'me'])
   me(@CurrentUser() user: CurrentUserPayload) {
     return user;
+  }
+
+  /**
+   * Logout (BFD-11). Token sesi bersifat stateless (HMAC) sehingga belum bisa dicabut di server
+   * tanpa kolom versi sesi di tabel User; endpoint ini mencatat logout di audit log dan frontend
+   * menghapus token dari penyimpanan lokal. Token tetap kedaluwarsa sendiri setelah TTL.
+   */
+  @Post('auth/logout')
+  @HttpCode(200)
+  async logout(
+    @CurrentUser() user: CurrentUserPayload,
+    @ClientIp() ip: string | null,
+    @ClientUserAgent() userAgent: string | null,
+  ) {
+    await this.audit.log({ actorId: user.id, action: 'AUTH_LOGOUT', entityType: 'User', entityId: user.id, ipAddress: ip, userAgent });
+    return { loggedOut: true };
   }
 
   @Roles('ADMIN')
