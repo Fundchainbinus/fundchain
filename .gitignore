@@ -30,3 +30,6 @@ CLAUDE.local.md
 graphify-out/
 # Ekspor frame Figma (sumber); aset yang dipakai web ada di apps/web/public/figma/
 FundChain figma/
+
+# Output build sementara docs/openapi.ts (BFD-44)
+apps/api/.openapi-build/

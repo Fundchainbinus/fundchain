@@ -56,6 +56,73 @@ jobs:
       - name: Test api
         run: pnpm --filter @fundchain/api test
 
+  seed-smoke:
+    name: Seed smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # BFD-43: seed dijalankan sungguhan ke Postgres sekali pakai di runner.
+    # Tidak ada `secrets.*` di job ini: koneksi hanya ke service container localhost.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/test
+      DIRECT_URL: postgresql://test:test@localhost:5432/test
+      NODE_ENV: test
+      # File seed disimpan di tabel stored_files; jangan pernah Supabase Storage di CI.
+      STORAGE_DRIVER: db
+      PAYMENT_PROVIDER: mock
+      BLOCKCHAIN_NETWORK: localhost
+      CHAIN_ID: "31337"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Guard - database harus lokal
+        run: |
+          case "$DATABASE_URL|$DIRECT_URL" in
+            postgresql://test:test@localhost:5432/test\|postgresql://test:test@localhost:5432/test) echo "OK: DB lokal" ;;
+            *) echo "::error::DATABASE_URL/DIRECT_URL bukan service postgres lokal"; exit 1 ;;
+          esac
+          test ! -e apps/api/.env || { echo "::error::apps/api/.env tidak boleh ada di CI"; exit 1; }
+
+      - name: Migrate
+        run: pnpm --filter @fundchain/api exec prisma migrate deploy
+
+      - name: Seed (1x)
+        run: pnpm --filter @fundchain/api db:seed
+
+      - name: Cek hasil seed
+        run: pnpm --filter @fundchain/api exec ts-node --transpile-only scripts/check-seed.ts --out "$RUNNER_TEMP/seed-counts.json"
+
+      - name: Seed (2x) - harus idempoten
+        run: pnpm --filter @fundchain/api db:seed
+
+      - name: Cek jumlah baris tidak berubah
+        run: pnpm --filter @fundchain/api exec ts-node --transpile-only scripts/check-seed.ts --expect "$RUNNER_TEMP/seed-counts.json"
+
   gitleaks:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest

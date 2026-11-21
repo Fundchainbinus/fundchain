@@ -1,0 +1,40 @@
+name: Cron tick
+
+# BFD-22 / D-005: Vercel Cron di paket Hobby hanya harian, padahal donasi PENDING kedaluwarsa
+# 15 menit (LIMITS.PAYMENT_EXPIRY_MINUTES). Workflow ini memanggil GET /api/v1/cron/tick tiap
+# 10 menit (expireStale, antrean notarisasi, campaign lewat deadline).
+# Butuh secret repo CRON_SECRET = nilai CRON_SECRET di environment Vercel.
+# Catatan: schedule GitHub hanya jalan dari default branch dan bisa terlambat beberapa menit.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: cron-tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    name: GET /api/v1/cron/tick
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Panggil cron tick
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          TICK_URL: https://fundchain-api.vercel.app/api/v1/cron/tick
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Secret CRON_SECRET belum di-set (Settings > Secrets and variables > Actions). Isi dengan nilai CRON_SECRET di Vercel."
+            exit 1
+          fi
+          # Tidak memakai -v/-i supaya header Authorization tidak pernah tercetak di log.
+          # --max-time 70: function Vercel maxDuration 60 dtk; tanpa retry (tick berikutnya 10 menit lagi).
+          curl -fsS --max-time 70 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$TICK_URL"
+          echo

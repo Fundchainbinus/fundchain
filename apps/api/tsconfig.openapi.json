@@ -1,0 +1,9 @@
+{
+  "//": "Build terpisah untuk docs/openapi.ts (dokumen OpenAPI + Postman). Sama dengan tsconfig.json, beda folder output agar dist/ tidak tertimpa.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./.openapi-build",
+    "incremental": false,
+    "sourceMap": false
+  }
+}

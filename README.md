@@ -130,6 +130,9 @@ FundChain_Complete_Planning_Docs   dokumen perencanaan (PRD, API spec, dll.)
 | Refund (BFD-75)     | Manual oleh admin (wajib alasan), hanya donasi PAID di campaign FROZEN; status REFUNDED + audit, hash & catatan on-chain tidak diubah; uang dikembalikan di luar sistem | Bukti on-chain permanen; Pakasir tidak punya API refund. Detail di [D-001](docs/DECISIONS.md#d-001--kebijakan-refund-donasi-bfd-75) |
 | RLS (BFD-23)        | RLS deny-all di semua tabel tanpa policy; akses hanya lewat Prisma (role owner), kontrol akses di service; dijaga `rls.test.ts` | Tidak ada akses Supabase/PostgREST dari browser. Ditinjau ulang kalau itu berubah. Detail di [D-003](docs/DECISIONS.md#d-003--rls-deny-all-tetap-dipakai-bfd-23) |
 | Envelope `{ data, meta }` (BFD-40) | Tetap `{ success, data }` / `{ success: false, error }`; cursor list (`nextCursor`) di dalam `data` | Frontend sudah bergantung pada bentuk ini. Detail di [D-004](docs/DECISIONS.md#d-004--envelope-response-tetap--success-data--bfd-40) |
+| Expiry donasi 30 menit (BFD-22) | 15 menit (= masa berlaku QR); GitHub Actions `cron-tick.yml` memanggil `/api/v1/cron/tick` tiap 10 menit | Vercel Cron Hobby hanya harian. Detail di [D-005](docs/DECISIONS.md#d-005--expiry-donasi-15-menit--github-actions-cron-tiap-10-menit-bfd-22) |
+| Login Google via Passport redirect (BFD-10) | GIS popup (token client) di web + `POST /auth/google` memverifikasi access token ke Google | Tanpa state/callback di server, cocok untuk serverless. Detail di [D-006](docs/DECISIONS.md#d-006--login-google-gis-popup--verifikasi-token-di-post-authgoogle-bfd-10) |
+| `refund()` di PaymentGateway (BFD-19, BFD-108) | Tidak ada; refund manual sesuai D-001 | API refund Sakurupiah belum diketahui; ditinjau ulang setelahnya. Detail di [D-007](docs/DECISIONS.md#d-007--paymentgateway-tanpa-refund-bfd-19-bfd-108) |
 | Backup (BFD-25)     | GitHub Actions harian 02:00 WIB: `pg_dump` terenkripsi GPG (artifact 14 hari) + uji restore otomatis | Tanpa infrastruktur tambahan. Detail di [docs/BACKUP.md](docs/BACKUP.md) |
 
 Log keputusan lengkap: [`docs/DECISIONS.md`](docs/DECISIONS.md).
@@ -181,7 +184,7 @@ Dua project Vercel dari repo yang sama:
 
 Perbedaan mode serverless (diatur lewat env di project `fundchain-api`):
 
-- `WORKER_MODE=on-demand`: tidak ada polling. Worker notarisasi dipicu setelah pembayaran lunas, saat halaman donasi melakukan polling, saat admin retry, dan oleh Vercel Cron harian (`/api/v1/cron/tick`).
+- `WORKER_MODE=on-demand`: tidak ada polling. Worker notarisasi dipicu setelah pembayaran lunas, saat halaman donasi melakukan polling, saat admin retry, oleh GitHub Actions `cron-tick.yml` tiap 10 menit (juga meng-expire donasi PENDING > 15 menit), dan oleh Vercel Cron harian sebagai cadangan (`/api/v1/cron/tick`). Workflow GitHub butuh secret repo `CRON_SECRET` yang sama dengan `CRON_SECRET` di Vercel (D-005).
 - Upload disimpan di tabel `stored_files` (disk Vercel tidak permanen). Batas upload 4MB (batas body request Vercel 4,5MB).
 - Blockchain: Sepolia (`BLOCKCHAIN_NETWORK=sepolia`, `CHAIN_ID=11155111`, `RELAYER_PRIVATE_KEY`, `CONTRACT_ADDRESS`).
 

@@ -135,3 +135,80 @@ bergantung pada bentuk ini, termasuk `nextCursor` untuk infinite query.
 - Endpoint list baru mengikuti pola yang sama (`nextCursor` atau `hasMore` di dalam `data`).
 - Kalau kelak ada konsumen API eksternal yang butuh `meta` standar, buat versi API baru (`/api/v2`). Jangan ubah
   envelope v1.
+
+---
+
+## D-005 — Expiry donasi 15 menit + GitHub Actions cron tiap 10 menit (BFD-22)
+
+**Status:** diterima (tech lead) · **Menggantikan:** expiry 30 menit di tiket BFD-22.
+**Kode:** `LIMITS.PAYMENT_EXPIRY_MINUTES` (`packages/shared/src/constants.ts`), `PaymentsService.expireStale`,
+`GET /api/v1/cron/tick` (`integrity.controller.ts`), `.github/workflows/cron-tick.yml`.
+
+### Konteks
+
+BFD-22 meminta donasi PENDING kedaluwarsa setelah 30 menit. Kode memakai 15 menit, sama dengan masa berlaku QR
+yang dibuat adapter pembayaran. Di Vercel tidak ada worker yang berjalan terus (`WORKER_MODE=on-demand`), dan Vercel
+Cron di paket Hobby hanya boleh harian, jadi donasi bisa tetap PENDING hingga satu hari.
+
+### Keputusan
+
+1. **Expiry tetap 15 menit.** Lewat dari itu QR sudah tidak bisa dibayar, jadi status PENDING hanya menyesatkan.
+2. **Pemicu serverless = GitHub Actions** (`cron-tick.yml`): jadwal `*/10 * * * *` + `workflow_dispatch`, memanggil
+   `GET /api/v1/cron/tick` dengan `Authorization: Bearer <CRON_SECRET>`. Secret repo `CRON_SECRET` harus sama dengan
+   `CRON_SECRET` di Vercel. Workflow gagal dengan pesan jelas bila secret belum di-set dan tidak pernah mencetaknya.
+3. Vercel Cron harian di `vercel.json` tetap ada sebagai cadangan.
+
+### Konsekuensi
+
+- Batas atas status PENDING ≈ 15 menit + 10 menit + keterlambatan jadwal GitHub (bisa beberapa menit, kadang dilewati
+  saat beban tinggi). Schedule hanya jalan dari default branch dan dinonaktifkan GitHub bila repo tidak aktif 60 hari.
+- Tick yang sama juga memproses antrean notarisasi dan campaign lewat deadline, jadi keduanya ikut lebih cepat.
+- Bila pindah ke Vercel Pro (cron per menit) atau worker permanen, workflow ini boleh dihapus.
+
+---
+
+## D-006 — Login Google: GIS popup + verifikasi token di `POST /auth/google` (BFD-10)
+
+**Status:** diterima · **Kode:** `apps/web/src/lib/google.ts`, `UsersController.loginGoogle` (`users.controller.ts`).
+
+### Konteks
+
+Rancangan awal memakai alur redirect OAuth di server (Passport: `/auth/google` → Google → callback). API berjalan
+sebagai Vercel Function stateless tanpa session store, dan web di-host terpisah.
+
+### Keputusan
+
+1. Web memakai **Google Identity Services (GIS) token client** (`initTokenClient`, popup, scope `openid email profile`)
+   untuk mendapat access token Google.
+2. Web mengirim token itu ke **`POST /api/v1/auth/google`** (`{ accessToken }`). Server memverifikasi lewat Google
+   `tokeninfo` (audience harus `GOOGLE_CLIENT_ID`) dan `userinfo` (email wajib terverifikasi), lalu menerbitkan token
+   sesi FundChain sendiri. Tidak ada Passport dan tidak ada callback URL di API.
+
+### Konsekuensi
+
+- Alur OAuth tidak butuh state/session di server, cocok untuk serverless. Callback URL tidak perlu didaftarkan per
+  environment; cukup "Authorized JavaScript origins".
+- Setiap login memanggil Google dua kali dari server (endpoint dibatasi 10 request/menit per IP).
+- Token Google hanya dipakai sekali saat login; selanjutnya yang berlaku token sesi FundChain.
+
+---
+
+## D-007 — `PaymentGateway` tanpa `refund()` (BFD-19, BFD-108)
+
+**Status:** diterima · **Kode:** `apps/api/src/modules/payments/adapters/payment-gateway.ts`.
+
+### Konteks
+
+BFD-19/BFD-108 menyebut kemampuan refund di adapter gateway. Refund saat ini manual di luar sistem (D-001), dan API
+refund Sakurupiah (D-002) belum diketahui.
+
+### Keputusan
+
+Interface `PaymentGateway` **tidak** punya method `refund()`. Refund tetap dicatat lewat
+`POST /api/v1/admin/donations/:id/refund` sesuai D-001, tanpa memanggil gateway.
+
+### Konsekuensi
+
+- Adapter `mock`/`pakasir` tidak dipaksa mengimplementasikan method yang tidak didukung gateway-nya.
+- **Ditinjau ulang** begitu API refund Sakurupiah diketahui: bila ada, tambahkan `refund?()` opsional di interface dan
+  panggil dari `PaymentsService.refund`, lalu ganti D-001/D-007 dengan entri baru.
