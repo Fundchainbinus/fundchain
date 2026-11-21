@@ -6,9 +6,10 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { z } from 'zod';
 import { ErrorBox, InfoNote, PageHeader, Spinner, SuccessBox } from '../components/ui';
-import { api, get, patch, post } from '../lib/api';
+import { get, patch, post } from '../lib/api';
 import { dateTime, fileSize } from '../lib/format';
 import type { CampaignDetail } from '../lib/types';
+import { attachFile, maxSizeLabel, useFilesConfig } from '../lib/upload';
 
 const schema = z.object({
   title: z.string().trim().min(LIMITS.TITLE_MIN, `Judul minimal ${LIMITS.TITLE_MIN} karakter`).max(LIMITS.TITLE_MAX),
@@ -59,6 +60,8 @@ export function CampaignFormCard({ id, onCreated, onSubmitted }: { id?: string; 
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [file, setFile] = useState<File | null>(null);
   const [saved, setSaved] = useState(false);
+  const filesConfig = useFilesConfig();
+  const [progress, setProgress] = useState<number | null>(null);
 
   useEffect(() => {
     const c = existing.data;
@@ -78,11 +81,16 @@ export function CampaignFormCard({ id, onCreated, onSubmitted }: { id?: string; 
     },
   });
   const upload = useMutation({
-    mutationFn: async () => {
-      const fd = new FormData();
-      fd.append('file', file!);
-      return api.post(`/campaigns/${id}/documents`, fd);
-    },
+    mutationFn: () =>
+      attachFile({
+        url: `/campaigns/${id}/documents`,
+        file: file!,
+        purpose: 'campaign-document',
+        fileField: 'file',
+        config: filesConfig,
+        onProgress: setProgress,
+      }),
+    onSettled: () => setProgress(null),
     onSuccess: () => {
       setFile(null);
       void qc.invalidateQueries({ queryKey: ['campaign', id] });
@@ -183,12 +191,12 @@ export function CampaignFormCard({ id, onCreated, onSubmitted }: { id?: string; 
               />
               {id && (
                 <button type="button" className="btn-secondary" disabled={!file || upload.isPending} onClick={() => upload.mutate()} aria-label="Unggah proposal">
-                  <FileUp size={15} /> {upload.isPending ? 'Mengunggah…' : doc ? 'Ganti' : 'Unggah'}
+                  <FileUp size={15} /> {upload.isPending ? `Mengunggah…${progress !== null ? ` ${progress}%` : ''}` : doc ? 'Ganti' : 'Unggah'}
                 </button>
               )}
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              {id ? 'Wajib PDF · maksimum 4 MB.' : 'Simpan draft dulu, lalu unggah proposal (PDF · maksimum 4 MB).'}
+              {id ? `Wajib PDF · maksimum ${maxSizeLabel(filesConfig.maxBytes)}.` : `Simpan draft dulu, lalu unggah proposal (PDF · maksimum ${maxSizeLabel(filesConfig.maxBytes)}).`}
             </p>
           </div>
         </fieldset>
