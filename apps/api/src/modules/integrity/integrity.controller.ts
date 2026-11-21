@@ -44,7 +44,8 @@ export class IntegrityController {
   @Public()
   @Get('blockchain/info')
   info() {
-    return this.blockchain.info();
+    // Publik: tanpa agregat biaya gas (itu untuk dashboard admin via GET admin/stats).
+    return this.blockchain.info({ fees: false });
   }
 
   @Roles('ADMIN')
@@ -85,7 +86,11 @@ export class IntegrityController {
     return this.integrity.verifyMany(admin.id, undefined, { ip, userAgent, source: 'MANUAL' });
   }
 
-  /** Antrekan ulang notarisasi yang FAILED. Hash yang dikirim tetap hash saat settlement. */
+  /**
+   * Antrekan ulang notarisasi yang FAILED. Hash yang dikirim tetap hash saat settlement.
+   * 404 = donasi tidak punya record notarisasi · 409 = status bukan FAILED.
+   * Dipakai juga setelah relayer diisi ulang (lastError [INSUFFICIENT_FUNDS]).
+   */
   @Roles('ADMIN')
   @Post('admin/blockchain/:donationId/retry')
   @HttpCode(200)
@@ -99,7 +104,11 @@ export class IntegrityController {
       where: { donationId, status: 'FAILED' },
       data: { status: 'QUEUED', retryCount: 0, lastError: null, nextAttemptAt: new Date() },
     });
-    if (count === 0) throw new AppError('BLOCKCHAIN_INVALID_STATUS', 'Hanya notarisasi FAILED yang bisa diulang.');
+    if (count === 0) {
+      const existing = await this.prisma.blockchainTransaction.findUnique({ where: { donationId }, select: { status: true } });
+      if (!existing) throw new AppError('DONATION_NOT_FOUND', 'Notarisasi untuk donasi ini tidak ditemukan.');
+      throw new AppError('BLOCKCHAIN_INVALID_STATUS', `Hanya notarisasi FAILED yang bisa diulang (status: ${existing.status}).`);
+    }
     await this.audit.log({
       actorId: admin.id,
       action: 'BLOCKCHAIN_RETRY_REQUESTED',

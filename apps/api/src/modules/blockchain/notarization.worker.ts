@@ -2,7 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { HARDHAT_CHAIN_ID, LIMITS } from '@fundchain/shared';
 import type { BlockchainTransaction } from '@prisma/client';
 import { waitUntil } from '@vercel/functions';
-import type { ContractTransactionResponse } from 'ethers';
+import type { Contract, ContractTransactionResponse } from 'ethers';
 import { sendAlert } from '../../common/alert';
 import { env } from '../../common/env';
 import { PrismaService } from '../../common/prisma.service';
@@ -11,6 +11,15 @@ import { CampaignsService } from '../campaigns/campaigns.service';
 import { IntegrityService } from '../integrity/integrity.service';
 import { PaymentsService } from '../payments/payments.service';
 import { BlockchainService } from './blockchain.service';
+import {
+  bumpFees,
+  classifyRelayerError,
+  errorClassFromLastError,
+  formatRelayerError,
+  RELAYER_ERROR_HANDLING,
+  relayerErrorMessage,
+  type RelayerErrorClass,
+} from './relayer-errors';
 
 const HOUSEKEEPING_MS = 60_000;
 const STUCK_SUBMITTED_MS = 120_000;
@@ -22,6 +31,39 @@ const INTEGRITY_SWEEP_MS = 60_000;
 const STUCK_CHECK_MS = 60_000;
 /** Batas baris per scan recoverStuck() per tick: tiap baris = panggilan RPC, jadi harus dibatasi di serverless. */
 export const RECOVER_BATCH = 20;
+/** BFD-49: maksimal kirim ulang langsung (nonce baru / fee naik / gas limit naik) dalam satu percobaan. */
+export const SEND_REPAIR_ATTEMPTS = 2;
+/** BFD-49: setelah INSUFFICIENT_FUNDS, instance ini berhenti mengirim tx selama ini (alert sekali per jeda). */
+export const INSUFFICIENT_FUNDS_PAUSE_MS = 10 * 60_000;
+/** Jeda cek saldo relayer (1 panggilan RPC); saldo rendah -> warning di log. */
+export const BALANCE_CHECK_MS = 5 * 60_000;
+/** Headroom gas limit saat GAS_TOO_LOW: estimasi x 1.5. */
+const GAS_LIMIT_HEADROOM_PERCENT = 150n;
+
+/** Field receipt ethers v6 yang dipakai untuk biaya gas (gasPrice = effective gas price). */
+interface GasReceipt {
+  gasUsed?: bigint | null;
+  gasPrice?: bigint | null;
+}
+
+type NotarizeOverrides = {
+  nonce?: number;
+  gasLimit?: bigint;
+  maxFeePerGas?: bigint;
+  maxPriorityFeePerGas?: bigint;
+  gasPrice?: bigint;
+};
+
+/** BFD-92: gasUsed, effectiveGasPrice, feeWei (string wei) dari receipt; null bila receipt tidak memuatnya. */
+export function gasFields(receipt?: GasReceipt | null) {
+  const gasUsed = typeof receipt?.gasUsed === 'bigint' ? receipt.gasUsed : null;
+  const price = typeof receipt?.gasPrice === 'bigint' ? receipt.gasPrice : null;
+  return {
+    gasUsed: gasUsed === null ? null : gasUsed.toString(),
+    effectiveGasPrice: price === null ? null : price.toString(),
+    feeWei: gasUsed === null || price === null ? null : (gasUsed * price).toString(),
+  };
+}
 
 /**
  * Worker notarisasi (in-process).
@@ -31,6 +73,9 @@ export const RECOVER_BATCH = 20;
  * Tunggu receipt dibatasi waktu: tx lambat tidak mengunci antrean & hash checker; sisanya lewat recoverStuck().
  * Belum CONFIRMED > STUCK_TX_ALERT_MS → audit BLOCKCHAIN_TX_STUCK + alert (sekali per donasi).
  * Invariant: status PAID donasi TIDAK PERNAH diubah oleh worker (BR-BC-004).
+ * BFD-48: CONFIRMED hanya setelah BLOCKCHAIN_CONFIRMATIONS konfirmasi (default 2).
+ * BFD-49: error kirim tx diklasifikasi (relayer-errors.ts): nonce -> nonce 'pending' baru, underpriced -> fee naik,
+ *         insufficient funds -> FAILED tanpa menghabiskan retry + alert + jeda kirim. Lihat docs/blockchain/WORKER.md.
  */
 @Injectable()
 export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestroy {
@@ -42,6 +87,9 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
   private lastStuckCheck = 0;
   private chainReady = false;
   private lastNotReadyReason = '';
+  private lastBalanceCheck = 0;
+  /** BFD-49: kirim tx dijeda sampai waktu ini setelah INSUFFICIENT_FUNDS (per instance). */
+  private fundsPausedUntil = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -109,13 +157,21 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
         await this.resyncLocalChain();
       }
       await this.recoverStuck();
+      await this.checkRelayerBalance();
+      if (Date.now() < this.fundsPausedUntil) {
+        // Saldo relayer habis: jangan gagalkan antrean satu per satu. Job tetap QUEUED/RETRYING sampai jeda selesai.
+        await this.integritySweep();
+        return;
+      }
       const due = await this.prisma.blockchainTransaction.findMany({
         // Hanya antrean milik chain ini — dev lokal & production bisa berbagi database.
         where: { status: { in: ['QUEUED', 'RETRYING'] }, nextAttemptAt: { lte: new Date() }, chainId: this.blockchain.target().chainId },
         orderBy: { createdAt: 'asc' },
         take: 5,
       });
-      for (const job of due) await this.process(job);
+      for (const job of due) {
+        if ((await this.process(job)) === 'halt') break;
+      }
       await this.integritySweep();
     } catch (e) {
       this.logger.error(`Tick gagal: ${(e as Error).message}`);
@@ -124,7 +180,8 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     }
   }
 
-  private async process(job: BlockchainTransaction) {
+  /** 'halt' = hentikan sisa batch tick ini (saldo relayer habis). */
+  private async process(job: BlockchainTransaction): Promise<'halt' | void> {
     const donation = await this.prisma.donation.findUnique({ where: { id: job.donationId }, select: { status: true, hash: true } });
     if (!donation || donation.status !== 'PAID' || !donation.hash) {
       await this.fail(job, 'Donasi bukan PAID atau hash kosong (BR-BC-001)');
@@ -135,7 +192,17 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
       const reader = this.blockchain.contract();
       // Idempotency: kalau sudah ada di chain (mis. crash setelah kirim tx), anggap sukses.
       if (await reader.isNotarized(job.onchainKey)) {
-        await this.confirm(job, { txHash: job.txHash, blockNumber: job.blockNumber, contractAddress, already: true });
+        // Tx kita sendiri yang sudah masuk blok: tetap tunggu N konfirmasi & ambil biaya gas dari receipt-nya.
+        const receipt = job.txHash ? await this.blockchain.getProvider().getTransactionReceipt(job.txHash).catch(() => null) : null;
+        if (receipt && receipt.status === 1 && (await this.confirmationsOf(receipt)) < this.requiredConfirmations()) {
+          await this.postpone(job);
+          return;
+        }
+        await this.confirm(
+          job,
+          { txHash: job.txHash, blockNumber: receipt?.blockNumber ?? job.blockNumber, contractAddress, already: !receipt },
+          receipt,
+        );
         return;
       }
 
@@ -151,11 +218,12 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
       if (claim.count === 0) return;
 
       const writer = this.blockchain.contract(true);
-      const tx = (await writer.notarize(job.onchainKey, donation.hash)) as ContractTransactionResponse;
+      const tx = await this.sendNotarize(job, writer, donation.hash);
       await this.prisma.blockchainTransaction.update({ where: { id: job.id }, data: { txHash: tx.hash } });
       this.logger.log(`Tx terkirim untuk donasi ${job.donationId}: ${tx.hash}`);
 
-      const { confirmations, confirmWaitMs } = env().blockchain;
+      const { confirmWaitMs } = env().blockchain;
+      const confirmations = this.requiredConfirmations();
       let receipt: Awaited<ReturnType<ContractTransactionResponse['wait']>>;
       try {
         receipt = await tx.wait(confirmations, confirmWaitMs);
@@ -168,16 +236,125 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
         return;
       }
       if (!receipt || receipt.status !== 1) throw new Error('Transaksi gagal di chain');
-      await this.confirm(job, { txHash: tx.hash, blockNumber: receipt.blockNumber, contractAddress, already: false });
+      await this.confirm(job, { txHash: tx.hash, blockNumber: receipt.blockNumber, contractAddress, already: false }, receipt);
     } catch (e) {
       const revert = this.blockchain.parseRevert(e);
       if (revert === 'AlreadyNotarized') {
         await this.confirm(job, { txHash: job.txHash, blockNumber: job.blockNumber, contractAddress, already: true });
-      } else if (revert === 'ZeroHash') {
-        await this.fail(job, 'Contract menolak hash nol (ZeroHash)');
-      } else {
-        await this.retry(job, revert ?? (e as Error).message);
+        return;
       }
+      if (revert === 'ZeroHash') {
+        await this.fail(job, 'Contract menolak hash nol (ZeroHash)');
+        return;
+      }
+      const cls = revert ? null : classifyRelayerError(e);
+      const reason = formatRelayerError(cls, revert ?? relayerErrorMessage(e));
+      if (cls === 'INSUFFICIENT_FUNDS') {
+        await this.failInsufficientFunds(job, reason);
+        return 'halt';
+      }
+      if (cls === 'ALREADY_KNOWN') {
+        // Tx identik sudah di mempool (sudah terkirim). Kirim ulang = tx dobel. Biarkan SUBMITTED:
+        // recoverStuck() mengonfirmasi bila hash sudah on-chain, atau mengirim ulang bila tx dropped.
+        await this.prisma.blockchainTransaction.update({ where: { id: job.id }, data: { lastError: reason.slice(0, 500) } });
+        this.logger.warn(`Tx donasi ${job.donationId} sudah ada di mempool, menunggu recoverStuck(): ${reason}`);
+        return;
+      }
+      await this.retry(job, reason);
+    }
+  }
+
+  /** BFD-48: jumlah konfirmasi yang ditunggu (BLOCKCHAIN_CONFIRMATIONS, minimal 1). */
+  private requiredConfirmations(): number {
+    return Math.max(1, env().blockchain.confirmations);
+  }
+
+  private async confirmationsOf(receipt: { confirmations?: unknown }): Promise<number> {
+    return typeof receipt.confirmations === 'function' ? Number(await (receipt.confirmations as () => Promise<number>)()) : 0;
+  }
+
+  /**
+   * BFD-49: kirim notarize(); error nonce/fee/gas diperbaiki lalu dikirim ulang langsung (maks SEND_REPAIR_ATTEMPTS).
+   * Aman dari tx dobel: error-error ini berarti node MENOLAK tx, jadi belum ada tx yang masuk mempool.
+   * Kategori dari percobaan sebelumnya (prefix lastError) langsung diterapkan di kiriman pertama.
+   */
+  private async sendNotarize(job: BlockchainTransaction, writer: Contract, hash: string): Promise<ContractTransactionResponse> {
+    const overrides: NotarizeOverrides = {};
+    let cls: RelayerErrorClass | null = errorClassFromLastError(job.lastError);
+    for (let repair = 0; ; repair++) {
+      if (cls) await this.applyRepair(cls, overrides, writer, job.onchainKey, hash);
+      try {
+        return (Object.keys(overrides).length
+          ? await writer.notarize(job.onchainKey, hash, overrides)
+          : await writer.notarize(job.onchainKey, hash)) as ContractTransactionResponse;
+      } catch (e) {
+        if (this.blockchain.parseRevert(e)) throw e;
+        const next = classifyRelayerError(e);
+        const handling = next ? RELAYER_ERROR_HANDLING[next] : null;
+        const repairable = handling && (handling.freshNonce || handling.bumpFee || handling.bumpGasLimit);
+        if (!repairable || repair >= SEND_REPAIR_ATTEMPTS) throw e;
+        this.logger.warn(`Kirim tx donasi ${job.donationId} ditolak [${next}], kirim ulang dengan perbaikan: ${relayerErrorMessage(e)}`);
+        cls = next;
+      }
+    }
+  }
+
+  private async applyRepair(cls: RelayerErrorClass, overrides: NotarizeOverrides, writer: Contract, key: string, hash: string) {
+    const handling = RELAYER_ERROR_HANDLING[cls];
+    if (handling.freshNonce) overrides.nonce = await this.blockchain.pendingNonce();
+    if (handling.bumpFee) {
+      const fees = bumpFees(await this.blockchain.feeData(), overrides);
+      if (fees) {
+        delete overrides.gasPrice;
+        delete overrides.maxFeePerGas;
+        delete overrides.maxPriorityFeePerGas;
+        Object.assign(overrides, fees);
+      }
+    }
+    if (handling.bumpGasLimit) {
+      const estimate = (await writer.notarize.estimateGas(key, hash)) as bigint;
+      const base = overrides.gasLimit && overrides.gasLimit > estimate ? overrides.gasLimit : estimate;
+      overrides.gasLimit = (base * GAS_LIMIT_HEADROOM_PERCENT) / 100n;
+    }
+  }
+
+  /** BFD-49: saldo relayer habis. FAILED tanpa menambah retryCount, alert, dan jeda kirim di instance ini. */
+  private async failInsufficientFunds(job: BlockchainTransaction, reason: string) {
+    await this.fail(job, reason, job.retryCount);
+    const now = Date.now();
+    const alreadyPaused = now < this.fundsPausedUntil;
+    this.fundsPausedUntil = now + INSUFFICIENT_FUNDS_PAUSE_MS;
+    if (alreadyPaused) return;
+    let address = '';
+    try {
+      address = this.blockchain.getRelayer().address;
+    } catch {
+      /* alamat opsional di pesan alert */
+    }
+    const { network } = this.blockchain.target();
+    await sendAlert(
+      [
+        `⛽ Saldo relayer tidak cukup untuk notarisasi (${network})${address ? ` · ${address}` : ''}`,
+        `- Donasi ${job.donationId} -> FAILED: ${reason.slice(0, 200)}`,
+        `- Pengiriman tx dijeda ${INSUFFICIENT_FUNDS_PAUSE_MS / 60_000} menit; antrean lain tetap QUEUED.`,
+        '- Aksi: isi saldo relayer, lalu Admin -> Integritas -> Retry (POST admin/blockchain/:donationId/retry).',
+      ].join('\n'),
+    );
+  }
+
+  /** Saldo relayer rendah -> warning di log (throttled BALANCE_CHECK_MS). Read-only, tidak pernah melempar. */
+  private async checkRelayerBalance() {
+    if (Date.now() - this.lastBalanceCheck < BALANCE_CHECK_MS) return;
+    this.lastBalanceCheck = Date.now();
+    try {
+      const r = await this.blockchain.relayerBalance();
+      if (r.lowBalance) {
+        this.logger.warn(
+          `Saldo relayer ${r.address} rendah: ${r.balance} ETH < ${r.minBalance} ETH. Isi dari faucet; notarisasi bisa gagal INSUFFICIENT_FUNDS.`,
+        );
+      }
+    } catch (e) {
+      this.logger.debug(`Cek saldo relayer dilewati: ${(e as Error).message}`);
     }
   }
 
@@ -213,7 +390,9 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
   private async confirm(
     job: BlockchainTransaction,
     r: { txHash: string | null; blockNumber: number | null; contractAddress: string | null; already: boolean },
+    receipt?: GasReceipt | null,
   ) {
+    const gas = gasFields(receipt);
     await this.prisma.$transaction(async (tx) => {
       await tx.blockchainTransaction.update({
         where: { id: job.id },
@@ -224,6 +403,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
           contractAddress: r.contractAddress,
           confirmedAt: new Date(),
           lastError: null,
+          ...gas,
         },
       });
       await this.audit.log(
@@ -231,7 +411,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
           action: 'BLOCKCHAIN_NOTARIZED',
           entityType: 'Donation',
           entityId: job.donationId,
-          metadata: { txHash: r.txHash, blockNumber: r.blockNumber, alreadyOnChain: r.already },
+          metadata: { txHash: r.txHash, blockNumber: r.blockNumber, alreadyOnChain: r.already, gasUsed: gas.gasUsed, feeWei: gas.feeWei },
         },
         tx,
       );
@@ -288,8 +468,12 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     for (const job of pending) {
       const receipt = await this.blockchain.getProvider().getTransactionReceipt(job.txHash!).catch(() => null);
       if (!receipt) continue;
-      if (receipt.status === 1 && (await receipt.confirmations()) >= env().blockchain.confirmations) {
-        await this.confirm(job, { txHash: job.txHash, blockNumber: receipt.blockNumber, contractAddress: job.contractAddress, already: false });
+      if (receipt.status === 1 && (await receipt.confirmations()) >= this.requiredConfirmations()) {
+        await this.confirm(
+          job,
+          { txHash: job.txHash, blockNumber: receipt.blockNumber, contractAddress: job.contractAddress, already: false },
+          receipt,
+        );
       } else if (receipt.status === 0) {
         await this.retry(job, 'Transaksi di-revert oleh chain');
       }
@@ -307,12 +491,18 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
         const receipt = job.txHash
           ? await this.blockchain.getProvider().getTransactionReceipt(job.txHash).catch(() => null)
           : null;
-        await this.confirm(job, {
-          txHash: job.txHash,
-          blockNumber: receipt?.blockNumber ?? null,
-          contractAddress: job.contractAddress,
-          already: true,
-        });
+        // Receipt tx kita ada tapi konfirmasi belum cukup: tunggu (BFD-48), jangan CONFIRMED lebih awal.
+        if (receipt && receipt.status === 1 && (await this.confirmationsOf(receipt)) < this.requiredConfirmations()) continue;
+        await this.confirm(
+          job,
+          {
+            txHash: job.txHash,
+            blockNumber: receipt?.blockNumber ?? null,
+            contractAddress: job.contractAddress,
+            already: true,
+          },
+          receipt,
+        );
       } else {
         await this.retry(job, 'Transaksi tidak terkonfirmasi (dropped), dikirim ulang');
       }
@@ -344,6 +534,9 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
           submittedAt: null,
           retryCount: 0,
           contractAddress,
+          gasUsed: null,
+          effectiveGasPrice: null,
+          feeWei: null,
           nextAttemptAt: new Date(),
           lastError: 'Chain lokal di-reset, notarisasi ulang',
         },
