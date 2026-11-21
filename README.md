@@ -125,8 +125,11 @@ FundChain_Complete_Planning_Docs   dokumen perencanaan (PRD, API spec, dll.)
 | PostgreSQL          | PostgreSQL di Supabase (Prisma, pooler + direct URL)                      | Sesuai rencana deploy; RLS aktif di semua tabel     |
 | Redis + BullMQ      | Tabel `blockchain_transactions` sebagai antrean (outbox) + worker polling | Tanpa Redis; retry/backoff/FAILED tetap sesuai spec |
 | Microsoft SSO       | Persona switcher (`DEMO_MODE`)                                            | Permintaan: tanpa login                             |
-| Midtrans            | `mock` (default) + adapter `pakasir`                                      | Sesuai keputusan Pakasir + Mock                     |
+| Midtrans            | `mock` (default) + adapter `pakasir` (deprecated) → pindah ke Sakurupiah (BFD-107–111) | Keputusan tim; detail di [D-002](docs/DECISIONS.md#d-002--payment-gateway-pakasir--sakurupiah-bfd-107--bfd-111) |
 | Worker app terpisah | Worker di dalam proses API                                                | Satu perintah untuk jalan                           |
+| Refund (BFD-75)     | Manual oleh admin (wajib alasan), hanya donasi PAID di campaign FROZEN; status REFUNDED + audit, hash & catatan on-chain tidak diubah; uang dikembalikan di luar sistem | Bukti on-chain permanen; Pakasir tidak punya API refund. Detail di [D-001](docs/DECISIONS.md#d-001--kebijakan-refund-donasi-bfd-75) |
+
+Log keputusan lengkap: [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## Konfigurasi
 
