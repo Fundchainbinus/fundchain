@@ -1,5 +1,5 @@
 import { SDG_CATEGORIES } from '@fundchain/shared';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { CampaignCard } from '../components/CampaignCard';
@@ -7,7 +7,7 @@ import { EmptyState, ErrorBox, FilterTabs, InfoNote, Spinner, Stat } from '../co
 import { get } from '../lib/api';
 import { rupiah } from '../lib/format';
 import { useMe } from '../lib/hooks';
-import type { CampaignDetail, CampaignSummary, MyDonation } from '../lib/types';
+import type { CampaignSummary, MyDonation } from '../lib/types';
 
 const PUBLIC = 'ACTIVE,COMPLETED,FROZEN';
 
@@ -18,14 +18,11 @@ function SummaryStats() {
     queryFn: () => get<{ campaigns: CampaignSummary[] }>('/campaigns', { status: PUBLIC, limit: 100 }),
   });
   const cs = all.data?.campaigns ?? [];
-  // Ringkasan integritas hanya ada di detail kampanye (publik); detail ini juga dipakai ulang halaman kampanye.
-  const details = useQueries({
-    queries: cs.map((c) => ({ queryKey: ['campaign', c.id], queryFn: () => get<CampaignDetail>(`/campaigns/${c.id}`) })),
-  });
   const mine = useQuery({ queryKey: ['me', 'donations'], queryFn: () => get<MyDonation[]>('/me/donations'), enabled: !!me });
   const by = (s: string) => cs.filter((c) => c.status === s).length;
   const paid = (mine.data ?? []).filter((d) => d.status === 'PAID');
-  const integ = (k: 'VERIFIED' | 'TAMPERED' | 'PENDING') => details.reduce((n, q) => n + (q.data?.integritySummary[k] ?? 0), 0);
+  // integritySummary ikut di respons list (BFD-56), jadi tidak perlu fetch detail per kampanye.
+  const integ = (k: 'VERIFIED' | 'TAMPERED' | 'PENDING') => cs.reduce((n, c) => n + (c.integritySummary?.[k] ?? 0), 0);
   const totalDonations = cs.reduce((n, c) => n + c.donorCount, 0);
 
   return (

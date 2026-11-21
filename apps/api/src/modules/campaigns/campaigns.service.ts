@@ -71,8 +71,22 @@ export class CampaignsService {
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
     const page = rows.slice(0, limit);
+    // BFD-56: ringkasan integritas per campaign dalam satu groupBy, supaya beranda tidak fetch detail per kartu (N+1).
+    const integrity = page.length
+      ? await this.prisma.donation.groupBy({
+          by: ['campaignId', 'integrityStatus'],
+          where: { campaignId: { in: page.map((c) => c.id) }, status: 'PAID' },
+          _count: true,
+        })
+      : [];
+    const integrityOf = (id: string) =>
+      Object.fromEntries(integrity.filter((g) => g.campaignId === id).map((g) => [g.integrityStatus, g._count]));
     return {
-      campaigns: page.map(({ _count, ...c }) => ({ ...c, donorCount: _count.donations })),
+      campaigns: page.map(({ _count, ...c }) => ({
+        ...c,
+        donorCount: _count.donations,
+        integritySummary: integrityOf(c.id),
+      })),
       nextCursor: rows.length > limit ? page[page.length - 1].id : null,
     };
   }
