@@ -1,0 +1,12 @@
+{
+  "command": "ALLOW_DEMO_TAMPER=true pnpm --silent --filter @fundchain/api demo:tamper <donationId> 900000 --json",
+  "donationId": "a4a63dd3-8113-4d2d-90a2-df94b17773f0",
+  "exitCode": 0,
+  "json": {
+    "status": "TAMPERED",
+    "currentHash": "0xfd134fb0b6a3dcdc630ea7c9de7a02093fdbaacc01dc7126abd7a753419ba859",
+    "onChainHash": "0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef",
+    "campaignFrozen": true
+  },
+  "stderrTail": "⚠️  Data donasi dimanipulasi langsung di database\n   Donasi   : a4a63dd3-8113-4d2d-90a2-df94b17773f0\n   Nominal  : Rp100.000 → Rp900.000\n   Campaign : de42000e-2c95-4056-9b18-d013edd628b3\n   Pulihkan : ALLOW_DEMO_TAMPER=true pnpm demo:tamper a4a63dd3-8113-4d2d-90a2-df94b17773f0 100000 --check\n"
+}

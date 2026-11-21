@@ -1,0 +1,83 @@
+{
+  "name": "gate2-tamper",
+  "generatedAt": "2026-11-21T17:58:37.432Z",
+  "runUrl": "https://github.com/Fundchainbinus/fundchain/actions/runs/44932667635",
+  "commit": "ecf517fd525176fcf4569fbddc444fb7669e9d0d",
+  "pass": 9,
+  "fail": 0,
+  "notRun": 0,
+  "steps": [
+    {
+      "id": "G2-01",
+      "name": "Siapkan campaign ACTIVE + donasi Rp100.000 CONFIRMED + pengajuan pencairan REQUESTED",
+      "expected": "Donasi CONFIRMED, match=true; pencairan REQUESTED",
+      "status": "PASS",
+      "actual": "campaign de42000e-2c95-4056-9b18-d013edd628b3 ACTIVE; donasi a4a63dd3-8113-4d2d-90a2-df94b17773f0 CONFIRMED tx 0x675afab74f15cc9503ce0c37586a01465f0ac50a2c2967f55401f3ad35fb6587; pencairan 45a1380a-fa56-46e9-a571-d18f09e0bc2f REQUESTED",
+      "durationMs": 1743
+    },
+    {
+      "id": "G2-02",
+      "name": "demo:tamper --json (100.000 → 900.000)",
+      "expected": "{status: TAMPERED, currentHash != onChainHash, campaignFrozen: true}",
+      "status": "PASS",
+      "actual": "{\"status\":\"TAMPERED\",\"currentHash\":\"0xfd134fb0b6a3dcdc630ea7c9de7a02093fdbaacc01dc7126abd7a753419ba859\",\"onChainHash\":\"0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef\",\"campaignFrozen\":true}",
+      "durationMs": 2138
+    },
+    {
+      "id": "G2-03",
+      "name": "API: campaign FROZEN & proof match=false",
+      "expected": "GET /campaigns/:id status FROZEN; /proof match=false, currentHash != hashOnChain",
+      "status": "PASS",
+      "actual": "campaign FROZEN (Integrity check: donasi a4a63dd3-8113-4d2d-90a2-df94b17773f0 TAMPERED (hash DB ≠ hash on-chain)); proof match=false, currentHash 0xfd134fb0b6a3dcdc630ea7c9de7a02093fdbaacc01dc7126abd7a753419ba859 != hashOnChain 0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef",
+      "durationMs": 50
+    },
+    {
+      "id": "G2-04",
+      "name": "Pencairan terkunci",
+      "expected": "Ajukan baru → 409 CAMPAIGN_FROZEN; approve pengajuan lama → 409 CAMPAIGN_FROZEN",
+      "status": "PASS",
+      "actual": "ajukan baru → 409 CAMPAIGN_FROZEN; approve pengajuan lama → 409 CAMPAIGN_FROZEN",
+      "durationMs": 34
+    },
+    {
+      "id": "G2-05",
+      "name": "Audit log INTEGRITY_TAMPERED + CAMPAIGN_FROZEN",
+      "expected": "metadata berisi source, storedHash/currentHash/onChainHash; IP & User-Agent tercatat",
+      "status": "PASS",
+      "actual": "INTEGRITY_TAMPERED source=DEMO (script) & MANUAL (IP 10.0.2.10, UA FundChain-QA-E2E/1.0); CAMPAIGN_FROZEN tercatat",
+      "durationMs": 81
+    },
+    {
+      "id": "G2-06",
+      "name": "UI: halaman bukti TAMPERED & banner FROZEN",
+      "expected": "Verdict \"TAMPERED: ...\" dan campaign FROZEN tampil",
+      "status": "PASS",
+      "actual": "UI bukti donasi menampilkan TAMPERED; halaman campaign menampilkan status dibekukan",
+      "durationMs": 1932
+    },
+    {
+      "id": "G2-07",
+      "name": "Unfreeze ditolak selama TAMPERED",
+      "expected": "409 CAMPAIGN_FROZEN \"Masih ada 1 donasi TAMPERED\"",
+      "status": "PASS",
+      "actual": "409 CAMPAIGN_FROZEN: Masih ada 1 donasi TAMPERED. Pulihkan datanya lalu jalankan verifikasi ulang sebelum unfreeze.",
+      "durationMs": 23
+    },
+    {
+      "id": "G2-08",
+      "name": "Pulihkan nominal (demo:tamper 100.000 --json) lalu unfreeze",
+      "expected": "status VERIFIED, unfreeze → ACTIVE",
+      "status": "PASS",
+      "actual": "restore → {\"status\":\"VERIFIED\",\"currentHash\":\"0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef\",\"onChainHash\":\"0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef\",\"campaignFrozen\":true}; unfreeze 201 → campaign ACTIVE",
+      "durationMs": 2153
+    },
+    {
+      "id": "G2-09",
+      "name": "Hash checker otomatis tanpa klik admin",
+      "expected": "Tamper tanpa --check → worker (source SCHEDULED) menandai TAMPERED & FROZEN dalam ≤ 150 dtk",
+      "status": "PASS",
+      "actual": "Worker menandai TAMPERED (source SCHEDULED) & campaign FROZEN ±70 dtk setelah tamper, tanpa klik admin",
+      "durationMs": 72876
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "campaign": {
+    "id": "de42000e-2c95-4056-9b18-d013edd628b3",
+    "creatorId": "8226fe13-bfd7-4a9f-8c6f-ae49436d5243",
+    "title": "Gate2 Tamper mwqpn5r1",
+    "description": "Gate2 Tamper mwqpn5r1: campaign uji otomatis QA (E2E harness) untuk membuktikan alur end-to-end FundChain.",
+    "sdgCategory": "QUALITY_EDUCATION",
+    "targetAmount": 5000000,
+    "currentAmount": 900000,
+    "deadline": "2026-12-21T17:57:16.381Z",
+    "status": "FROZEN",
+    "rejectionReason": null,
+    "frozenReason": "Integrity check: donasi a4a63dd3-8113-4d2d-90a2-df94b17773f0 TAMPERED (hash DB ≠ hash on-chain)",
+    "frozenAt": "2026-11-21T17:57:20.216Z",
+    "deletedAt": null,
+    "createdAt": "2026-11-21T17:57:16.388Z",
+    "updatedAt": "2026-11-21T17:57:20.217Z",
+    "creator": {
+      "id": "8226fe13-bfd7-4a9f-8c6f-ae49436d5243",
+      "name": "Budi Santoso"
+    },
+    "documents": [
+      {
+        "id": "a2a143a3-d04e-4be2-bb7a-bb45b64b50ee",
+        "campaignId": "de42000e-2c95-4056-9b18-d013edd628b3",
+        "originalName": "proposal-contoh.pdf",
+        "storageKey": "proposals/de42000e-2c95-4056-9b18-d013edd628b3/06f739e3-00f3-48cf-8e74-b82706cfc14f.pdf",
+        "fileType": "application/pdf",
+        "size": 669,
+        "createdAt": "2026-11-21T17:57:16.409Z"
+      }
+    ],
+    "reviews": [],
+    "donorCount": 1,
+    "integritySummary": {
+      "TAMPERED": 1
+    },
+    "funds": {
+      "raised": 900000,
+      "disbursed": 0,
+      "approved": 0,
+      "requested": 50000,
+      "available": 850000
+    },
+    "viewer": {
+      "isOwner": false,
+      "isAdmin": false
+    }
+  },
+  "proof": {
+    "donationId": "a4a63dd3-8113-4d2d-90a2-df94b17773f0",
+    "campaignId": "de42000e-2c95-4056-9b18-d013edd628b3",
+    "integrityStatus": "TAMPERED",
+    "lastCheckedAt": "2026-11-21T17:57:20.211Z",
+    "hashDb": "0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef",
+    "currentHash": "0xfd134fb0b6a3dcdc630ea7c9de7a02093fdbaacc01dc7126abd7a753419ba859",
+    "hashOnChain": "0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef",
+    "match": false,
+    "txHash": "0x675afab74f15cc9503ce0c37586a01465f0ac50a2c2967f55401f3ad35fb6587",
+    "blockNumber": 10,
+    "timestamp": "2026-11-21T17:57:17.326Z",
+    "donatedAt": "2026-11-21T17:57:16.000Z",
+    "notarizationStatus": "CONFIRMED",
+    "network": "localhost",
+    "chainId": 31337,
+    "contractAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "etherscanUrl": null,
+    "onChainError": null,
+    "checkedAt": "2026-11-21T17:57:20.302Z"
+  }
+}

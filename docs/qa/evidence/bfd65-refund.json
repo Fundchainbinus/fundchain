@@ -1,0 +1,33 @@
+{
+  "donationId": "d56067e0-f1c4-437b-a1c1-3d66710d9655",
+  "response": {
+    "donationId": "d56067e0-f1c4-437b-a1c1-3d66710d9655",
+    "status": "REFUNDED"
+  },
+  "campaignAmountBefore": 500000,
+  "campaignAmountAfter": 300000,
+  "audit": {
+    "id": "9598c3e3-a96a-4b68-990c-27a56ff67c1a",
+    "actorId": "306bf8ac-9f6c-4ff9-8cf0-c38e52be2b78",
+    "action": "DONATION_REFUNDED",
+    "entityType": "Donation",
+    "entityId": "d56067e0-f1c4-437b-a1c1-3d66710d9655",
+    "metadata": {
+      "amount": 200000,
+      "campaignId": "447d1abf-025c-486d-ac98-fd924acc5f71",
+      "campaignStatus": "FROZEN",
+      "frozenReason": "Manual: Laporan penggunaan dana tidak sesuai proposal, menunggu klarifikasi pembuat campaign.",
+      "reason": "Campaign dibekukan; dana dikembalikan manual ke donatur (QA BFD-65)",
+      "hash": "0x0b9aca8f6b19ef99dc69aeeb9cc5c83d26009c36d5bd6da40d0428845461e5c0",
+      "onchainStatus": "CONFIRMED"
+    },
+    "ipAddress": "10.0.3.10",
+    "userAgent": null,
+    "createdAt": "2026-11-21T17:58:42.401Z",
+    "actor": {
+      "id": "306bf8ac-9f6c-4ff9-8cf0-c38e52be2b78",
+      "name": "Admin BINUS",
+      "role": "ADMIN"
+    }
+  }
+}

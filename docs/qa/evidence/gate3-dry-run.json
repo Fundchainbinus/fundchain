@@ -1,0 +1,75 @@
+{
+  "name": "gate3-dry-run",
+  "generatedAt": "2026-11-21T17:59:13.372Z",
+  "runUrl": "https://github.com/Fundchainbinus/fundchain/actions/runs/44932667635",
+  "commit": "ecf517fd525176fcf4569fbddc444fb7669e9d0d",
+  "pass": 8,
+  "fail": 0,
+  "notRun": 0,
+  "steps": [
+    {
+      "id": "D-1",
+      "name": "1. Login",
+      "expected": "Login Microsoft BINUS DISUBSTITUSI DEMO_MODE (SSO belum tersedia) → login persona Mahasiswa berhasil",
+      "status": "PASS",
+      "actual": "Microsoft SSO belum ada → DEMO_MODE: login persona Mahasiswa (Budi Santoso) berhasil",
+      "durationMs": 1911
+    },
+    {
+      "id": "D-2",
+      "name": "2. Create Campaign",
+      "expected": "Mahasiswa mengisi title, SDG, target, deadline, proposal PDF → status PENDING_REVIEW",
+      "status": "PASS",
+      "actual": "Campaign 85461730-f030-4a15-8556-683bc09d54f6: SDG QUALITY_EDUCATION, target 7500000, deadline 2026-12-12, proposal PDF → PENDING_REVIEW",
+      "durationMs": 3181
+    },
+    {
+      "id": "D-3",
+      "name": "3. Admin Review",
+      "expected": "Admin membuka antrean review → approve → status ACTIVE",
+      "status": "PASS",
+      "actual": "Admin approve dari antrean review → ACTIVE",
+      "durationMs": 3883
+    },
+    {
+      "id": "D-4",
+      "name": "4. Donation",
+      "expected": "Donor donasi; pembayaran QRIS/VA DISUBSTITUSI QRIS mock; webhook SETTLED → donasi PAID",
+      "status": "PASS",
+      "actual": "Donasi db8bff71-66e5-4d33-bb7c-0e8a475fe49a Rp100.000; webhook mock SETTLED (audit PAYMENT_WEBHOOK_RECEIVED) → PAID",
+      "durationMs": 1558
+    },
+    {
+      "id": "D-5",
+      "name": "5. Blockchain",
+      "expected": "Canonical payload v1 → Keccak-256 → antre → relayer submit → txHash tersimpan (CONFIRMED)",
+      "status": "PASS",
+      "actual": "payload v1|db8bff71-66e5-4d33-bb7c-0e8a475fe49a|STU-00001|100000|1795283941; hash 0xda3e8f4942dffaa67103e725d908d0c7a8828b58394b3631f368144335b8594c; tx 0xaa0049f1354df6b2a4787897b944d2210d6ffb059dd84e9d3c09ed5e58f8ae6d blok 15",
+      "durationMs": 3931
+    },
+    {
+      "id": "D-6",
+      "name": "6. Transparency",
+      "expected": "Donasi, nominal, status verifikasi VERIFIED/COCOK, txHash tampil; explorer Sepolia DISUBSTITUSI chain lokal (tanpa link Etherscan)",
+      "status": "PASS",
+      "actual": "COCOK (match=true, integrityStatus=VERIFIED); txHash tampil; etherscanUrl=null (chain lokal)",
+      "durationMs": 179
+    },
+    {
+      "id": "D-7",
+      "name": "7. Tamper Simulation",
+      "expected": "Rp100.000 → Rp900.000 di DB; integrity checker → TAMPERED; campaign FROZEN; pencairan LOCKED",
+      "status": "PASS",
+      "actual": "TAMPERED (verifikasi admin), campaign FROZEN, pengajuan pencairan → 409 CAMPAIGN_FROZEN",
+      "durationMs": 3241
+    },
+    {
+      "id": "D-8",
+      "name": "8. Disbursement (campaign normal)",
+      "expected": "Creator ajukan + unggah bukti → admin approve → mark paid (PAID)",
+      "status": "PASS",
+      "actual": "Pencairan Rp100.000 di campaign normal: REQUESTED → APPROVED → PAID (milestone 1/1)",
+      "durationMs": 2888
+    }
+  ]
+}

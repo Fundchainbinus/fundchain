@@ -1,0 +1,107 @@
+{
+  "name": "bfd65-refund-milestone",
+  "generatedAt": "2026-11-21T17:58:43.787Z",
+  "runUrl": "https://github.com/Fundchainbinus/fundchain/actions/runs/44932667635",
+  "commit": "ecf517fd525176fcf4569fbddc444fb7669e9d0d",
+  "pass": 12,
+  "fail": 0,
+  "notRun": 0,
+  "steps": [
+    {
+      "id": "M-01",
+      "name": "Status awal milestone (seed)",
+      "expected": "1 selesai, tahap 2 REQUESTED berjalan, canRequestNext=false",
+      "status": "PASS",
+      "actual": "1 dari 2 selesai, tahap 2 REQUESTED, canRequestNext=false",
+      "durationMs": 32
+    },
+    {
+      "id": "M-02",
+      "name": "Milestone berikutnya diblokir selama ada yang terbuka",
+      "expected": "409 DISBURSEMENT_IN_PROGRESS",
+      "status": "PASS",
+      "actual": "409 DISBURSEMENT_IN_PROGRESS",
+      "durationMs": 27
+    },
+    {
+      "id": "M-03",
+      "name": "Admin setujui milestone 2 (UI)",
+      "expected": "Status APPROVED",
+      "status": "PASS",
+      "actual": "Milestone 2 APPROVED lewat UI admin",
+      "durationMs": 1250
+    },
+    {
+      "id": "M-04",
+      "name": "Admin tandai transfer dibayar (UI)",
+      "expected": "Status PAID; 2 dari 2 selesai",
+      "status": "PASS",
+      "actual": "Milestone 2 PAID; 2 dari 2 selesai; canRequestNext=true",
+      "durationMs": 1191
+    },
+    {
+      "id": "M-05",
+      "name": "Mahasiswa ajukan milestone 3 dengan bukti (UI)",
+      "expected": "\"Pengajuan terkirim\", status REQUESTED",
+      "status": "PASS",
+      "actual": "Milestone 3 (100000) REQUESTED lewat UI dengan bukti PDF",
+      "durationMs": 1298
+    },
+    {
+      "id": "M-06",
+      "name": "Milestone 4 diblokir selama milestone 3 terbuka",
+      "expected": "409 DISBURSEMENT_IN_PROGRESS",
+      "status": "PASS",
+      "actual": "409 DISBURSEMENT_IN_PROGRESS",
+      "durationMs": 21
+    },
+    {
+      "id": "M-07",
+      "name": "Approve + mark paid milestone 3, progres milestone",
+      "expected": "3 dari 3 selesai, canRequestNext=true; UI \"3 dari 3 selesai\"",
+      "status": "PASS",
+      "actual": "3 dari 3 selesai, canRequestNext=true",
+      "durationMs": 828
+    },
+    {
+      "id": "R-01",
+      "name": "Refund ditolak di campaign ACTIVE",
+      "expected": "409 REFUND_CAMPAIGN_NOT_FROZEN",
+      "status": "PASS",
+      "actual": "409 REFUND_CAMPAIGN_NOT_FROZEN; donasi tetap PAID",
+      "durationMs": 55
+    },
+    {
+      "id": "R-02",
+      "name": "Validasi alasan refund",
+      "expected": "400 VALIDATION_ERROR untuk alasan < 5 karakter",
+      "status": "PASS",
+      "actual": "400 VALIDATION_ERROR: Alasan refund minimal 5 karakter",
+      "durationMs": 16
+    },
+    {
+      "id": "R-03",
+      "name": "Refund donasi PAID di campaign FROZEN",
+      "expected": "200 status REFUNDED; saldo campaign berkurang; audit DONATION_REFUNDED",
+      "status": "PASS",
+      "actual": "REFUNDED; saldo campaign 500000 → 300000; audit DONATION_REFUNDED tercatat",
+      "durationMs": 76
+    },
+    {
+      "id": "R-04",
+      "name": "Refund ganda ditolak",
+      "expected": "409 DONATION_NOT_REFUNDABLE",
+      "status": "PASS",
+      "actual": "409 DONATION_NOT_REFUNDABLE",
+      "durationMs": 18
+    },
+    {
+      "id": "R-05",
+      "name": "Halaman pembayaran menampilkan REFUNDED",
+      "expected": "Badge \"Dana dikembalikan\" + catatan refund untuk donatur",
+      "status": "PASS",
+      "actual": "Halaman pembayaran donatur: \"Dana dikembalikan\" + penjelasan refund",
+      "durationMs": 941
+    }
+  ]
+}

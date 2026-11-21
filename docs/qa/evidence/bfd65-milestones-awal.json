@@ -1,0 +1,37 @@
+{
+  "steps": [
+    {
+      "step": 1,
+      "id": "3dbe6deb-2b7c-460b-a1d8-8137f45c3984",
+      "description": "Milestone 1: pembelian pipa dan tandon air 1.000 liter.",
+      "amount": 500000,
+      "status": "PAID",
+      "requestedAt": "2026-11-20T05:56:08.353Z",
+      "approvedAt": "2026-11-20T11:56:08.353Z",
+      "paidAt": "2026-11-20T17:56:08.353Z"
+    },
+    {
+      "step": 2,
+      "id": "c8f14e58-4d10-4a50-bad0-334f2960cf37",
+      "description": "Milestone 2: filter air dan pelatihan perawatan untuk warga.",
+      "amount": 400000,
+      "status": "REQUESTED",
+      "requestedAt": "2026-11-21T15:56:08.356Z",
+      "approvedAt": null,
+      "paidAt": null
+    }
+  ],
+  "completed": 1,
+  "total": 2,
+  "current": {
+    "step": 2,
+    "id": "c8f14e58-4d10-4a50-bad0-334f2960cf37",
+    "description": "Milestone 2: filter air dan pelatihan perawatan untuk warga.",
+    "amount": 400000,
+    "status": "REQUESTED",
+    "requestedAt": "2026-11-21T15:56:08.356Z",
+    "approvedAt": null,
+    "paidAt": null
+  },
+  "canRequestNext": false
+}

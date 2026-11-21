@@ -1,0 +1,114 @@
+{
+  "idorRead": {
+    "donasiPendingMilikAdmin": "404 DONATION_NOT_FOUND",
+    "campaignPendingReviewAndi": "404 CAMPAIGN_NOT_FOUND",
+    "campaignRejectedSiti": "404 CAMPAIGN_NOT_FOUND",
+    "proposalCampaignAndi": "403 AUTH_FORBIDDEN",
+    "aktivitasCampaignAndi": "404 CAMPAIGN_NOT_FOUND"
+  },
+  "idorWrite": {
+    "patchCampaignSiti": "403 CAMPAIGN_NOT_OWNED",
+    "submitCampaignSiti": "403 CAMPAIGN_NOT_OWNED",
+    "hapusCampaignSiti": "403 CAMPAIGN_NOT_OWNED",
+    "pencairanCampaignSiti": "403 CAMPAIGN_NOT_OWNED",
+    "simulasiBayarDonasiAdmin": "403 AUTH_FORBIDDEN"
+  },
+  "anonymous": {
+    "GET /auth/me": "401 AUTH_UNAUTHENTICATED",
+    "GET /me/donations": "401 AUTH_UNAUTHENTICATED",
+    "GET /me/points": "401 AUTH_UNAUTHENTICATED",
+    "POST /campaigns": "401 AUTH_UNAUTHENTICATED",
+    "GET /admin/stats": "401 AUTH_UNAUTHENTICATED"
+  },
+  "nonAdmin": {
+    "GET /admin/stats": "403 AUTH_FORBIDDEN",
+    "GET /admin/audit-logs": "403 AUTH_FORBIDDEN",
+    "GET /admin/donations": "403 AUTH_FORBIDDEN",
+    "GET /admin/campaigns": "403 AUTH_FORBIDDEN",
+    "GET /admin/disbursements": "403 AUTH_FORBIDDEN",
+    "POST /admin/campaigns/:id/approve": "403 AUTH_FORBIDDEN",
+    "POST /admin/campaigns/:id/freeze": "403 AUTH_FORBIDDEN",
+    "POST /admin/integrity/verify-all": "403 AUTH_FORBIDDEN",
+    "POST /admin/donations/:id/refund": "403 AUTH_FORBIDDEN",
+    "POST /admin/blockchain/:id/retry": "403 AUTH_FORBIDDEN"
+  },
+  "forgedWebhook": {
+    "secretSalah": "401 PAYMENT_SIGNATURE_INVALID",
+    "tanpaSignature": "401 PAYMENT_SIGNATURE_INVALID",
+    "signatureNgawur": "401 PAYMENT_SIGNATURE_INVALID",
+    "signatureBodyLain": "401 PAYMENT_SIGNATURE_INVALID"
+  },
+  "duplicateWebhook": {
+    "pertama": "200 {\"received\":true,\"replayed\":false,\"donationId\":\"043c42b6-3db8-4e1b-b985-aca8c8535bbf\",\"status\":\"PAID\"}",
+    "kedua": "200 {\"received\":true,\"replayed\":true,\"donationId\":\"043c42b6-3db8-4e1b-b985-aca8c8535bbf\",\"status\":\"PAID\"}",
+    "mismatch": "400 PAYMENT_AMOUNT_MISMATCH",
+    "orderTakDikenal": "404 PAYMENT_NOT_FOUND",
+    "saldoSetelahReplay": "1380000 → 1380000 (tidak berubah)"
+  },
+  "rateLimit": {
+    "authDemo": [
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      429,
+      429
+    ],
+    "authGoogle": [
+      401,
+      401,
+      401,
+      401,
+      401,
+      401,
+      401,
+      401,
+      401,
+      401,
+      429,
+      429
+    ],
+    "ipLainTetap200": 200
+  },
+  "csrf": {
+    "cookieTanpaHeader": "403 AUTH_FORBIDDEN",
+    "cookieHeaderSalah": "403 AUTH_FORBIDDEN",
+    "getDenganCookie": "200",
+    "cookieDenganHeader": "201"
+  },
+  "sqli": {
+    "probes": 54,
+    "statusCounts": {
+      "200": 31,
+      "400": 23
+    }
+  },
+  "upload": {
+    "pdfPalsu": "400 INVALID_FILE_TYPE",
+    "exe": "400 INVALID_FILE_TYPE"
+  },
+  "cookie": {
+    "setCookie": "fc_session=<redacted>; Max-Age=604800; Path=/api; Expires=Sat, 28 Nov 2026 17:58:45 GMT; HttpOnly; SameSite=Lax",
+    "notFound": 404,
+    "badUuid": 400
+  },
+  "secrets": {
+    "envFilesTracked": [
+      "apps/web/.env.remote"
+    ],
+    "gitleaks": "job \"Secret scan (gitleaks)\" di .github/workflows/ci.yml + langkah gitleaks di e2e-gates.yml"
+  },
+  "revocation": {
+    "before": 200,
+    "logout": 200,
+    "oldCookie": 401,
+    "oldBearer": 401,
+    "otherOldSession": 401
+  }
+}

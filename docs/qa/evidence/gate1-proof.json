@@ -1,0 +1,70 @@
+{
+  "campaignId": "3c117965-6afa-4fdb-bcc2-26103c2ba292",
+  "donationId": "69fcba53-4703-4138-a817-e1d41d9f9369",
+  "donation": {
+    "id": "69fcba53-4703-4138-a817-e1d41d9f9369",
+    "amount": 100000,
+    "status": "PAID",
+    "isAnonymous": false,
+    "donor": {
+      "displayName": "Budi S.",
+      "integritySubjectId": "STU-00001"
+    },
+    "campaign": {
+      "id": "3c117965-6afa-4fdb-bcc2-26103c2ba292",
+      "title": "Gate1 Taman Baca mwqpmwak",
+      "status": "ACTIVE"
+    },
+    "donatedAt": "2026-11-21T17:57:10.000Z",
+    "createdAt": "2026-11-21T17:57:09.259Z",
+    "canonicalPayload": "v1|69fcba53-4703-4138-a817-e1d41d9f9369|STU-00001|100000|1795283830",
+    "hash": "0x41992b44a5331d5858df9d6ec9cbffce2c2881ccbe036686f845e2e052d375c0",
+    "integrityStatus": "VERIFIED",
+    "lastCheckedAt": "2026-11-21T17:57:11.360Z",
+    "payment": {
+      "provider": "mock",
+      "method": "QRIS",
+      "status": "SETTLED",
+      "amount": 100000,
+      "paidAt": "2026-11-21T17:57:10.285Z",
+      "expiresAt": "2026-11-21T18:12:09.263Z"
+    },
+    "blockchain": {
+      "status": "CONFIRMED",
+      "network": "localhost",
+      "chainId": 31337,
+      "contractAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "txHash": "0x41c50a6eb29b81357ac2000e0fdc59a5ab13b4b6ba9e308af21bbe247fcf1909",
+      "blockNumber": 9,
+      "retryCount": 0,
+      "submittedAt": "2026-11-21T17:57:11.252Z",
+      "confirmedAt": "2026-11-21T17:57:11.328Z",
+      "explorerUrl": null
+    },
+    "viewer": {
+      "isDonor": false,
+      "isAdmin": false
+    }
+  },
+  "proof": {
+    "donationId": "69fcba53-4703-4138-a817-e1d41d9f9369",
+    "campaignId": "3c117965-6afa-4fdb-bcc2-26103c2ba292",
+    "integrityStatus": "VERIFIED",
+    "lastCheckedAt": "2026-11-21T17:57:11.360Z",
+    "hashDb": "0x41992b44a5331d5858df9d6ec9cbffce2c2881ccbe036686f845e2e052d375c0",
+    "currentHash": "0x41992b44a5331d5858df9d6ec9cbffce2c2881ccbe036686f845e2e052d375c0",
+    "hashOnChain": "0x41992b44a5331d5858df9d6ec9cbffce2c2881ccbe036686f845e2e052d375c0",
+    "match": true,
+    "txHash": "0x41c50a6eb29b81357ac2000e0fdc59a5ab13b4b6ba9e308af21bbe247fcf1909",
+    "blockNumber": 9,
+    "timestamp": "2026-11-21T17:57:11.328Z",
+    "donatedAt": "2026-11-21T17:57:10.000Z",
+    "notarizationStatus": "CONFIRMED",
+    "network": "localhost",
+    "chainId": 31337,
+    "contractAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "etherscanUrl": null,
+    "onChainError": null,
+    "checkedAt": "2026-11-21T17:57:12.827Z"
+  }
+}

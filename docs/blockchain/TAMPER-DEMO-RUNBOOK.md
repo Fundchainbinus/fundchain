@@ -95,10 +95,12 @@ Status donasi kembali **VERIFIED**, lalu unfreeze campaign dari Admin (wajib isi
 
 ## Checklist lulus Gate 2
 
-- [ ] Tamper terdeteksi oleh checker otomatis tanpa klik admin
-- [ ] Campaign otomatis FROZEN, pencairan & approve pencairan terkunci
-- [ ] Audit log `INTEGRITY_TAMPERED` berisi sumber, hash, IP, User-Agent
-- [ ] Proof API menunjukkan `match: false`
-- [ ] Unfreeze ditolak sebelum data dipulihkan; berhasil setelah verifikasi ulang VERIFIED
-- [ ] Unit test: `pnpm --filter @fundchain/api test` (skenario ada di `src/integrity.test.ts`)
-- [ ] Tidak ada bug S1/S2 terkait integritas data
+Bukti otomatis: [`docs/qa/GATE-2.md`](../qa/GATE-2.md), run CI [#44932667635](https://github.com/Fundchainbinus/fundchain/actions/runs/44932667635) (stack lokal, `e2e/specs/02-gate2-tamper.spec.ts`).
+
+- [x] Tamper terdeteksi oleh checker otomatis tanpa klik admin (G2-09: `source=SCHEDULED`, FROZEN ±70 dtk dengan `INTEGRITY_CHECK_INTERVAL_MS=15000`)
+- [x] Campaign otomatis FROZEN, pencairan & approve pencairan terkunci (G2-03, G2-04: `409 CAMPAIGN_FROZEN`)
+- [x] Audit log `INTEGRITY_TAMPERED` berisi sumber, hash, IP, User-Agent (G2-05; IP/UA terisi pada pengecekan manual admin, kosong untuk sumber script/worker)
+- [x] Proof API menunjukkan `match: false` (G2-03)
+- [x] Unfreeze ditolak sebelum data dipulihkan; berhasil setelah verifikasi ulang VERIFIED (G2-07, G2-08)
+- [x] Unit test: `pnpm --filter @fundchain/api test` (skenario ada di `src/integrity.test.ts`) (322/322 lulus di run yang sama)
+- [ ] Tidak ada bug S1/S2 terkait integritas data (tidak ada temuan di run otomatis; menunggu sign-off QA + TL)

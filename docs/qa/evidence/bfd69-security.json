@@ -1,0 +1,115 @@
+{
+  "name": "bfd69-security",
+  "generatedAt": "2026-11-21T17:58:45.901Z",
+  "runUrl": "https://github.com/Fundchainbinus/fundchain/actions/runs/44932667635",
+  "commit": "ecf517fd525176fcf4569fbddc444fb7669e9d0d",
+  "pass": 13,
+  "fail": 0,
+  "notRun": 0,
+  "steps": [
+    {
+      "id": "S-01",
+      "name": "IDOR baca: data user lain",
+      "expected": "404 untuk donasi PENDING milik admin, campaign PENDING_REVIEW/REJECTED milik user lain & proposalnya",
+      "status": "PASS",
+      "actual": "{\"donasiPendingMilikAdmin\":\"404 DONATION_NOT_FOUND\",\"campaignPendingReviewAndi\":\"404 CAMPAIGN_NOT_FOUND\",\"campaignRejectedSiti\":\"404 CAMPAIGN_NOT_FOUND\",\"proposalCampaignAndi\":\"403 AUTH_FORBIDDEN\",\"aktivitasCampaignAndi\":\"404 CAMPAIGN_NOT_FOUND\"}",
+      "durationMs": 93
+    },
+    {
+      "id": "S-02",
+      "name": "IDOR tulis: aksi atas resource user lain",
+      "expected": "403 (CAMPAIGN_NOT_OWNED / AUTH_FORBIDDEN), data tidak berubah",
+      "status": "PASS",
+      "actual": "{\"patchCampaignSiti\":\"403 CAMPAIGN_NOT_OWNED\",\"submitCampaignSiti\":\"403 CAMPAIGN_NOT_OWNED\",\"hapusCampaignSiti\":\"403 CAMPAIGN_NOT_OWNED\",\"pencairanCampaignSiti\":\"403 CAMPAIGN_NOT_OWNED\",\"simulasiBayarDonasiAdmin\":\"403 AUTH_FORBIDDEN\"}",
+      "durationMs": 121
+    },
+    {
+      "id": "S-03",
+      "name": "Tanpa login ke endpoint privat",
+      "expected": "401 AUTH_UNAUTHENTICATED",
+      "status": "PASS",
+      "actual": "{\"GET /auth/me\":\"401 AUTH_UNAUTHENTICATED\",\"GET /me/donations\":\"401 AUTH_UNAUTHENTICATED\",\"GET /me/points\":\"401 AUTH_UNAUTHENTICATED\",\"POST /campaigns\":\"401 AUTH_UNAUTHENTICATED\",\"GET /admin/stats\":\"401 AUTH_UNAUTHENTICATED\"}",
+      "durationMs": 64
+    },
+    {
+      "id": "S-04",
+      "name": "Non-admin ke endpoint admin",
+      "expected": "403 AUTH_FORBIDDEN untuk semua endpoint admin, tanpa efek samping",
+      "status": "PASS",
+      "actual": "{\"GET /admin/stats\":\"403 AUTH_FORBIDDEN\",\"GET /admin/audit-logs\":\"403 AUTH_FORBIDDEN\",\"GET /admin/donations\":\"403 AUTH_FORBIDDEN\",\"GET /admin/campaigns\":\"403 AUTH_FORBIDDEN\",\"GET /admin/disbursements\":\"403 AUTH_FORBIDDEN\",\"POST /admin/campaigns/:id/approve\":\"403 AUTH_FORBIDDEN\",\"POST /admin/campaigns/:id/freeze\":\"403 AUTH_FORBIDDEN\",\"POST /admin/integrity/verify-all\":\"403 AUTH_FORBIDDEN\",\"POST /admin/donations/:id/refund\":\"403 AUTH_FORBIDDEN\",\"POST /admin/blockchain/:id/retry\":\"403 AUTH_FORBIDDEN\"}",
+      "durationMs": 160
+    },
+    {
+      "id": "S-05",
+      "name": "Webhook palsu",
+      "expected": "401 PAYMENT_SIGNATURE_INVALID (signature salah / tanpa signature), donasi tetap PENDING",
+      "status": "PASS",
+      "actual": "{\"secretSalah\":\"401 PAYMENT_SIGNATURE_INVALID\",\"tanpaSignature\":\"401 PAYMENT_SIGNATURE_INVALID\",\"signatureNgawur\":\"401 PAYMENT_SIGNATURE_INVALID\",\"signatureBodyLain\":\"401 PAYMENT_SIGNATURE_INVALID\"}; donasi tetap PENDING",
+      "durationMs": 69
+    },
+    {
+      "id": "S-06",
+      "name": "Webhook dobel & mismatch",
+      "expected": "pertama 200 replayed=false PAID; kedua 200 replayed=true; amount mismatch 400; order tak dikenal 404",
+      "status": "PASS",
+      "actual": "{\"pertama\":\"200 {\\\"received\\\":true,\\\"replayed\\\":false,\\\"donationId\\\":\\\"043c42b6-3db8-4e1b-b985-aca8c8535bbf\\\",\\\"status\\\":\\\"PAID\\\"}\",\"kedua\":\"200 {\\\"received\\\":true,\\\"replayed\\\":true,\\\"donationId\\\":\\\"043c42b6-3db8-4e1b-b985-aca8c8535bbf\\\",\\\"status\\\":\\\"PAID\\\"}\",\"mismatch\":\"400 PAYMENT_AMOUNT_MISMATCH\",\"orderTakDikenal\":\"404 PAYMENT_NOT_FOUND\",\"saldoSetelahReplay\":\"1380000 → 1380000 (tidak berubah)\"}",
+      "durationMs": 196
+    },
+    {
+      "id": "S-07",
+      "name": "Rate limit login",
+      "expected": "/auth/demo & /auth/google → 429 RATE_LIMITED setelah 10 request/menit",
+      "status": "PASS",
+      "actual": "/auth/demo: 200,200,200,200,200,200,200,200,200,200,429,429; /auth/google: 401,401,401,401,401,401,401,401,401,401,429,429; IP lain 200",
+      "durationMs": 310
+    },
+    {
+      "id": "S-08",
+      "name": "CSRF: POST berbasis cookie tanpa X-Requested-With",
+      "expected": "403 AUTH_FORBIDDEN; dengan header → sukses",
+      "status": "PASS",
+      "actual": "{\"cookieTanpaHeader\":\"403 AUTH_FORBIDDEN\",\"cookieHeaderSalah\":\"403 AUTH_FORBIDDEN\",\"getDenganCookie\":\"200\",\"cookieDenganHeader\":\"201\"}",
+      "durationMs": 68
+    },
+    {
+      "id": "S-09",
+      "name": "Payload bergaya SQL injection di query/search",
+      "expected": "tidak ada 500, tidak ada data non-publik bocor, tabel tetap utuh",
+      "status": "PASS",
+      "actual": "54 probe; status {\"200\":31,\"400\":23}; 0 respons 5xx, 0 kebocoran, tabel utuh",
+      "durationMs": 706
+    },
+    {
+      "id": "S-10",
+      "name": "Upload file berbahaya (bukan PDF berekstensi .pdf)",
+      "expected": "400 INVALID_FILE_TYPE",
+      "status": "PASS",
+      "actual": "{\"pdfPalsu\":\"400 INVALID_FILE_TYPE\",\"exe\":\"400 INVALID_FILE_TYPE\"}",
+      "durationMs": 58
+    },
+    {
+      "id": "S-11",
+      "name": "Atribut cookie sesi & error tanpa stack trace",
+      "expected": "HttpOnly; SameSite=Lax; Path=/api; body error tanpa stack/Prisma",
+      "status": "PASS",
+      "actual": "Set-Cookie: fc_session=<redacted>; Max-Age=604800; Path=/api; Expires=Sat, 28 Nov 2026 17:58:45 GMT; HttpOnly; SameSite=Lax; 404/400 tanpa stack trace; tanpa X-Powered-By",
+      "durationMs": 37
+    },
+    {
+      "id": "S-12",
+      "name": "Secret tidak di-commit",
+      "expected": "tidak ada .env (selain *.example) yang dilacak git; gitleaks dijalankan di workflow",
+      "status": "PASS",
+      "actual": "File .env yang dilacak: apps/web/.env.remote; scan gitleaks dijalankan di workflow",
+      "durationMs": 7
+    },
+    {
+      "id": "S-13",
+      "name": "Revokasi sesi setelah logout",
+      "expected": "cookie & Bearer lama → 401 setelah POST /auth/logout",
+      "status": "PASS",
+      "actual": "{\"before\":200,\"logout\":200,\"oldCookie\":401,\"oldBearer\":401,\"otherOldSession\":401}",
+      "durationMs": 78
+    }
+  ]
+}

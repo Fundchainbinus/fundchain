@@ -1,0 +1,10 @@
+{
+  "restoreJson": {
+    "status": "VERIFIED",
+    "currentHash": "0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef",
+    "onChainHash": "0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef",
+    "campaignFrozen": true
+  },
+  "unfreezeStatus": 201,
+  "campaignStatus": "ACTIVE"
+}

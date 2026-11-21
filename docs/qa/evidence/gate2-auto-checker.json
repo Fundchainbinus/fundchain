@@ -1,0 +1,36 @@
+{
+  "campaignId": "35a173a6-a27a-492c-8589-0fc0c2864b67",
+  "donationId": "71464276-03aa-4594-8e19-36a04b7e8096",
+  "detectSeconds": 70,
+  "campaignStatus": "FROZEN",
+  "auditSources": [
+    "SCHEDULED"
+  ],
+  "auditEntry": {
+    "id": "7ae57177-a8c8-43e4-8da1-2c1558bf879a",
+    "actorId": null,
+    "action": "INTEGRITY_TAMPERED",
+    "entityType": "Donation",
+    "entityId": "71464276-03aa-4594-8e19-36a04b7e8096",
+    "metadata": {
+      "source": "SCHEDULED",
+      "previousStatus": "VERIFIED",
+      "firstDetection": true,
+      "campaignId": "35a173a6-a27a-492c-8589-0fc0c2864b67",
+      "storedHash": "0xa4a5bdba3c8cc24fd04161c26fef06567b642f819ff16842d0d76aa06a1378c1",
+      "currentHash": "0xeec7a9660e76db784ee0bee02f40cca015f534c7dc41ccee10524f58e25a47f7",
+      "onChainHash": "0xa4a5bdba3c8cc24fd04161c26fef06567b642f819ff16842d0d76aa06a1378c1",
+      "txHash": "0x46d878bf39885adbc6a0ef271c7ad829e73f03da63bf6c82ee9bae9fa89bbb38",
+      "currentData": {
+        "amount": 777000,
+        "donatedAt": "2026-11-21T17:57:24.000Z"
+      },
+      "donationLastModifiedAt": "2026-11-21T17:57:27.015Z",
+      "detectedAt": "2026-11-21T17:58:37.320Z"
+    },
+    "ipAddress": null,
+    "userAgent": null,
+    "createdAt": "2026-11-21T17:58:37.322Z",
+    "actor": null
+  }
+}
