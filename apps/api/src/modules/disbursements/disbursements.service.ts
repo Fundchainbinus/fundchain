@@ -5,6 +5,7 @@ import type { CurrentUserPayload } from '../../common/auth';
 import { Db, PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { DISBURSABLE_STATUSES } from '../campaigns/campaign-status';
+import { createSignedQuery } from '../../common/signed-link';
 import { StorageService } from '../storage/storage.service';
 
 /** Dana yang sudah dikunci oleh pengajuan aktif/selesai. */
@@ -97,7 +98,7 @@ export class DisbursementsService {
 
   async create(
     campaignId: string,
-    input: { amount: number; description: string },
+    input: { amount: number; description: string; fileId?: string },
     file: Express.Multer.File | undefined,
     user: CurrentUserPayload,
     ip: string | null,
@@ -108,7 +109,7 @@ export class DisbursementsService {
       throw new AppError('CAMPAIGN_NOT_OWNED', 'Hanya pembuat campaign yang dapat mengajukan pencairan.');
     }
     assertDisbursable(campaign.status);
-    if (!file) throw new AppError('DISBURSEMENT_PROOF_REQUIRED', 'Bukti milestone / rencana penggunaan dana wajib diunggah.');
+    if (!file && !input.fileId) throw new AppError('DISBURSEMENT_PROOF_REQUIRED', 'Bukti milestone / rencana penggunaan dana wajib diunggah.');
     if (!Number.isInteger(input.amount) || input.amount <= 0) {
       throw new AppError('VALIDATION_ERROR', 'Nominal pencairan harus bilangan bulat positif.');
     }
@@ -120,7 +121,9 @@ export class DisbursementsService {
       throw new AppError('DISBURSEMENT_AMOUNT_EXCEEDS', 'Nominal melebihi sisa dana yang dapat dicairkan.');
     }
 
-    const proof = await this.storage.save(file, `disbursements/${campaignId}`, ['pdf', 'png', 'jpg']);
+    const proof = input.fileId
+      ? await this.storage.confirmDirect(input.fileId, user.id, 'disbursement-proof')
+      : await this.storage.save(file, `disbursements/${campaignId}`, ['pdf', 'png', 'jpg']);
     return this.prisma.$transaction(async (tx) => {
       // Cek ulang di dalam transaksi supaya dua pengajuan bersamaan tidak melebihi saldo.
       await lockCampaign(tx, campaignId);
@@ -193,13 +196,26 @@ export class DisbursementsService {
     });
   }
 
-  async openProof(id: string, viewer: CurrentUserPayload) {
+  private async proofFor(id: string, viewer: CurrentUserPayload) {
     const d = await this.prisma.disbursement.findUnique({ where: { id } });
     if (!d) throw new AppError('DISBURSEMENT_NOT_FOUND', 'Pengajuan tidak ditemukan.');
     if (viewer.role !== 'ADMIN' && viewer.id !== d.requesterId) {
       throw new AppError('AUTH_FORBIDDEN', 'Anda tidak memiliki akses ke bukti ini.');
     }
+    return d;
+  }
+
+  async openProof(id: string, viewer: CurrentUserPayload) {
+    const d = await this.proofFor(id, viewer);
     return { d, stream: await this.storage.open(d.proofKey) };
+  }
+
+  /** Link bukti (BFD-42): Supabase → signed URL langsung; Postgres → /files/:fileId bertanda tangan. */
+  async proofLink(id: string, viewer: CurrentUserPayload) {
+    const d = await this.proofFor(id, viewer);
+    const row = await this.storage.findByKey(d.proofKey);
+    const direct = await this.storage.signedDownloadUrl(row);
+    return { url: direct ?? `/api/v1/files/${row.id}?${createSignedQuery(`file:${row.id}`)}` };
   }
 
   async decide(

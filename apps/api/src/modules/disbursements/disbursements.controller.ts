@@ -13,7 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsInt, IsString, MaxLength, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
 import type { Response } from 'express';
 import { ClientIp, CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
 import { ReasonDto } from '../campaigns/campaigns.dto';
@@ -29,13 +29,18 @@ class CreateDisbursementDto {
   @IsString()
   @MaxLength(2000)
   description!: string;
+
+  /** Bukti yang sudah diunggah langsung ke Supabase (BFD-15) — pengganti field multipart `proof`. */
+  @IsOptional()
+  @IsUUID('all', { message: 'fileId tidak valid' })
+  fileId?: string;
 }
 
 @Controller()
 export class DisbursementsController {
   constructor(private readonly disbursements: DisbursementsService) {}
 
-  /** multipart/form-data: amount, description, proof (PDF/PNG/JPG). */
+  /** multipart/form-data: amount, description, proof (PDF/PNG/JPG ≤4MB) — atau JSON dengan fileId (≤10MB, driver supabase). */
   @Post('campaigns/:id/disbursements')
   @UseInterceptors(uploadInterceptor('proof'))
   create(
@@ -58,6 +63,12 @@ export class DisbursementsController {
   @Get('campaigns/:id/milestones')
   milestones(@Param('id', ParseUUIDPipe) campaignId: string) {
     return this.disbursements.milestones(campaignId);
+  }
+
+  /** JSON { url }: signed URL Supabase (5 menit) atau URL API bertanda tangan untuk file di Postgres. */
+  @Get('disbursements/:id/proof/link')
+  proofLink(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.disbursements.proofLink(id, user);
   }
 
   @Get('disbursements/:id/proof')

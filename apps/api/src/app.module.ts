@@ -22,6 +22,7 @@ import { MockPaymentAdapter } from './modules/payments/adapters/mock.adapter';
 import { PakasirAdapter } from './modules/payments/adapters/pakasir.adapter';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './modules/payments/adapters/payment-gateway';
 import { PaymentsService } from './modules/payments/payments.service';
+import { FilesController } from './modules/storage/files.controller';
 import { StorageService } from './modules/storage/storage.service';
 import { UsersController } from './modules/users/users.controller';
 
@@ -43,6 +44,7 @@ export function selectPaymentGateway(provider: string = env().paymentProvider): 
     DonationsController,
     IntegrityController,
     DisbursementsController,
+    FilesController,
   ],
   providers: [
     AuditService,
