@@ -72,10 +72,19 @@ describe('DonationRegistry', () => {
     expect(await registry.isNotarized(id)).to.equal(false);
   });
 
-  it('constructor menolak zero address', async () => {
+  it('constructor menolak zero address (relayer)', async () => {
     const [admin] = await ethers.getSigners();
     const Registry = await ethers.getContractFactory('DonationRegistry');
     await expect(Registry.deploy(admin.address, ethers.ZeroAddress)).to.be.revertedWithCustomError(
+      Registry,
+      'ZeroAddress',
+    );
+  });
+
+  it('constructor menolak zero address (admin)', async () => {
+    const [, relayer] = await ethers.getSigners();
+    const Registry = await ethers.getContractFactory('DonationRegistry');
+    await expect(Registry.deploy(ethers.ZeroAddress, relayer.address)).to.be.revertedWithCustomError(
       Registry,
       'ZeroAddress',
     );

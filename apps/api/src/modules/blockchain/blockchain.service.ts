@@ -8,6 +8,35 @@ import {
 import { Contract, ethers, JsonRpcProvider, Wallet } from 'ethers';
 import { AppError } from '../../common/app-error';
 import { env, readDeploymentFile } from '../../common/env';
+import { PrismaService } from '../../common/prisma.service';
+import type { FeeData } from './relayer-errors';
+
+export interface RelayerBalance {
+  address: string;
+  /** Saldo (ETH, string desimal); null bila chain belum siap. */
+  balance: string | null;
+  lowBalance: boolean;
+  minBalance: string;
+}
+
+/** BFD-92: agregat biaya gas notarisasi yang CONFIRMED (hanya baris yang punya data receipt). */
+export interface FeeStats {
+  count: number;
+  totalFeeEth: string;
+  avgFeeEth: string | null;
+  totalGasUsed: string;
+  last24h: { count: number; totalFeeEth: string; avgFeeEth: string | null };
+}
+
+/** Decimal Prisma / string / number → bigint wei (Decimal.toString() bisa notasi eksponen, jadi pakai toFixed(0)). */
+export function toWei(value: unknown): bigint {
+  if (value === null || value === undefined) return 0n;
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'object' && typeof (value as { toFixed?: unknown }).toFixed === 'function') {
+    return BigInt((value as { toFixed: (d: number) => string }).toFixed(0));
+  }
+  return BigInt(String(value).split('.')[0] || '0');
+}
 
 export interface ChainTarget {
   network: string;
@@ -24,6 +53,8 @@ export class BlockchainService {
   private readonly logger = new Logger('Blockchain');
   private provider?: JsonRpcProvider;
   private wallet?: Wallet;
+
+  constructor(private readonly prisma: PrismaService) {}
 
   target(): ChainTarget {
     const cfg = env().blockchain;
@@ -102,18 +133,75 @@ export class BlockchainService {
     return !hash || hash === ZERO_HASH;
   }
 
-  async info() {
+  /** Saldo relayer + flag lowBalance (threshold RELAYER_MIN_BALANCE_ETH, default 0.02). Read-only. */
+  async relayerBalance(chainReady = true): Promise<RelayerBalance> {
+    const wallet = this.getRelayer();
+    const minBalance = env().blockchain.relayerMinBalanceEth;
+    const balance = chainReady ? await this.getProvider().getBalance(wallet.address) : null;
+    return {
+      address: wallet.address,
+      balance: balance === null ? null : ethers.formatEther(balance),
+      lowBalance: balance !== null && balance < ethers.parseEther(minBalance),
+      minBalance,
+    };
+  }
+
+  /** BFD-49: nonce berikutnya menurut provider, termasuk tx relayer yang masih di mempool. */
+  async pendingNonce(): Promise<number> {
+    return this.getProvider().getTransactionCount(this.getRelayer().address, 'pending');
+  }
+
+  async feeData(): Promise<FeeData> {
+    const f = await this.getProvider().getFeeData();
+    return { maxFeePerGas: f.maxFeePerGas, maxPriorityFeePerGas: f.maxPriorityFeePerGas, gasPrice: f.gasPrice };
+  }
+
+  /**
+   * BFD-92: agregat biaya gas notarisasi di chain aktif. Dua query aggregate (bukan memuat baris), jadi aman
+   * dipanggil dashboard admin yang polling. Gagal (mis. migration belum jalan) → null, dashboard tetap tampil.
+   */
+  async feeStats(now = new Date()): Promise<FeeStats | null> {
+    const { chainId } = this.target();
+    const base = { status: 'CONFIRMED', chainId, feeWei: { not: null } };
+    try {
+      const [all, recent] = await Promise.all([
+        this.prisma.blockchainTransaction.aggregate({
+          where: base,
+          _count: { _all: true },
+          _sum: { feeWei: true, gasUsed: true },
+        }),
+        this.prisma.blockchainTransaction.aggregate({
+          where: { ...base, confirmedAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },
+          _count: { _all: true },
+          _sum: { feeWei: true },
+        }),
+      ]);
+      const summarize = (count: number, total: bigint) => ({
+        count,
+        totalFeeEth: ethers.formatEther(total),
+        avgFeeEth: count ? ethers.formatEther(total / BigInt(count)) : null,
+      });
+      return {
+        ...summarize(all._count._all, toWei(all._sum.feeWei)),
+        totalGasUsed: toWei(all._sum.gasUsed).toString(),
+        last24h: summarize(recent._count._all, toWei(recent._sum.feeWei)),
+      };
+    } catch (e) {
+      this.logger.warn(`Statistik biaya gas gagal dibaca: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Info chain untuk admin (GET admin/stats → `chain`) dan publik (GET blockchain/info).
+   * `fees: false` dipakai endpoint publik supaya tidak menambah query DB.
+   */
+  async info(opts: { fees?: boolean } = {}) {
     const target = this.target();
     const health = await this.health();
-    let relayer: { address: string; balance: string | null; lowBalance: boolean } | null = null;
+    let relayer: RelayerBalance | null = null;
     try {
-      const wallet = this.getRelayer();
-      const balance = health.ready ? await this.getProvider().getBalance(wallet.address) : null;
-      relayer = {
-        address: wallet.address,
-        balance: balance === null ? null : ethers.formatEther(balance),
-        lowBalance: balance !== null && balance < ethers.parseEther('0.02'),
-      };
+      relayer = await this.relayerBalance(health.ready);
     } catch {
       relayer = null;
     }
@@ -123,6 +211,7 @@ export class BlockchainService {
       reason: health.reason ?? null,
       relayer,
       explorerUrl: target.contractAddress ? explorerAddressUrl(target.chainId, target.contractAddress) : null,
+      ...(opts.fees === false ? {} : { fees: await this.feeStats() }),
     };
   }
 
