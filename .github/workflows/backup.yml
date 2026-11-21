@@ -1,0 +1,180 @@
+# BFD-25 — Backup harian database (Supabase Postgres) + uji restore.
+# Detail, secret yang dibutuhkan, dan cara restore manual: docs/BACKUP.md.
+#
+# Alur: cek secret → hitung baris sumber → pg_dump (custom format, schema public) → enkripsi GPG AES256
+#       → upload artifact (14 hari) → dekripsi → pg_restore ke Postgres service container → cek jumlah baris.
+#
+# Versi Postgres: PG_MAJOR dan image service di bawah HARUS sama dan >= versi server Supabase.
+# Asumsi: 17 (repo hanya menyebut postgres:16 untuk compose lokal; versi server Supabase tidak tercatat).
+# pg_dump 17 bisa membaca server 15/16/17. Kalau Supabase dinaikkan ke major yang lebih baru, naikkan keduanya.
+name: DB backup
+
+on:
+  schedule:
+    # 02:00 WIB = 19:00 UTC hari sebelumnya.
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup + uji restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PG_MAJOR: '17'
+      MAIN_TABLES: users campaigns donations payments disbursements audit_logs stored_files
+    services:
+      # Target uji restore. Konteks `env` tidak tersedia di `services`, jadi versinya ditulis langsung (= PG_MAJOR).
+      restore-db:
+        image: postgres:17
+        env:
+          POSTGRES_USER: restore
+          POSTGRES_PASSWORD: restore
+          POSTGRES_DB: restore_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U restore -d restore_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Cek secret
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          missing=""
+          [ -n "$DIRECT_URL" ] || missing="$missing DIRECT_URL"
+          [ -n "$BACKUP_PASSPHRASE" ] || missing="$missing BACKUP_PASSPHRASE"
+          if [ -n "$missing" ]; then
+            echo "::error title=Secret backup belum diisi::Secret GitHub berikut kosong:$missing. Isi di Settings → Secrets and variables → Actions (lihat docs/BACKUP.md)."
+            exit 1
+          fi
+          if [ "${#BACKUP_PASSPHRASE}" -lt 16 ]; then
+            echo "::error title=Passphrase terlalu pendek::BACKUP_PASSPHRASE minimal 16 karakter."
+            exit 1
+          fi
+          # Folder kerja di luar workspace repo (tidak pernah ikut ter-commit / ter-cache).
+          WORK="$RUNNER_TEMP/db-backup"
+          mkdir -p "$WORK"
+          chmod 700 "$WORK"
+          echo "WORK=$WORK" >> "$GITHUB_ENV"
+
+      - name: Hitung baris sumber + pg_dump
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          set -euo pipefail
+          # libpq menolak parameter khusus Prisma (?schema=, ?pgbouncer=, ?connection_limit=): buang query string.
+          SRC_URL="${DIRECT_URL%%\?*}?sslmode=require"
+          # Sembunyikan URL turunan + password-nya dari log (GitHub hanya otomatis menyamarkan nilai secret asli).
+          echo "::add-mask::$SRC_URL"
+          SRC_PW="$(printf '%s' "$SRC_URL" | sed -E 's#^[^:]+://[^:@/]*:([^@]*)@.*$#\1#')"
+          [ -n "$SRC_PW" ] && [ "$SRC_PW" != "$SRC_URL" ] && echo "::add-mask::$SRC_PW"
+
+          pg() {
+            docker run --rm --network host -e SRC_URL -v "$WORK:/work" -w /work "postgres:$PG_MAJOR" "$@"
+          }
+          export SRC_URL
+
+          echo "Versi server sumber:"
+          pg sh -c 'psql "$SRC_URL" -XAtc "SHOW server_version"'
+
+          : > "$WORK/source-counts.txt"
+          for t in $MAIN_TABLES; do
+            n="$(pg sh -c "psql \"\$SRC_URL\" -XAtc 'SELECT count(*) FROM public.\"$t\"'")"
+            echo "$t $n" >> "$WORK/source-counts.txt"
+          done
+          echo "Jumlah baris sumber:"; cat "$WORK/source-counts.txt"
+
+          # Hanya schema public (data aplikasi). Schema internal Supabase (auth, storage, ...) tidak dipakai app
+          # dan tidak bisa di-restore ke Postgres biasa. Tanpa owner/privilege: role Supabase tidak ada di target.
+          pg sh -c 'pg_dump "$SRC_URL" --format=custom --schema=public --no-owner --no-privileges --file=/work/fundchain.dump'
+          # Container berjalan sebagai root: kembalikan kepemilikan file ke user runner.
+          sudo chown -R "$(id -u):$(id -g)" "$WORK"
+          chmod 600 "$WORK/fundchain.dump"
+          ls -l "$WORK/fundchain.dump"
+
+      - name: Enkripsi (GPG AES256)
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+          OUT="$WORK/fundchain-$STAMP.dump.gpg"
+          # Passphrase lewat file descriptor, tidak pernah lewat argv (argv terlihat di daftar proses).
+          gpg --batch --yes --quiet --pinentry-mode loopback --passphrase-fd 3 \
+            --symmetric --cipher-algo AES256 --output "$OUT" "$WORK/fundchain.dump" \
+            3< <(printf '%s' "$BACKUP_PASSPHRASE")
+          # Dump plaintext (berisi PII donatur) dihapus begitu terenkripsi.
+          shred -u "$WORK/fundchain.dump" 2>/dev/null || rm -f "$WORK/fundchain.dump"
+          (cd "$WORK" && sha256sum "$(basename "$OUT")" > "$(basename "$OUT").sha256")
+          mkdir -p "$WORK/artifact"
+          mv "$OUT" "$OUT.sha256" "$WORK/artifact/"
+          echo "BACKUP_FILE=$WORK/artifact/$(basename "$OUT")" >> "$GITHUB_ENV"
+          ls -l "$WORK/artifact"
+
+      # Diunggah sebelum uji restore: kalau uji restore gagal, backup hari ini tetap tersimpan (job tetap merah).
+      - name: Upload artifact terenkripsi
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: ${{ env.WORK }}/artifact/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Uji restore ke Postgres ${{ env.PG_MAJOR }}
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          # Uji file yang benar-benar diunggah: dekripsi .gpg (sekaligus menguji passphrase).
+          gpg --batch --yes --quiet --pinentry-mode loopback --passphrase-fd 3 \
+            --decrypt --output "$WORK/restore.dump" "$BACKUP_FILE" \
+            3< <(printf '%s' "$BACKUP_PASSPHRASE")
+          chmod 644 "$WORK/restore.dump" # dibaca container lewat mount read-only
+
+          export DST_URL="postgresql://restore:restore@localhost:5432/restore_test"
+          pg() {
+            docker run --rm --network host -e DST_URL -v "$WORK:/work:ro" -w /work "postgres:$PG_MAJOR" "$@"
+          }
+          # Dump berisi CREATE SCHEMA public; hapus schema bawaan supaya restore bersih dan exit code 0.
+          pg sh -c 'psql "$DST_URL" -X -v ON_ERROR_STOP=1 -qc "DROP SCHEMA IF EXISTS public CASCADE"'
+          pg sh -c 'pg_restore --dbname="$DST_URL" --no-owner --no-privileges --exit-on-error /work/restore.dump'
+
+          fail=0
+          printf '%-16s %10s %10s\n' tabel sumber restore
+          for t in $MAIN_TABLES; do
+            src="$(awk -v t="$t" '$1==t {print $2}' "$WORK/source-counts.txt")"
+            if ! dst="$(pg sh -c "psql \"\$DST_URL\" -XAtc 'SELECT count(*) FROM public.\"$t\"'")"; then
+              echo "::error::Tabel $t tidak ada setelah restore"
+              fail=1
+              continue
+            fi
+            printf '%-16s %10s %10s\n' "$t" "$src" "$dst"
+            if [ "$t" = donations ] && [ "${src:-0}" -gt 0 ] && [ "$dst" -eq 0 ]; then
+              echo "::error::donations kosong setelah restore padahal sumber berisi $src baris"
+              fail=1
+            fi
+            # Data bisa bertambah antara hitung sumber dan pg_dump (snapshot); yang aneh adalah restore < sumber.
+            if [ -n "$src" ] && [ "$dst" -lt "$src" ]; then
+              echo "::warning::$t: restore ($dst) < sumber ($src)"
+            fi
+          done
+          exit $fail
+
+      - name: Bersihkan file kerja
+        if: always()
+        run: |
+          if [ -d "$WORK" ]; then
+            find "$WORK" -type f \( -name '*.dump' \) -exec shred -u {} + 2>/dev/null || true
+            rm -rf "$WORK"
+          fi
