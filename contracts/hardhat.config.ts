@@ -19,7 +19,11 @@ const config: HardhatUserConfig = {
       chainId: 11155111,
     },
   },
+  // `npx hardhat verify` / scripts/verify-contract.ts. Key HANYA dari env, jangan di-commit.
+  // hardhat-verify 2.x memakai Etherscan API v2 (satu key untuk semua chain, termasuk Sepolia).
   etherscan: { apiKey: process.env.ETHERSCAN_API_KEY || '' },
+  // Sourcify tidak butuh key — jalur verifikasi cadangan.
+  sourcify: { enabled: true },
 };
 
 export default config;
