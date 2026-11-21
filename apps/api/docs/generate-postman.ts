@@ -29,8 +29,48 @@ const controllers: Type[] = [
 ];
 
 /** Contoh body untuk endpoint utama (DTO tidak memakai dekorator @ApiProperty). */
+const reason = { reason: 'Alasan minimal sepuluh karakter.' };
 const EXAMPLE_BODIES: Record<string, unknown> = {
   'POST /auth/google': { accessToken: '<google-access-token>' },
+  'POST /campaigns': {
+    title: 'Beasiswa Buku Anak Desa',
+    description: 'Penggalangan dana untuk membeli buku pelajaran anak-anak desa.',
+    sdgCategory: 'QUALITY_EDUCATION',
+    targetAmount: 5_000_000,
+    deadline: '2027-06-30',
+  },
+  'PATCH /campaigns/{id}': { targetAmount: 7_500_000 },
+  'POST /campaigns/{id}/donations': { amount: 50_000, anonymous: false },
+  'POST /admin/campaigns/{id}/reject': reason,
+  'POST /admin/campaigns/{id}/freeze': reason,
+  'POST /admin/campaigns/{id}/unfreeze': reason,
+  'POST /admin/disbursements/{id}/reject': reason,
+  'POST /admin/donations/{id}/refund': { reason: 'Campaign dibekukan, dana dikembalikan.' },
+  'POST /dev/payments/{donationId}/simulate': { outcome: 'settlement' },
+  'POST /webhooks/payment': { order_id: '<donation-id>', status: 'settlement', amount: 50_000 },
+};
+
+/** Endpoint multipart/form-data (upload file). */
+const FORM_BODIES: Record<string, { key: string; type: 'text' | 'file'; value?: string }[]> = {
+  'POST /campaigns/{id}/documents': [{ key: 'file', type: 'file' }],
+  'POST /campaigns/{id}/disbursements': [
+    { key: 'amount', type: 'text', value: '1000000' },
+    { key: 'description', type: 'text', value: 'Pembelian buku tahap 1' },
+    { key: 'proof', type: 'file' },
+  ],
+};
+
+const EXTRA_HEADERS: Record<string, { key: string; value: string; description?: string }[]> = {
+  'POST /campaigns/{id}/donations': [{ key: 'Idempotency-Key', value: '{{$guid}}' }],
+  'POST /webhooks/payment': [
+    { key: 'x-fundchain-signature', value: '<hmac-sha256 body dengan MOCK_WEBHOOK_SECRET>', description: 'Hanya untuk PAYMENT_PROVIDER=mock' },
+  ],
+  'GET /cron/tick': [{ key: 'Authorization', value: 'Bearer {{cronSecret}}' }],
+};
+
+/** Query yang berasal dari class DTO (tidak terbaca Swagger tanpa @ApiProperty). */
+const EXTRA_QUERY: Record<string, string[]> = {
+  'GET /campaigns': ['status', 'sdg', 'q', 'mine', 'limit', 'cursor'],
 };
 
 const deps = new Set<unknown>();
@@ -53,23 +93,26 @@ function toPostman(doc: OpenAPIObject) {
       const folder = segments[0] === 'admin' ? 'admin' : segments[0] ?? 'root';
       const params = op.parameters ?? [];
       const key = `${method.toUpperCase()} ${rel}`;
-      const isPublicish = ['/health', '/config', '/auth/google'].includes(rel) || rel.startsWith('/public');
+      const noAuth = ['/health', '/config', '/auth/google', '/webhooks/payment', '/cron/tick'].includes(rel);
+      const queryNames = [...params.filter((p) => p.in === 'query').map((p) => p.name as string), ...(EXTRA_QUERY[key] ?? [])];
+      const header: unknown[] = [...(EXTRA_HEADERS[key] ?? [])];
       const request: Record<string, unknown> = {
         method: method.toUpperCase(),
-        header: [] as unknown[],
+        header,
         url: {
           raw: `{{baseUrl}}${rel.replace(/\{(\w+)\}/g, ':$1')}`,
           host: ['{{baseUrl}}'],
           path: segments.map((s) => s.replace(/^\{(\w+)\}$/, ':$1')),
           variable: params.filter((p) => p.in === 'path').map((p) => ({ key: p.name, value: '' })),
-          query: params.filter((p) => p.in === 'query').map((p) => ({ key: p.name, value: '', disabled: true })),
+          query: queryNames.map((name) => ({ key: name, value: '', disabled: true })),
         },
-        ...(isPublicish ? { auth: { type: 'noauth' } } : {}),
+        ...(noAuth ? { auth: { type: 'noauth' } } : {}),
       };
-      if (EXAMPLE_BODIES[key] !== undefined || ['post', 'patch', 'put'].includes(method)) {
-        const body = EXAMPLE_BODIES[key];
-        (request.header as unknown[]).push({ key: 'Content-Type', value: 'application/json' });
-        if (body !== undefined) request.body = { mode: 'raw', raw: JSON.stringify(body, null, 2), options: { raw: { language: 'json' } } };
+      if (FORM_BODIES[key]) {
+        request.body = { mode: 'formdata', formdata: FORM_BODIES[key].map((f) => (f.type === 'file' ? { key: f.key, type: 'file', src: [] } : f)) };
+      } else if (EXAMPLE_BODIES[key] !== undefined) {
+        header.push({ key: 'Content-Type', value: 'application/json' });
+        request.body = { mode: 'raw', raw: JSON.stringify(EXAMPLE_BODIES[key], null, 2), options: { raw: { language: 'json' } } };
       }
       if (!folders.has(folder)) folders.set(folder, []);
       folders.get(folder)!.push({ name: key, request });
@@ -86,6 +129,7 @@ function toPostman(doc: OpenAPIObject) {
     variable: [
       { key: 'baseUrl', value: 'http://localhost:3000/api/v1' },
       { key: 'token', value: '' },
+      { key: 'cronSecret', value: '' },
     ],
     item: [...folders.entries()].map(([name, item]) => ({ name, item })),
   };

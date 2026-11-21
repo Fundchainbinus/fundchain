@@ -12,6 +12,12 @@ import { MockPaymentAdapter } from './modules/payments/adapters/mock.adapter';
 import { PakasirAdapter } from './modules/payments/adapters/pakasir.adapter';
 import { UsersController } from './modules/users/users.controller';
 
+// Mengimpor app.module memanggil ConfigModule.forRoot() yang membaca apps/api/.env (DB asli).
+// Diganti stub supaya test hermetis dan tidak pernah memuat kredensial nyata.
+vi.mock('@nestjs/config', () => ({
+  ConfigModule: { forRoot: () => ({ module: class StubConfigModule {} }) },
+}));
+
 class Handlers {
   @Roles('ADMIN')
   adminOnly() {}
