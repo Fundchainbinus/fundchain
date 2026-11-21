@@ -1,0 +1,5 @@
+# Output `npx hardhat coverage` (solidity-coverage)
+coverage/
+coverage.json
+# Output opsional scripts/collect-evidence.ts (EVIDENCE_JSON)
+evidence*.json
