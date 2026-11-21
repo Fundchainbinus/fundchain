@@ -268,8 +268,9 @@ export function Layout() {
   useEffect(() => setSidebarOpen(inAdmin && isDesktop()), [inAdmin]);
   // Laci (bukan sidebar menempel) = dialog modal: Esc menutup, fokus terjebak, lalu kembali ke tombol grid.
   const drawerRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeDrawer = () => setSidebarOpen(false);
-  useFocusTrap(drawerRef, sidebarOpen && !docked, closeDrawer);
+  useFocusTrap(drawerRef, sidebarOpen && !docked, closeDrawer, undefined, menuButtonRef);
 
   const links = [
     { to: '/', label: 'FundChain', end: true },
@@ -284,6 +285,7 @@ export function Layout() {
       <header className="sticky top-0 z-50 border-b border-line bg-white">
         <div className="flex h-[54px] items-center gap-4 px-4">
           <button
+            ref={menuButtonRef}
             type="button"
             onClick={() => setSidebarOpen((o) => !o)}
             aria-label={sidebarOpen ? 'Tutup menu' : 'Buka menu'}

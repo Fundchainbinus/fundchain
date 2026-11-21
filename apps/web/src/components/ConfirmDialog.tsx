@@ -14,6 +14,8 @@ export function useFocusTrap(
   active: boolean,
   onEscape: () => void,
   initialFocus?: RefObject<HTMLElement | null>,
+  /** Elemen tujuan fokus saat ditutup; diutamakan (Safari/iOS tidak memfokuskan tombol saat diklik). */
+  returnFocus?: RefObject<HTMLElement | null>,
 ) {
   // Simpan callback di ref agar efek tidak berjalan ulang (dan mencuri fokus) di setiap render.
   const escRef = useRef(onEscape);
@@ -55,9 +57,10 @@ export function useFocusTrap(
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
-      if (trigger?.isConnected) trigger.focus();
+      const target = returnFocus?.current?.isConnected ? returnFocus.current : trigger;
+      if (target?.isConnected) target.focus();
     };
-  }, [active, ref, initialFocus]);
+  }, [active, ref, initialFocus, returnFocus]);
 }
 
 /** Dialog konfirmasi untuk aksi admin yang tidak bisa dibatalkan (approve, cairkan, tandai paid). */

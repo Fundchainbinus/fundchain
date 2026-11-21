@@ -16,7 +16,7 @@ export function BottomNav() {
     ...(isAdmin ? [{ to: '/admin', label: 'Admin', icon: LayoutDashboard, end: false }] : []),
   ];
   return (
-    <nav className="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white md:hidden" aria-label="Navigasi bawah">
+    <nav className="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white md:hidden print:hidden" aria-label="Navigasi bawah">
       <ul className="flex">
         {items.map((it) => (
           <li key={it.to} className="min-w-0 flex-1">
