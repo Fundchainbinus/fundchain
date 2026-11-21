@@ -67,10 +67,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
-          # Wajib bila repo dimiliki organisasi GitHub (lisensi gratis dari gitleaks.io).
-          # Repo milik akun pribadi tidak membutuhkannya.
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+      # Pakai CLI resmi (bukan gitleaks-action) supaya tidak butuh GITLEAKS_LICENSE di repo organisasi.
+      - name: Run gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2             git /repo --config /repo/.gitleaks.toml --redact --verbose --exit-code 1
