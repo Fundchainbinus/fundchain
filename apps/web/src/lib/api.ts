@@ -1,5 +1,4 @@
 import axios, { AxiosError } from 'axios';
-import { useSession } from './session';
 
 export class ApiError extends Error {
   constructor(
@@ -12,13 +11,13 @@ export class ApiError extends Error {
   }
 }
 
-export const api = axios.create({ baseURL: '/api/v1' });
+/**
+ * Sesi dibawa cookie httpOnly (BFD-11). Header X-Requested-With wajib untuk request non-GET
+ * berbasis cookie (anti-CSRF); dikirim di semua request supaya sederhana.
+ */
+const CSRF_HEADERS = { 'X-Requested-With': 'fundchain' };
 
-api.interceptors.request.use((config) => {
-  const token = useSession.getState().token;
-  if (token) config.headers.set('Authorization', `Bearer ${token}`);
-  return config;
-});
+export const api = axios.create({ baseURL: '/api/v1', withCredentials: true, headers: CSRF_HEADERS });
 
 api.interceptors.response.use(
   (res) => (res.config.responseType === 'blob' ? res : res.data?.data),
@@ -42,15 +41,13 @@ export const post = <T,>(url: string, body?: unknown, headers?: Record<string, s
 export const patch = <T,>(url: string, body?: unknown) => api.patch(url, body) as unknown as Promise<T>;
 
 /**
- * Buka file (proposal, bukti pencairan) di tab baru DENGAN header identitas.
- * Link biasa tidak membawa header Authorization, sehingga file campaign yang belum publik ditolak.
- * Tab dibuka lebih dulu secara sinkron agar tidak diblokir popup blocker.
+ * Buka file (proposal, bukti pencairan) di tab baru lewat fetch (cookie sesi ikut terkirim),
+ * lalu tampilkan sebagai blob URL. Tab dibuka lebih dulu secara sinkron agar tidak diblokir popup blocker.
  */
 export async function openProtectedFile(url: string) {
   const tab = window.open('', '_blank');
   try {
-    const token = useSession.getState().token;
-    const res = await fetch(`/api/v1${url}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    const res = await fetch(`/api/v1${url}`, { credentials: 'same-origin', headers: CSRF_HEADERS });
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       throw new ApiError(body?.error?.code ?? 'NOT_FOUND', body?.error?.message ?? 'File tidak dapat dibuka.', res.status);

@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Bell, Blocks, LogIn, LogOut, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { errorMessage, post } from '../lib/api';
+import { errorMessage, get, post } from '../lib/api';
 import { requestGoogleAccessToken } from '../lib/google';
 import { useConfig, useMe } from '../lib/hooks';
 import { AppSidebar } from './AppSidebar';
@@ -12,21 +12,19 @@ import { useSession } from '../lib/session';
 function GoogleAuthButton() {
   const { me } = useMe();
   const config = useConfig();
-  const setToken = useSession((s) => s.setToken);
+  const setSignedIn = useSession((s) => s.setSignedIn);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const login = async () => {
-    const clientId = config.data?.googleClientId;
-    if (!clientId) return setError('Login Google belum dikonfigurasi.');
+  // API memasang cookie httpOnly; di sini cukup tandai login lalu muat ulang /auth/me & data lain.
+  const startSession = async (signIn: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
     try {
-      const accessToken = await requestGoogleAccessToken(clientId);
-      const res = await post<{ token: string }>('/auth/google', { accessToken });
-      setToken(res.token);
+      await signIn();
+      setSignedIn(true);
       setOpen(false);
       void qc.invalidateQueries();
     } catch (e) {
@@ -36,11 +34,19 @@ function GoogleAuthButton() {
     }
   };
 
-  const logout = () => {
-    // Fire-and-forget: header dikirim eksplisit karena token dihapus sebelum interceptor axios jalan.
-    const token = useSession.getState().token;
-    if (token) void post('/auth/logout', undefined, { Authorization: `Bearer ${token}` }).catch(() => undefined);
-    setToken(null);
+  const login = () => {
+    const clientId = config.data?.googleClientId;
+    if (!clientId) return setError('Login Google belum dikonfigurasi.');
+    void startSession(async () => post('/auth/google', { accessToken: await requestGoogleAccessToken(clientId) }));
+  };
+
+  const loginDemo = (persona: 'student' | 'admin') => void startSession(() => get(`/auth/demo?persona=${persona}`));
+
+  const logout = async () => {
+    // Server mencabut semua sesi (session_version++) dan menghapus cookie; state lokal tetap dibersihkan bila gagal.
+    await post('/auth/logout').catch(() => undefined);
+    setSignedIn(false);
+    setOpen(false);
     qc.clear();
   };
 
@@ -54,7 +60,7 @@ function GoogleAuthButton() {
           <div className="absolute right-0 top-10 z-50 w-56 rounded-md border border-line bg-white p-3 text-sm shadow-lg">
             <p className="truncate font-semibold text-ink">{me.name}</p>
             <p className="truncate text-xs text-slate-500">{me.email}</p>
-            <button onClick={logout} className="btn-secondary btn-sm mt-3 w-full">
+            <button onClick={() => void logout()} className="btn-secondary btn-sm mt-3 w-full">
               <LogOut size={14} aria-hidden /> Keluar
             </button>
           </div>
@@ -97,6 +103,19 @@ function GoogleAuthButton() {
               <GoogleLogo />
               {busy ? 'Menunggu popup Google…' : 'Login dengan Google'}
             </button>
+            {config.data?.demoMode && (
+              <div className="mt-4 border-t border-slate-200 pt-4">
+                <p className="text-xs text-slate-500">Mode demo aktif</p>
+                <div className="mt-2 flex gap-2">
+                  <button onClick={() => loginDemo('student')} disabled={busy} className="btn-secondary btn-sm flex-1">
+                    Demo Mahasiswa
+                  </button>
+                  <button onClick={() => loginDemo('admin')} disabled={busy} className="btn-secondary btn-sm flex-1">
+                    Demo Admin
+                  </button>
+                </div>
+              </div>
+            )}
             {error && (
               <p className="mt-3 text-xs text-red-600" role="alert">
                 {error}
