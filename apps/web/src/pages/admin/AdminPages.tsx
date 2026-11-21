@@ -334,7 +334,7 @@ export function AdminIntegrityPage() {
     },
   });
   const verifyAll = useMutation({
-    mutationFn: () => post<{ checked: number; verified: number; tampered: number; skippedNotNotarized: number; frozenCampaigns: string[] }>('/admin/integrity/verify-all'),
+    mutationFn: () => post<{ checked: number; verified: number; tampered: number; skippedNotNotarized: number; frozenCampaigns: string[]; hasMore?: boolean }>('/admin/integrity/verify-all'),
     onSuccess: () => qc.invalidateQueries(),
   });
   const retry = useMutation({ mutationFn: (id: string) => post(`/admin/blockchain/${id}/retry`), onSuccess: () => qc.invalidateQueries() });
@@ -385,7 +385,11 @@ export function AdminIntegrityPage() {
             <span><b>{verifyAll.data.tampered} donasi TAMPERED</b> dari {verifyAll.data.checked} yang dicek. {verifyAll.data.frozenCampaigns.length} kampanye otomatis dibekukan dan pencairannya dikunci.</span>
           </div>
         ) : (
-          <SuccessBox>Semua {verifyAll.data.checked} donasi cocok dengan blockchain.{verifyAll.data.skippedNotNotarized ? ` ${verifyAll.data.skippedNotNotarized} belum ternotarisasi (dilewati).` : ''}</SuccessBox>
+          <SuccessBox>
+            {verifyAll.data.hasMore ? '' : 'Semua '}{verifyAll.data.checked} donasi yang dicek cocok dengan blockchain.
+            {verifyAll.data.skippedNotNotarized ? ` ${verifyAll.data.skippedNotNotarized} belum ternotarisasi (dilewati).` : ''}
+            {verifyAll.data.hasMore ? ' Masih ada donasi yang belum dicek — klik verifikasi lagi untuk batch berikutnya.' : ''}
+          </SuccessBox>
         )
       )}
 
