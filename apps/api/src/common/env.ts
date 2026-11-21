@@ -40,9 +40,19 @@ export function env() {
       chainId: int(e.CHAIN_ID, 31337),
       contractAddress: e.CONTRACT_ADDRESS || '',
       relayerPrivateKey: e.RELAYER_PRIVATE_KEY || '',
-      confirmations: int(e.BLOCKCHAIN_CONFIRMATIONS, 1),
+      /**
+       * BFD-48: jumlah konfirmasi blok sebelum notarisasi dianggap CONFIRMED (minimal 1).
+       * Default 2; khusus Hardhat lokal (CHAIN_ID=31337, automine 1 blok per tx) default 1
+       * karena blok kedua baru muncul saat ada tx lain. Nilai eksplisit selalu dipakai.
+       */
+      confirmations: Math.max(1, Math.floor(int(e.BLOCKCHAIN_CONFIRMATIONS, int(e.CHAIN_ID, 31337) === 31337 ? 1 : 2))),
       /** Batas tunggu receipt per tx; lewat batas, konfirmasi diteruskan recoverStuck() supaya antrean tidak terkunci. */
       confirmWaitMs: int(e.BLOCKCHAIN_CONFIRM_WAIT_MS, 45_000),
+      /** Saldo relayer di bawah ini (ETH) dianggap rendah: warning di log worker & flag lowBalance di admin. */
+      relayerMinBalanceEth: (() => {
+        const v = (e.RELAYER_MIN_BALANCE_ETH || '').trim();
+        return /^\d+(\.\d{1,18})?$/.test(v) ? v : '0.02';
+      })(),
     },
     alerts: {
       /** Discord webhook untuk alert operasional (kosong = hanya log). */

@@ -165,6 +165,11 @@ model BlockchainTransaction {
   nextAttemptAt   DateTime  @default(now()) @map("next_attempt_at")
   submittedAt     DateTime? @map("submitted_at")
   confirmedAt     DateTime? @map("confirmed_at")
+  /// BFD-92: biaya gas dari receipt saat CONFIRMED (wei). Null = dikonfirmasi tanpa receipt (mis. sudah ada di chain).
+  gasUsed           Decimal? @map("gas_used") @db.Decimal(78, 0)
+  effectiveGasPrice Decimal? @map("effective_gas_price") @db.Decimal(78, 0)
+  /// gasUsed × effectiveGasPrice (wei), disimpan supaya agregat biaya cukup SUM/AVG satu kolom.
+  feeWei            Decimal? @map("fee_wei") @db.Decimal(78, 0)
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

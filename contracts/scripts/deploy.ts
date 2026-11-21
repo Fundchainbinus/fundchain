@@ -40,6 +40,8 @@ async function main() {
         address,
         admin: deployer.address,
         relayer,
+        // Argumen constructor asli; dipakai scripts/verify-contract.ts walau `relayer` dirotasi.
+        constructorArgs: [deployer.address, relayer],
         blockNumber: receipt?.blockNumber ?? null,
         deployedAt: new Date().toISOString(),
       },
