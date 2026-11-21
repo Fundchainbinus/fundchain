@@ -1,6 +1,7 @@
 import type { BlockchainStatus, CampaignStatus, DisbursementStatus, DonationStatus, IntegrityStatus } from '@fundchain/shared';
 import { AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, Info, Loader2, ShieldAlert, ShieldCheck, ShieldQuestion } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
+import { LIMITS } from '@fundchain/shared';
 import { percent, sdg, shortHash } from '../lib/format';
 
 const tone = {
@@ -305,14 +306,14 @@ export function ReasonDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="dialog" aria-modal="true">
       <div className="card w-full max-w-md p-5">
         <h2 className="text-lg font-semibold">{title}</h2>
-        <label className="label mt-4" htmlFor="reason">Alasan (min. 10 karakter)</label>
+        <label className="label mt-4" htmlFor="reason">Alasan (min. {LIMITS.REASON_MIN} karakter)</label>
         <textarea id="reason" className="input min-h-[100px]" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
         <div className="mt-3"><ErrorBox error={error} /></div>
         <div className="mt-4 flex justify-end gap-2">
           <button className="btn-secondary" onClick={onCancel} disabled={pending}>Batal</button>
           <button
             className={danger ? 'btn-danger' : 'btn-primary'}
-            disabled={pending || reason.trim().length < 10}
+            disabled={pending || reason.trim().length < LIMITS.REASON_MIN}
             onClick={() => onConfirm(reason.trim())}
           >
             {pending && <Loader2 size={14} className="animate-spin" />}

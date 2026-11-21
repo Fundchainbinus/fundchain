@@ -159,10 +159,7 @@ const REVIEW_GROUPS: Record<ReviewTab, string[]> = {
 };
 
 /** Nama & ukuran proposal; detail kampanye di-cache sehingga dipakai ulang oleh panel review. */
-function ProposalCell({ id }: { id: string }) {
-  const detail = useQuery({ queryKey: ['campaign', id], queryFn: () => get<CampaignDetail>(`/campaigns/${id}`) });
-  const doc = detail.data?.documents[0];
-  if (detail.isLoading) return <span className="text-slate-400">…</span>;
+function ProposalCell({ doc }: { doc?: { originalName: string; size: number } | null }) {
   if (!doc) return <span className="text-slate-400">Belum ada</span>;
   return (
     <>
@@ -306,7 +303,7 @@ export function AdminReviewsPage() {
                         <p>{rupiah(c.targetAmount)}</p>
                         <p className="text-xs text-slate-500">{date(c.deadline)}</p>
                       </td>
-                      <td><ProposalCell id={c.id} /></td>
+                      <td><ProposalCell doc={c.proposal} /></td>
                       <td>
                         <button type="button" className="btn-link" onClick={() => setSelectedId(c.id)}>
                           {tab === 'PENDING' ? 'Review' : 'Detail'}

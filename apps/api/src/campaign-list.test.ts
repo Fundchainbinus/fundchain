@@ -29,10 +29,39 @@ function row(id: string, donations: number) {
 function setup(rows: ReturnType<typeof row>[], groups: { campaignId: string; integrityStatus: string; _count: number }[]) {
   const findMany = vi.fn(async () => rows);
   const groupBy = vi.fn(async () => groups);
-  const prisma = { campaign: { findMany }, donation: { groupBy }, auditLog: { create: vi.fn() } } as any;
+  const docFindMany = vi.fn(async () => [
+    { id: 'd-new', campaignId: 'c-1', originalName: 'proposal-v2.pdf', size: 2048, createdAt: new Date('2026-11-03') },
+    { id: 'd-old', campaignId: 'c-1', originalName: 'proposal-v1.pdf', size: 1024, createdAt: new Date('2026-11-02') },
+  ]);
+  const prisma = {
+    campaign: { findMany },
+    donation: { groupBy },
+    campaignDocument: { findMany: docFindMany },
+    auditLog: { create: vi.fn() },
+  } as any;
   const service = new CampaignsService(prisma, new AuditService(prisma), {} as StorageService);
-  return { service, findMany, groupBy };
+  return { service, findMany, groupBy, docFindMany };
 }
+
+describe('CampaignsService.list — proposal di list admin (BFD-58 N+1)', () => {
+  it('admin: satu query dokumen, proposal terbaru per campaign, null bila belum ada', async () => {
+    const { service, docFindMany } = setup([row('c-1', 0), row('c-2', 0)], []);
+    const res = await service.list({} as any, undefined, true);
+    expect(docFindMany).toHaveBeenCalledTimes(1);
+    expect((docFindMany.mock.calls[0] as any)[0].where.campaignId.in).toEqual(['c-1', 'c-2']);
+    expect(res.campaigns.map((c: any) => [c.id, c.proposal])).toEqual([
+      ['c-1', { id: 'd-new', originalName: 'proposal-v2.pdf', size: 2048 }],
+      ['c-2', null],
+    ]);
+  });
+
+  it('publik: tidak query dokumen dan tidak ada field proposal', async () => {
+    const { service, docFindMany } = setup([row('c-1', 0)], []);
+    const res = await service.list({ status: 'ACTIVE' } as any);
+    expect(docFindMany).not.toHaveBeenCalled();
+    expect(res.campaigns[0]).not.toHaveProperty('proposal');
+  });
+});
 
 describe('CampaignsService.list — integritySummary (BFD-56)', () => {
   it('menambahkan integritySummary per campaign dari satu groupBy, field lama tetap', async () => {

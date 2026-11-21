@@ -81,11 +81,24 @@ export class CampaignsService {
       : [];
     const integrityOf = (id: string) =>
       Object.fromEntries(integrity.filter((g) => g.campaignId === id).map((g) => [g.integrityStatus, g._count]));
+    // Admin: proposal terbaru per campaign dalam satu query (hindari N+1 detail per baris di tabel review).
+    const docs = adminScope && page.length
+      ? await this.prisma.campaignDocument.findMany({
+          where: { campaignId: { in: page.map((c) => c.id) } },
+          select: { id: true, campaignId: true, originalName: true, size: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+    const proposalOf = (id: string) => {
+      const d = docs.find((x) => x.campaignId === id);
+      return d ? { id: d.id, originalName: d.originalName, size: d.size } : null;
+    };
     return {
       campaigns: page.map(({ _count, ...c }) => ({
         ...c,
         donorCount: _count.donations,
         integritySummary: integrityOf(c.id),
+        ...(adminScope ? { proposal: proposalOf(c.id) } : {}),
       })),
       nextCursor: rows.length > limit ? page[page.length - 1].id : null,
     };

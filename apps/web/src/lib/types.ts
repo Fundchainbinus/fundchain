@@ -31,6 +31,8 @@ export interface CampaignSummary {
   donorCount: number;
   /** Jumlah donasi PAID per status integritas (BFD-56: ikut di list agar beranda tidak fetch detail per kartu). */
   integritySummary: Partial<Record<IntegrityStatus, number>>;
+  /** Hanya di list admin: proposal terbaru (null = belum ada). */
+  proposal?: { id: string; originalName: string; size: number } | null;
 }
 
 export interface CampaignDetail extends Omit<CampaignSummary, 'donorCount' | 'integritySummary'> {
