@@ -6,28 +6,29 @@ import type { ChainInfo, User } from './types';
 
 /** Pengguna yang sedang login (null bila belum login / sesi kedaluwarsa). */
 export function useMe() {
-  const token = useSession((s) => s.token);
+  // Sesi ada di cookie httpOnly (BFD-11); `signedIn` hanya penanda supaya pengunjung anonim tidak memanggil /me.
+  const signedIn = useSession((s) => s.signedIn);
   const q = useQuery({
-    queryKey: ['me', token],
-    queryFn: () => get<User>('/me'),
-    enabled: !!token,
+    queryKey: ['me', signedIn],
+    queryFn: () => get<User>('/auth/me'),
+    enabled: signedIn,
     staleTime: 60_000,
     retry: false,
   });
-  const setToken = useSession((s) => s.setToken);
-  // Sesi kedaluwarsa / user hilang → keluar otomatis.
+  const setSignedIn = useSession((s) => s.setSignedIn);
+  // Sesi kedaluwarsa / dicabut (logout di perangkat lain) / user hilang → keluar otomatis.
   useEffect(() => {
-    if (token && q.error instanceof ApiError && q.error.status === 401) setToken(null);
-  }, [token, q.error, setToken]);
-  const me = token ? (q.data ?? null) : null;
-  return { me, isLoading: !!token && q.isLoading, isAdmin: me?.role === 'ADMIN' };
+    if (signedIn && q.error instanceof ApiError && q.error.status === 401) setSignedIn(false);
+  }, [signedIn, q.error, setSignedIn]);
+  const me = signedIn ? (q.data ?? null) : null;
+  return { me, isLoading: signedIn && q.isLoading, isAdmin: me?.role === 'ADMIN' };
 }
 
 export function useConfig() {
   return useQuery({
     queryKey: ['config'],
     queryFn: () =>
-      get<{ googleClientId: string; devTools: boolean; paymentProvider: string; chain: { network: string; chainId: number } }>(
+      get<{ googleClientId: string; devTools: boolean; demoMode?: boolean; paymentProvider: string; chain: { network: string; chainId: number } }>(
         '/config',
       ),
     staleTime: 60_000,

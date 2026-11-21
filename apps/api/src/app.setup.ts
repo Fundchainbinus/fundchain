@@ -16,7 +16,7 @@ export function configureApp(app: INestApplication) {
   app.enableCors({
     origin: cfg.webUrl.split(','),
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Idempotency-Key', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Idempotency-Key', 'Authorization', 'X-Requested-With'],
   });
   app.useGlobalPipes(
     new ValidationPipe({
@@ -39,7 +39,9 @@ function setupApiDocs(app: INestApplication) {
   const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger') as typeof import('@nestjs/swagger');
   const config = new DocumentBuilder()
     .setTitle('FundChain API')
-    .setDescription('REST API FundChain. Login lewat POST /auth/google, lalu kirim token sebagai Authorization: Bearer <token>.')
+    .setDescription(
+      'REST API FundChain. Login lewat POST /auth/google: browser memakai cookie httpOnly fc_session (request non-GET wajib header X-Requested-With: fundchain); Postman/script boleh mengirim token dari body sebagai Authorization: Bearer <token>.',
+    )
     .setVersion('1.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', description: 'Token sesi dari POST /auth/google' }, 'bearer')
     .addSecurityRequirements('bearer')

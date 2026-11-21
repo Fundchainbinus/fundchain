@@ -142,7 +142,7 @@ function AdminPanel({ campaign }: { campaign: CampaignDetail }) {
     },
   });
   const verify = useMutation({
-    mutationFn: () => post<{ checked: number; verified: number; tampered: number }>(`/admin/campaigns/${campaign.id}/verify`),
+    mutationFn: () => post<{ checked: number; verified: number; tampered: number; hasMore?: boolean }>(`/admin/campaigns/${campaign.id}/verify`),
     onSuccess: refresh,
   });
 
@@ -174,7 +174,10 @@ function AdminPanel({ campaign }: { campaign: CampaignDetail }) {
           verify.data.tampered > 0 ? (
             <ErrorBox error={`${verify.data.tampered} donasi TAMPERED dari ${verify.data.checked} yang dicek. Campaign dibekukan.`} />
           ) : (
-            <SuccessBox>{verify.data.verified} dari {verify.data.checked} donasi terverifikasi cocok dengan blockchain.</SuccessBox>
+            <SuccessBox>
+              {verify.data.verified} dari {verify.data.checked} donasi terverifikasi cocok dengan blockchain.
+              {verify.data.hasMore ? ' Masih ada donasi yang belum dicek — klik verifikasi lagi untuk batch berikutnya.' : ''}
+            </SuccessBox>
           )
         )}
       </div>

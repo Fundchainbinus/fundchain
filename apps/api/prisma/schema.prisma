@@ -24,6 +24,8 @@ model User {
   role               String   @default("STUDENT") // STUDENT | ADMIN
   /// Pseudonim stabil untuk canonical payload (on-chain). Bukan email/nama.
   integritySubjectId String   @unique @map("integrity_subject_id")
+  /// BFD-11: dinaikkan saat logout; token sesi dengan versi lain ditolak (revokasi).
+  sessionVersion     Int      @default(0) @map("session_version")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -119,6 +121,9 @@ model Donation {
 
   @@index([campaignId, status])
   @@index([donorId])
+  @@index([donorId, createdAt])
+  @@index([status, createdAt])
+  @@index([status, lastCheckedAt])
   @@map("donations")
 }
 
@@ -139,6 +144,7 @@ model Payment {
 
   donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
 
+  @@index([status, expiresAt])
   @@map("payments")
 }
 
@@ -189,6 +195,7 @@ model Disbursement {
   admin     User?    @relation("DisbursementAdmin", fields: [adminId], references: [id])
 
   @@index([campaignId, status])
+  @@index([status, requestedAt])
   @@map("disbursements")
 }
 
@@ -208,17 +215,25 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([actorId, createdAt])
   @@map("audit_logs")
 }
 
-/// File upload (proposal & bukti pencairan). Disimpan di Postgres agar jalan di serverless
-/// (Vercel tidak punya disk permanen). Maks 4MB per file.
+/// File upload (proposal & bukti pencairan). storageDriver 'db' = isi di kolom data (bytea, maks 4MB);
+/// 'supabase' = objek di Supabase Storage dengan path = key (data NULL). Upload langsung (BFD-15)
+/// dibuat PENDING lalu CONFIRMED setelah magic bytes diverifikasi saat di-attach.
 model StoredFile {
-  key         String   @id
-  data        Bytes
-  contentType String   @map("content_type")
-  size        Int
-  createdAt   DateTime @default(now()) @map("created_at")
+  key           String   @id
+  id            String   @unique @default(dbgenerated("(gen_random_uuid())::text"))
+  data          Bytes?
+  contentType   String   @map("content_type")
+  size          Int
+  storageDriver String   @default("db") @map("storage_driver") // db | supabase
+  status        String   @default("CONFIRMED") // PENDING | CONFIRMED
+  purpose       String? // campaign-document | disbursement-proof
+  ownerId       String?  @map("owner_id")
+  originalName  String?  @map("original_name")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   @@map("stored_files")
 }

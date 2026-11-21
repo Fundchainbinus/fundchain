@@ -94,6 +94,15 @@ export function insecureDefaultWarnings(e: NodeJS.ProcessEnv = process.env): str
   return warnings;
 }
 
+/**
+ * BFD-12: DEMO_MODE=true membuka GET /auth/demo (login sebagai user demo hasil seed).
+ * Default mati. Di production/Vercel tetap mati kecuali DEMO_MODE_ALLOW_PRODUCTION=true juga di-set.
+ */
+export function demoModeEnabled(e: NodeJS.ProcessEnv = process.env): boolean {
+  if (!bool(e.DEMO_MODE, false)) return false;
+  return !isProductionLike(e) || bool(e.DEMO_MODE_ALLOW_PRODUCTION, false);
+}
+
 /** BFD-44: dokumentasi OpenAPI aktif di non-production, atau bila ENABLE_API_DOCS=true. */
 export function apiDocsEnabled(e: NodeJS.ProcessEnv = process.env): boolean {
   return e.NODE_ENV !== 'production' || bool(e.ENABLE_API_DOCS, false);

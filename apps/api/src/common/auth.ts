@@ -10,11 +10,13 @@ import type { Role } from '@fundchain/shared';
 import type { Request } from 'express';
 import { AppError } from './app-error';
 import { PrismaService } from './prisma.service';
-import { verifySessionToken } from './session-token';
+import { CSRF_HEADER, CSRF_HEADER_VALUE, readCookie, SESSION_COOKIE, verifySessionToken } from './session-token';
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**
- * Login Google (popup). Setelah login, API menerbitkan token sesi yang dikirim frontend
- * lewat header `Authorization: Bearer <token>`.
+ * Login Google (popup). Setelah login, API menerbitkan token sesi sebagai cookie httpOnly
+ * `fc_session` (BFD-11); header `Authorization: Bearer <token>` tetap diterima untuk Postman/script.
  * Role SELALU dibaca dari database, tidak pernah dari request (BR-AUTH-002).
  */
 export interface CurrentUserPayload {
@@ -56,13 +58,18 @@ export class ActingUserGuard implements CanActivate {
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest<AuthedRequest>();
-    req.user = await this.resolveUser(req);
+    const { user, csrfBlocked } = await this.resolveUser(req);
+    req.user = user;
 
     const targets = [ctx.getHandler(), ctx.getClass()];
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets);
     const roles = this.reflector.getAllAndOverride<Role[]>(ROLES, targets);
 
+    // Endpoint publik (webhook, cron, login) tidak pernah ditolak karena CSRF; cookie-nya saja yang diabaikan.
     if (isPublic && !roles) return true;
+    if (!req.user && csrfBlocked) {
+      throw new AppError('AUTH_FORBIDDEN', `Request berbasis cookie wajib menyertakan header X-Requested-With: ${CSRF_HEADER_VALUE}.`);
+    }
     if (!req.user) throw new AppError('AUTH_UNAUTHENTICATED', 'Silakan login dengan Google terlebih dahulu.');
     if (roles?.length && !roles.includes(req.user.role)) {
       throw new AppError('AUTH_FORBIDDEN', 'Anda tidak memiliki akses ke fitur ini.');
@@ -70,13 +77,35 @@ export class ActingUserGuard implements CanActivate {
     return true;
   }
 
-  private async resolveUser(req: Request): Promise<CurrentUserPayload | undefined> {
+  /**
+   * Urutan (BFD-11): cookie sesi (bila valid & lolos CSRF), lalu `Authorization: Bearer`, lalu anonim.
+   * Cookie yang basi/dicabut atau tanpa header CSRF jatuh ke Bearer, supaya web lama (kirim Bearer
+   * tanpa X-Requested-With, tapi sudah menerima cookie) tetap jalan selama masa transisi.
+   */
+  private async resolveUser(req: Request): Promise<{ user?: CurrentUserPayload; csrfBlocked: boolean }> {
+    let csrfBlocked = false;
+    const cookieToken = readCookie(req.header('cookie'), SESSION_COOKIE);
+    if (cookieToken) {
+      const safeMethod = SAFE_METHODS.has((req.method ?? 'GET').toUpperCase());
+      if (safeMethod || req.header(CSRF_HEADER) === CSRF_HEADER_VALUE) {
+        const user = await this.userFromToken(cookieToken);
+        if (user) return { user, csrfBlocked };
+      } else {
+        csrfBlocked = true;
+      }
+    }
     const match = /^Bearer (.+)$/.exec(req.header('authorization') ?? '');
-    if (!match || match[1].length > 512) return undefined;
-    const userId = verifySessionToken(match[1]);
-    if (!userId) return undefined;
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return undefined;
+    const user = match ? await this.userFromToken(match[1]) : undefined;
+    return { user, csrfBlocked };
+  }
+
+  private async userFromToken(token: string): Promise<CurrentUserPayload | undefined> {
+    if (token.length > 512) return undefined;
+    const claims = verifySessionToken(token);
+    if (!claims) return undefined;
+    const user = await this.prisma.user.findUnique({ where: { id: claims.userId } });
+    // Revokasi: logout menaikkan session_version sehingga semua token versi lama ditolak.
+    if (!user || (user.sessionVersion ?? 0) !== claims.version) return undefined;
     return {
       id: user.id,
       email: user.email,

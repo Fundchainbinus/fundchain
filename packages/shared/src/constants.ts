@@ -66,6 +66,8 @@ export const LIMITS = {
   REASON_MIN: 10,
   // 4MB: di bawah batas body request Vercel Functions (4,5MB).
   FILE_MAX_BYTES: 4 * 1024 * 1024,
+  /** 10MB: upload langsung browser → Supabase Storage, tidak lewat Vercel (BFD-15). */
+  FILE_MAX_BYTES_DIRECT: 10 * 1024 * 1024,
   PAYMENT_EXPIRY_MINUTES: 15,
   NOTARIZE_MAX_ATTEMPTS: 5,
   /** Poin comserve donatur: 1 poin per kelipatan nominal ini dari donasi PAID (BFD-98). */

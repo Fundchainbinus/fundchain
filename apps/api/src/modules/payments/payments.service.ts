@@ -83,7 +83,8 @@ export class PaymentsService {
   async applyEvent(event: GatewayEvent): Promise<SettlementOutcome> {
     const payment = await this.prisma.payment.findUnique({
       where: { donationId: event.orderId },
-      include: { donation: { include: { donor: true } } },
+      // Hanya pseudonim donatur yang dibutuhkan untuk hash; jangan memuat email/nama.
+      include: { donation: { include: { donor: { select: { integritySubjectId: true } } } } },
     });
     if (!payment) throw new AppError('PAYMENT_NOT_FOUND', 'Order tidak dikenal.');
     const donationId = payment.donationId;

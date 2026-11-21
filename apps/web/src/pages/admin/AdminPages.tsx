@@ -17,7 +17,7 @@ import {
   Stat,
   SuccessBox,
 } from '../../components/ui';
-import { errorMessage, get, openProtectedFile, post } from '../../lib/api';
+import { errorMessage, get, openSignedFile, post } from '../../lib/api';
 import { date, dateTime, fileSize, rupiah, sdg, shortHash } from '../../lib/format';
 import type { AdminDisbursement, AuditLog, CampaignDetail, CampaignSummary, ChainInfo, VerifyResult } from '../../lib/types';
 
@@ -334,7 +334,7 @@ export function AdminIntegrityPage() {
     },
   });
   const verifyAll = useMutation({
-    mutationFn: () => post<{ checked: number; verified: number; tampered: number; skippedNotNotarized: number; frozenCampaigns: string[] }>('/admin/integrity/verify-all'),
+    mutationFn: () => post<{ checked: number; verified: number; tampered: number; skippedNotNotarized: number; frozenCampaigns: string[]; hasMore?: boolean }>('/admin/integrity/verify-all'),
     onSuccess: () => qc.invalidateQueries(),
   });
   const retry = useMutation({ mutationFn: (id: string) => post(`/admin/blockchain/${id}/retry`), onSuccess: () => qc.invalidateQueries() });
@@ -385,7 +385,11 @@ export function AdminIntegrityPage() {
             <span><b>{verifyAll.data.tampered} donasi TAMPERED</b> dari {verifyAll.data.checked} yang dicek. {verifyAll.data.frozenCampaigns.length} kampanye otomatis dibekukan dan pencairannya dikunci.</span>
           </div>
         ) : (
-          <SuccessBox>Semua {verifyAll.data.checked} donasi cocok dengan blockchain.{verifyAll.data.skippedNotNotarized ? ` ${verifyAll.data.skippedNotNotarized} belum ternotarisasi (dilewati).` : ''}</SuccessBox>
+          <SuccessBox>
+            {verifyAll.data.hasMore ? '' : 'Semua '}{verifyAll.data.checked} donasi yang dicek cocok dengan blockchain.
+            {verifyAll.data.skippedNotNotarized ? ` ${verifyAll.data.skippedNotNotarized} belum ternotarisasi (dilewati).` : ''}
+            {verifyAll.data.hasMore ? ' Masih ada donasi yang belum dicek — klik verifikasi lagi untuk batch berikutnya.' : ''}
+          </SuccessBox>
         )
       )}
 
@@ -504,7 +508,7 @@ export function AdminDisbursementsPage() {
   const selected = list.find((d) => d.id === selectedId) ?? list[0];
   const openProof = (id: string) => {
     setProofError(null);
-    openProtectedFile(`/disbursements/${id}/proof`).catch((e) => setProofError(errorMessage(e)));
+    openSignedFile(`/disbursements/${id}/proof/link`).catch((e) => setProofError(errorMessage(e)));
   };
 
   return (
