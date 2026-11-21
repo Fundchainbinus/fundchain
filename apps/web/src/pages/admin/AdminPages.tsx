@@ -287,7 +287,7 @@ export function AdminReviewsPage() {
                       </td>
                       <td><ProposalCell id={c.id} /></td>
                       <td>
-                        <button className="text-xs text-ink hover:text-navy hover:underline" onClick={() => setSelectedId(c.id)}>
+                        <button type="button" className="btn-link" onClick={() => setSelectedId(c.id)}>
                           {tab === 'PENDING' ? 'Review' : 'Detail'}
                         </button>
                       </td>
@@ -554,11 +554,11 @@ export function AdminDisbursementsPage() {
                     </td>
                     <td><DisbursementBadge status={d.status} /></td>
                     <td className="whitespace-nowrap">
-                      <button className="hover:text-navy hover:underline" onClick={() => openProof(d.id)}>Periksa bukti</button>
+                      <button type="button" className="btn-link" onClick={() => openProof(d.id)}>Periksa bukti</button>
                       {(d.status === 'REQUESTED' || d.status === 'APPROVED') && (
                         <>
                           {' · '}
-                          <button className="hover:text-navy hover:underline" onClick={() => setSelectedId(d.id)}>
+                          <button type="button" className="btn-link" onClick={() => setSelectedId(d.id)}>
                             {d.status === 'REQUESTED' ? 'Review' : 'Tandai paid'}
                           </button>
                         </>
@@ -714,7 +714,7 @@ export function AdminAuditPage() {
                     {l.entityType}
                     {l.entityId && (
                       <Link
-                        className="ml-1 hover:text-navy hover:underline"
+                        className="btn-link ml-1"
                         to={l.entityType === 'Campaign' ? `/campaigns/${l.entityId}` : l.entityType === 'Donation' ? `/donations/${l.entityId}` : '#'}
                       >
                         {l.entityId.slice(0, 8)}

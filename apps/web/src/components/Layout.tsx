@@ -6,6 +6,7 @@ import { errorMessage, get, post } from '../lib/api';
 import { requestGoogleAccessToken } from '../lib/google';
 import { useConfig, useMe } from '../lib/hooks';
 import { AppSidebar } from './AppSidebar';
+import { BottomNav } from './BottomNav';
 import { useFocusTrap } from './ConfirmDialog';
 import { RoleCard } from './RoleCard';
 import { Spinner } from './ui';
@@ -279,7 +280,7 @@ export function Layout() {
     `-mb-px whitespace-nowrap border-b-2 px-5 py-3 text-[15px] transition ${isActive ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-ink'}`;
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="has-bottom-nav flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 border-b border-line bg-white">
         <div className="flex h-[54px] items-center gap-4 px-4">
           <button
@@ -362,6 +363,7 @@ export function Layout() {
           )}
         </div>
       </div>
+      <BottomNav />
     </div>
   );
 }
