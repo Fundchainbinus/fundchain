@@ -1,0 +1,27 @@
+# Risk Register FundChain (BFD-7)
+
+> Disusun oleh tech lead mewakili QA, 22 Nov 2026.
+
+Skala: **Likelihood** dan **Impact** = Rendah / Sedang / Tinggi. **Skor** = L × I (R=1, S=2, T=3; ≥6 = prioritas).
+Owner ditulis per peran/divisi. Status: 🔴 terbuka · 🟡 dimitigasi sebagian · 🟢 terkendali.
+
+| ID | Risiko | L | I | Skor | Owner | Mitigasi | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| R-01 | **Pergantian gateway ke Sakurupiah (D-002).** Adapter Sakurupiah belum ada di repo (`adapters/` hanya `mock` dan `pakasir`). Production saat ini `PAYMENT_PROVIDER=mock` (`GET /config`, 22 Nov), dan 100% payment di DB berasal dari provider `mock` | T | T | 9 | BE Payment + TL | Demo memakai `mock` (diuji di CI seed-smoke dan `payments*.test.ts`). Sakurupiah hanya diaktifkan bila adapter + test webhook palsu/dobel/mismatch (setara PAY-07..09) hijau. Fallback: [`FALLBACK-PLAN.md`](FALLBACK-PLAN.md) F-2. Narasi demo harus jujur: "pembayaran disimulasikan" | 🔴 |
+| R-02 | **RPC Sepolia lambat / saldo relayer habis.** Saldo relayer 0.0484 ETH (RPC publik, 22 Nov), threshold 0.02 ETH. Biaya per notarisasi belum terukur di production (kolom `fee_wei` kosong untuk 16 tx) | S | T | 6 | BC Relayer | Worker retry 5x + klasifikasi error relayer (BFD-49), alert tx macet > 10 menit, `INSUFFICIENT_FUNDS` → antrean dijeda. Workflow `relayer-balance.yml` per jam + alert Discord, tapi belum pernah jalan terjadwal ([#34](https://github.com/Fundchainbinus/fundchain/issues/34)). Isi ulang faucet H-2 demo. Fallback F-3 (Hardhat lokal) | 🟡 |
+| R-03 | **Source kontrak belum diverifikasi** di Etherscan/Sourcify (per [`SEPOLIA-E2E.md`](../blockchain/evidence/SEPOLIA-E2E.md)). Juri tidak bisa membaca source atau memanggil `verify()` dari Etherscan | T | S | 6 | BC Smart Contract | Jalankan `contracts/scripts/verify-contract.ts` dengan `ETHERSCAN_API_KEY` ([`RELAYER-ROLE-RUNBOOK.md`](../blockchain/RELAYER-ROLE-RUNBOOK.md) §1). Sementara itu, halaman bukti di web menampilkan hash DB vs on-chain | 🔴 |
+| R-04 | **Repo public + backup DB sebagai artifact Actions.** Repo `Fundchainbinus/fundchain` berstatus PUBLIC, sedangkan [`BACKUP.md`](../BACKUP.md) mensyaratkan workflow backup dimatikan bila repo public. Dump berisi PII donatur, terenkripsi AES256 | S | T | 6 | TL + BE Infra | Issue [#33](https://github.com/Fundchainbinus/fundchain/issues/33): private-kan repo atau pindah backup ke storage privat, atau terima risiko di DECISIONS. Passphrase panjang + acak, hanya di password manager tim. Gitleaks di CI mencegah secret ter-commit | 🔴 |
+| R-05 | **Bus factor satu orang.** Akses Vercel, Supabase, secret GitHub, wallet admin kontrak, dan dokumen QA terpusat pada tech lead (dokumen QA ini pun disusun TL mewakili QA) | T | T | 9 | TL + PM | Dokumentasi runbook sudah ada (WORKER, BACKUP, RELAYER-ROLE, TAMPER-DEMO, FALLBACK-PLAN). Tambah minimal 1 anggota sebagai admin cadangan di Vercel/Supabase/GitHub, simpan `BACKUP_PASSPHRASE` dan kunci wallet admin di password manager bersama. Gladi demo oleh orang selain TL ([`DRY-RUN.md`](DRY-RUN.md)) | 🔴 |
+| R-06 | **Cadence cron serverless.** Expiry, antrean notarisasi, dan integrity checker bergantung pada GitHub Actions `*/10` (D-005). Belum ada satu pun run `schedule` (hanya `workflow_dispatch`) untuk cron tick, relayer balance, dan backup | T | S | 6 | BE Infra | Issue [#34](https://github.com/Fundchainbinus/fundchain/issues/34). Vercel Cron harian tetap sebagai cadangan. Sebelum demo: jalankan *Cron tick* manual, atau nyalakan worker lokal (`WORKER_ENABLED`). Notarisasi pasca-deploy di production terbukti cepat (p50 ≈ 15 dtk) saat dipicu | 🔴 |
+| R-07 | **Jaringan saat demo day** (Wi-Fi kampus lambat/terblokir, RPC atau Vercel tidak terjangkau) | S | T | 6 | PM + FE | Hotspot cadangan, video backup (Gate 3), stack lokal penuh (Hardhat + Postgres + mock) sesuai F-3/F-4 di [`FALLBACK-PLAN.md`](FALLBACK-PLAN.md), data demo di-seed sebelumnya | 🟡 |
+| R-08 | **Login Google tanpa filter domain BINUS** (D-006). Akun Google terverifikasi apa pun bisa masuk sebagai STUDENT; kasus plan AUTH-02 tidak berlaku | S | S | 4 | BE Auth + PM | Admin ditentukan lewat `ADMIN_EMAILS`. Putuskan di DECISIONS apakah perlu batas domain sebelum rilis non-demo | 🟡 |
+| R-09 | **Web tanpa test otomatis, kontrak tidak masuk CI** | S | S | 4 | FE + BC | Gate 3 manual + [`E2E-REFUND-MILESTONE.md`](E2E-REFUND-MILESTONE.md). Tambah job `contracts` di `ci.yml` (19 test, coverage 100% lokal) | 🟡 |
+| R-10 | **Data tamper uji di DB production** (1 donasi TAMPERED, 1 campaign FROZEN) bisa membingungkan juri bila tidak dijelaskan | S | R | 2 | BC Integrity | Jelaskan sebagai bukti fitur, atau bersihkan lewat alur resmi (refund/unfreeze) dengan persetujuan TL. Jangan jalankan `demo:tamper` ke production (guard sudah ada) | 🟡 |
+| R-11 | **Alert operasional tidak terkirim.** `ALERT_WEBHOOK_URL` tidak ada di env Vercel production, jadi alert tx macet / saldo habis hanya tercatat di audit log dan log | S | S | 4 | BE Infra | Isi `ALERT_WEBHOOK_URL` (Discord) di Vercel production, redeploy | 🔴 |
+| R-12 | **Query tanpa batas** (BUG-009..014) memperlambat API saat data tumbuh | R | S | 2 | BE | Issue [#27](https://github.com/Fundchainbinus/fundchain/issues/27)–[#32](https://github.com/Fundchainbinus/fundchain/issues/32). Volume data demo kecil | 🟢 |
+
+## Ditinjau
+
+| Tanggal | Oleh | Catatan |
+| --- | --- | --- |
+| 22 Nov 2026 | Tech lead (mewakili QA) | Versi awal dari data repo, CI, DB production (read-only), dan RPC publik |
