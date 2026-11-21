@@ -1,11 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell, Blocks, LogIn, LogOut, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { errorMessage, get, post } from '../lib/api';
 import { requestGoogleAccessToken } from '../lib/google';
 import { useConfig, useMe } from '../lib/hooks';
 import { AppSidebar } from './AppSidebar';
+import { useFocusTrap } from './ConfirmDialog';
 import { RoleCard } from './RoleCard';
 import { Spinner } from './ui';
 import { useSession } from '../lib/session';
@@ -264,6 +265,10 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(() => inAdmin && isDesktop());
   const docked = inAdmin && isDesktop();
   useEffect(() => setSidebarOpen(inAdmin && isDesktop()), [inAdmin]);
+  // Laci (bukan sidebar menempel) = dialog modal: Esc menutup, fokus terjebak, lalu kembali ke tombol grid.
+  const drawerRef = useRef<HTMLElement>(null);
+  const closeDrawer = () => setSidebarOpen(false);
+  useFocusTrap(drawerRef, sidebarOpen && !docked, closeDrawer);
 
   const links = [
     { to: '/', label: 'FundChain', end: true },
@@ -304,13 +309,27 @@ export function Layout() {
         {sidebarOpen && (
           <>
             {!docked && (
-              <div className="fixed inset-0 top-[55px] z-30 bg-black/40" onClick={() => setSidebarOpen(false)} aria-hidden />
+              <div className="fixed inset-0 top-[55px] z-30 bg-black/40" onClick={closeDrawer} aria-hidden />
             )}
             <aside
               id="app-sidebar"
-              className={`w-[232px] shrink-0 bg-navy ${docked ? '' : 'fixed bottom-0 left-0 top-[55px] z-40 overflow-y-auto shadow-xl'}`}
+              ref={drawerRef}
+              {...(docked ? {} : { role: 'dialog', 'aria-modal': true, 'aria-label': 'Menu navigasi', tabIndex: -1 })}
+              className={`w-[232px] shrink-0 bg-navy ${docked ? '' : 'fixed bottom-0 left-0 top-[55px] z-40 overflow-y-auto shadow-xl outline-none'}`}
             >
-              <AppSidebar inAdmin={inAdmin} onNavigate={docked ? undefined : () => setSidebarOpen(false)} />
+              {!docked && (
+                <div className="flex justify-end px-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeDrawer}
+                    aria-label="Tutup menu"
+                    className="flex h-11 w-11 items-center justify-center rounded text-white hover:bg-white/10"
+                  >
+                    <X size={20} aria-hidden />
+                  </button>
+                </div>
+              )}
+              <AppSidebar inAdmin={inAdmin} onNavigate={docked ? undefined : closeDrawer} />
             </aside>
           </>
         )}
