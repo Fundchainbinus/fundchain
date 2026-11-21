@@ -1,7 +1,12 @@
 import { loadFixture } from '@nomicfoundation/hardhat-toolbox/network-helpers';
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
-import { changeRelayerRole, requireAddress, resolveRegistryAddress } from '../scripts/lib/relayer-role';
+import {
+  changeRelayerRole,
+  requireAddress,
+  resolveRegistryAddress,
+  runRoleScript,
+} from '../scripts/lib/relayer-role';
 
 /**
  * BFD-29/30 — rotasi RELAYER_ROLE, dites dengan kode yang SAMA dengan
@@ -124,6 +129,32 @@ describe('Rotasi RELAYER_ROLE (grant/revoke)', () => {
     expect(await ethers.provider.getTransactionCount(admin.address)).to.equal(nonceBefore);
     const res2 = await changeRelayerRole('revoke', registry, admin, ethers.Wallet.createRandom().address);
     expect(res2.txHash).to.equal(null);
+  });
+
+  it('entry point script (runRoleScript) grant lalu revoke lewat env, di network hardhat', async () => {
+    const { registry, newRelayer, role } = await loadFixture(deployFixture);
+    const saved = { ...process.env };
+    const origLog = console.log;
+    const lines: string[] = [];
+    console.log = (...a: unknown[]) => lines.push(a.join(' '));
+    try {
+      process.env.REGISTRY_ADDRESS = await registry.getAddress();
+      process.env.NEW_RELAYER_ADDRESS = newRelayer.address;
+      process.env.OLD_RELAYER_ADDRESS = newRelayer.address;
+      await runRoleScript('grant', 'NEW_RELAYER_ADDRESS');
+      expect(await registry.hasRole(role, newRelayer.address)).to.equal(true);
+      await runRoleScript('revoke', 'OLD_RELAYER_ADDRESS');
+      expect(await registry.hasRole(role, newRelayer.address)).to.equal(false);
+    } finally {
+      console.log = origLog;
+      for (const k of ['REGISTRY_ADDRESS', 'NEW_RELAYER_ADDRESS', 'OLD_RELAYER_ADDRESS']) {
+        if (saved[k] === undefined) delete process.env[k];
+        else process.env[k] = saved[k];
+      }
+    }
+    expect(lines.filter((l) => l.startsWith('Tx hash  : 0x'))).to.have.length(2);
+    expect(lines.some((l) => l.includes('hasRole(RELAYER_ROLE) sesudah: true'))).to.equal(true);
+    expect(lines.some((l) => l.includes('hasRole(RELAYER_ROLE) sesudah: false'))).to.equal(true);
   });
 
   it('validasi input address', async () => {

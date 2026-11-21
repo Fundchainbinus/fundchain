@@ -69,9 +69,9 @@ Langkah membuka manual di Etherscan:
 
 1. Buka link tx, lalu tab **Logs**. Event `DonationNotarized` menampilkan `donationId`
    (topic 1) dan `hash` (data).
-2. Karena source belum diverifikasi, tab *Read Contract* belum tersedia di Etherscan.
-   Untuk sementara, panggil `verify(bytes32)` lewat script di bawah, Remix (*At Address*
-   + ABI), atau `cast call`.
+2. Jika source sudah diverifikasi, buka tab *Read Contract*, lalu `verify`. Selama source
+   belum terverifikasi, tab itu tidak tersedia. Panggil `verify(bytes32)` lewat script di
+   bawah, Remix (*At Address* + ABI), atau `cast call`.
 
 ### Catatan: cross-check Remix ≠ contract Sepolia ini
 

@@ -57,8 +57,10 @@ npx hardhat verify --network sepolia \
 ```
 
 Config verifikasi ada di `hardhat.config.ts`: `etherscan.apiKey` dari env
-`ETHERSCAN_API_KEY` (Etherscan API v2) dan `sourcify.enabled = true`. Sourcify tidak butuh
-key, jadi tetap jalan walau Etherscan gagal. Compiler harus sama dengan saat deploy
+`ETHERSCAN_API_KEY` (hardhat-verify 2.1.x memakai Etherscan API v2) dan
+`sourcify.enabled = true`. Sourcify tidak butuh key. `verify-contract.ts` menjalankan
+Etherscan dan Sourcify secara terpisah, jadi Sourcify tetap dicoba walau Etherscan gagal
+atau key kosong. Exit code 1 hanya kalau keduanya gagal. Compiler harus sama dengan saat deploy
 (`0.8.24`, optimizer 200 runs, evm `cancun`). **Jangan** ubah setting `solidity` di config
 sebelum verifikasi.
 
