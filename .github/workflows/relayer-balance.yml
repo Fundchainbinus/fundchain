@@ -1,0 +1,136 @@
+name: Relayer balance
+
+# BFD-73 / BFD-32: cek saldo wallet relayer di Sepolia tiap jam, alert ke Discord bila di bawah threshold.
+# READ-ONLY: hanya eth_getBalance ke RPC. Tidak butuh private key, tidak mengirim transaksi, tanpa checkout/install.
+#
+# Konfigurasi (Settings > Secrets and variables > Actions):
+#   RELAYER_ADDRESS          variable (atau secret) — alamat PUBLIK relayer, wajib
+#   RELAYER_MIN_BALANCE_ETH  variable, opsional — default 0.02 (sama dengan saldo_relayer.ts & flag lowBalance API)
+#   SEPOLIA_RPC_URL          secret, opsional — fallback ke RPC publik ethereum-sepolia-rpc.publicnode.com
+#   DISCORD_WEBHOOK_URL      secret, opsional — tanpa ini alert hanya di log workflow
+# Exit: 0 = aman, 1 = saldo rendah (job merah + Discord), 2 = konfigurasi/RPC error.
+# Catatan: schedule GitHub hanya jalan dari default branch; selama saldo rendah alert terkirim tiap jam.
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: relayer-balance
+  cancel-in-progress: false
+
+jobs:
+  balance:
+    name: Saldo relayer Sepolia
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Cek saldo (read-only)
+        env:
+          RELAYER_ADDRESS: ${{ vars.RELAYER_ADDRESS || secrets.RELAYER_ADDRESS }}
+          RELAYER_MIN_BALANCE_ETH: ${{ vars.RELAYER_MIN_BALANCE_ETH }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          node --input-type=module - <<'NODE'
+            // Cek saldo relayer READ-ONLY (eth_getBalance). Tanpa private key, tanpa dependency.
+            // Exit: 0 = aman, 1 = saldo rendah, 2 = konfigurasi/RPC error.
+            const PUBLIC_RPC = 'https://ethereum-sepolia-rpc.publicnode.com';
+            const address = (process.env.RELAYER_ADDRESS || '').trim();
+            const minText = (process.env.RELAYER_MIN_BALANCE_ETH || '0.02').trim();
+            const webhook = (process.env.DISCORD_WEBHOOK_URL || '').trim();
+            const rpcs = [...new Set([(process.env.SEPOLIA_RPC_URL || '').trim(), PUBLIC_RPC].filter(Boolean))];
+
+            function parseEth(text) {
+              const m = /^(\d+)(?:\.(\d{1,18}))?$/.exec(text);
+              if (!m) throw new Error(`RELAYER_MIN_BALANCE_ETH tidak valid: ${text}`);
+              return BigInt(m[1]) * 10n ** 18n + BigInt((m[2] || '').padEnd(18, '0'));
+            }
+            function formatEth(wei) {
+              const s = wei.toString().padStart(19, '0');
+              const frac = s.slice(-18).replace(/0+$/, '');
+              return `${s.slice(0, -18)}${frac ? '.' + frac : '.0'}`;
+            }
+            async function getBalance(rpc) {
+              const res = await fetch(rpc, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getBalance', params: [address, 'latest'] }),
+                signal: AbortSignal.timeout(15000),
+              });
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const body = await res.json();
+              if (body.error || typeof body.result !== 'string') throw new Error(body.error?.message || 'respons RPC tidak valid');
+              return BigInt(body.result);
+            }
+
+            async function main() {
+              if (!address) {
+                console.log('::error::RELAYER_ADDRESS belum di-set. Isi repo variable (atau secret) RELAYER_ADDRESS dengan alamat publik relayer.');
+                return 2;
+              }
+              if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+                console.log('::error::RELAYER_ADDRESS bukan alamat Ethereum yang valid (0x + 40 hex).');
+                return 2;
+              }
+              const minWei = parseEth(minText);
+              let balance = null;
+              for (const [i, rpc] of rpcs.entries()) {
+                const label = rpc === PUBLIC_RPC ? 'RPC publik' : 'SEPOLIA_RPC_URL';
+                try {
+                  balance = await getBalance(rpc);
+                  console.log(`Sumber    : ${label}`);
+                  break;
+                } catch (e) {
+                  // URL RPC tidak dicetak: bisa memuat API key.
+                  console.log(`::warning::${label} gagal (${e.message})${i < rpcs.length - 1 ? ', coba RPC berikutnya' : ''}`);
+                }
+              }
+              if (balance === null) {
+                console.log('::error::Semua RPC gagal, saldo relayer tidak bisa dicek.');
+                return 2;
+              }
+              console.log(`Relayer   : ${address}`);
+              console.log(`Saldo     : ${formatEth(balance)} ETH`);
+              console.log(`Threshold : ${minText} ETH`);
+              if (balance >= minWei) {
+                console.log('Status    : OK');
+                return 0;
+              }
+              const message = [
+                '⚠️ SALDO RELAYER RENDAH (Sepolia)',
+                `Address: ${address}`,
+                `Saldo: ${formatEth(balance)} ETH (threshold ${minText} ETH)`,
+                'Aksi: isi ulang relayer dari faucet Sepolia. Notarisasi yang gagal INSUFFICIENT_FUNDS di-retry dari Admin → Integritas.',
+                `Etherscan: https://sepolia.etherscan.io/address/${address}`,
+              ].join('\n');
+              console.log(`::error::Saldo relayer ${formatEth(balance)} ETH di bawah ${minText} ETH`);
+              if (!webhook) {
+                console.log('::warning::Secret DISCORD_WEBHOOK_URL kosong, alert hanya di log workflow.');
+                return 1;
+              }
+              try {
+                const res = await fetch(webhook, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ content: message }),
+                  signal: AbortSignal.timeout(10000),
+                });
+                console.log(res.ok ? 'Alert terkirim ke Discord.' : `::warning::Webhook Discord gagal: HTTP ${res.status}`);
+              } catch (e) {
+                console.log(`::warning::Webhook Discord gagal: ${e.message}`);
+              }
+              return 1;
+            }
+
+            main().then(
+              (code) => process.exit(code),
+              (e) => {
+                console.log(`::error::${e.message}`);
+                process.exit(2);
+              },
+            );
+          NODE
