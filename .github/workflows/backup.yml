@@ -79,6 +79,11 @@ jobs:
           echo "::add-mask::$SRC_URL"
           SRC_PW="$(printf '%s' "$SRC_URL" | sed -E 's#^[^:]+://[^:@/]*:([^@]*)@.*$#\1#')"
           [ -n "$SRC_PW" ] && [ "$SRC_PW" != "$SRC_URL" ] && echo "::add-mask::$SRC_PW"
+          # Pesan error koneksi psql/pg_dump menyebut host & user: samarkan juga.
+          SRC_USER="$(printf '%s' "$SRC_URL" | sed -E 's#^[^:]+://([^:@/]*).*$#\1#')"
+          SRC_HOST="$(printf '%s' "$SRC_URL" | sed -E 's#^[^@]*@([^:/?]*).*$#\1#')"
+          [ -n "$SRC_USER" ] && [ "$SRC_USER" != "$SRC_URL" ] && echo "::add-mask::$SRC_USER"
+          [ -n "$SRC_HOST" ] && [ "$SRC_HOST" != "$SRC_URL" ] && echo "::add-mask::$SRC_HOST"
 
           pg() {
             docker run --rm --network host -e SRC_URL -v "$WORK:/work" -w /work "postgres:$PG_MAJOR" "$@"

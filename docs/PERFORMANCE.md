@@ -32,7 +32,7 @@ tulisnya terasa.
 
 | Masalah | Perbaikan | Test |
 | ------- | --------- | ---- |
-| `verifyMany` (verify-all / verify per campaign) tanpa batas. Tiap donasi = 1 panggilan RPC + 1 transaksi, jadi request admin bisa melewati batas waktu fungsi Vercel | Maks `VERIFY_MANY_MAX` (100) per panggilan, urut `last_checked_at` naik (panggilan berikutnya maju ke donasi lain), field tambahan `hasMore`. Donasi yang gagal dicek digeser ke belakang | `perf.test.ts` › `IntegrityService.verifyMany` |
+| `verifyMany` (verify-all / verify per campaign) tanpa batas. Tiap donasi = 1 panggilan RPC + 1 transaksi, jadi request admin bisa melewati batas waktu fungsi Vercel | Maks `VERIFY_MANY_MAX` (100) per panggilan, urut PENDING/TAMPERED dulu (donasi TAMPERED yang dipulihkan langsung dicek ulang sebelum unfreeze), lalu `last_checked_at` naik (panggilan berikutnya maju ke donasi lain), field tambahan `hasMore`. Banner UI belum membaca `hasMore` (BUG-015). Donasi yang gagal dicek digeser ke belakang | `perf.test.ts` › `IntegrityService.verifyMany` |
 | `recoverStuck` (worker): dua scan `SUBMITTED` tanpa `take`, dan tiap baris memanggil RPC | `take: RECOVER_BATCH` (20), urut `submitted_at` naik | `perf.test.ts` › `NotarizationWorker scan` |
 | `alertStuck`: lookup audit `action + entity_id IN (...)` tidak memakai index | Tambah `entityType: 'Donation'` agar memakai `audit_logs(entity_type, entity_id)` | `perf.test.ts` › `alertStuck` |
 | `verifyDonation` & `applyEvent` memuat seluruh baris `users` (termasuk email/nama) padahal hanya butuh `integrity_subject_id` | `donor: { select: { integritySubjectId: true } }` | `perf.test.ts` |

@@ -154,7 +154,9 @@ export class IntegrityService {
     const rows = await this.prisma.donation.findMany({
       where: { campaignId, status: 'PAID', blockchain: { status: 'CONFIRMED' } },
       select: { id: true },
-      orderBy: [{ lastCheckedAt: { sort: 'asc', nulls: 'first' } }, { id: 'asc' }],
+      // integrityStatus asc = PENDING, TAMPERED, VERIFIED (urutan alfabet): donasi yang belum pernah dicek dan
+      // yang TAMPERED (mis. baru dipulihkan sebelum unfreeze) selalu masuk batch pertama, baru sisanya terlama dulu.
+      orderBy: [{ integrityStatus: 'asc' }, { lastCheckedAt: { sort: 'asc', nulls: 'first' } }, { id: 'asc' }],
       take: VERIFY_MANY_MAX + 1,
     });
     const hasMore = rows.length > VERIFY_MANY_MAX;

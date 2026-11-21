@@ -173,8 +173,11 @@ describe('IntegrityService.verifyMany', () => {
     const q = prisma.donation.findMany.mock.calls[0][0];
     expect(q.take).toBe(VERIFY_MANY_MAX + 1);
     expect(q.select).toEqual({ id: true });
-    // Paling lama tidak dicek duluan → panggilan berikutnya maju ke donasi lain.
-    expect(q.orderBy[0]).toEqual({ lastCheckedAt: { sort: 'asc', nulls: 'first' } });
+    // PENDING/TAMPERED dulu (unfreeze butuh re-check donasi TAMPERED), lalu paling lama tidak dicek duluan
+    // → panggilan berikutnya maju ke donasi lain.
+    expect(q.orderBy[0]).toEqual({ integrityStatus: 'asc' });
+    expect(['PENDING', 'TAMPERED', 'VERIFIED'].slice().sort()).toEqual(['PENDING', 'TAMPERED', 'VERIFIED']);
+    expect(q.orderBy[1]).toEqual({ lastCheckedAt: { sort: 'asc', nulls: 'first' } });
     expect(prisma.donation.findUnique).toHaveBeenCalledTimes(VERIFY_MANY_MAX);
     expect(r.hasMore).toBe(true);
     expect(r.errors).toHaveLength(VERIFY_MANY_MAX);

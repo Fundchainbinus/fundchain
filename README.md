@@ -166,7 +166,7 @@ Satu PR bisa menyebut beberapa key (`BFD-56 BFD-57 ...`). Kalau lupa, cukup edit
 pnpm test
 ```
 
-Mencakup: canonical hash (deterministik & avalanche), smart contract (9 test), state machine, aturan pencairan, dan signature webhook.
+Mencakup: canonical hash (deterministik & avalanche), smart contract (9 test), state machine, aturan pencairan, dan signature webhook. Guard skema: `rls.test.ts` (setiap tabel di migrasi wajib RLS, lihat D-003) dan `perf.test.ts` (setiap `@@index` punya `CREATE INDEX` di migrasi, query hot path dibatasi).
 
 ## Deploy (Vercel)
 

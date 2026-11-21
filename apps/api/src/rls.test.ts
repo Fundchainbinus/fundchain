@@ -72,8 +72,12 @@ export function exposedPolicies(sql: string): string[] {
   const out: string[] = [];
   for (const stmt of sql.split(';')) {
     if (!/^\s*CREATE\s+POLICY\b/i.test(stmt)) continue;
-    const to = /\bTO\s+([\s\S]+?)(?:\bUSING\b|\bWITH\s+CHECK\b|$)/i.exec(stmt);
-    const roles = to ? to[1].split(',').map((r) => r.trim().replace(/^"|"$/g, '').toLowerCase()) : ['public'];
+    // `TO` dicari setelah `ON <tabel> [AS ...] [FOR ...]`, supaya nama policy seperti "allow anon to read" tidak terbaca.
+    const to = new RegExp(
+      String.raw`\bON\s+${IDENT}\s+(?:AS\s+\w+\s+)?(?:FOR\s+\w+\s+)?TO\s+([\s\S]+?)(?:\bUSING\b|\bWITH\s+CHECK\b|$)`,
+      'i',
+    ).exec(stmt);
+    const roles = to ? to[2].split(',').map((r) => r.trim().replace(/^"|"$/g, '').toLowerCase()) : ['public'];
     if (roles.some((r) => EXPOSED_ROLES.includes(r))) out.push(stmt.trim().replace(/\s+/g, ' '));
   }
   return out;
@@ -140,5 +144,8 @@ describe('parser RLS (sanity)', () => {
     expect(exposedPolicies(`CREATE POLICY p ON "users" FOR SELECT TO anon USING (true);`)).toHaveLength(1);
     expect(exposedPolicies(`CREATE POLICY p ON "users" TO "authenticated", service_role USING (true);`)).toHaveLength(1);
     expect(exposedPolicies(`CREATE POLICY p ON "users" FOR ALL TO service_role USING (true);`)).toHaveLength(0);
+    // Nama policy yang mengandung " to " tidak boleh dibaca sebagai klausa TO.
+    expect(exposedPolicies(`CREATE POLICY "allow service to read" ON "public"."users" USING (true);`)).toHaveLength(1);
+    expect(exposedPolicies(`CREATE POLICY "anon to read" ON users AS PERMISSIVE FOR SELECT TO service_role USING (true);`)).toHaveLength(0);
   });
 });
