@@ -9,6 +9,10 @@ description = "File contoh env dan kunci dev Hardhat yang memang publik"
 paths = [
   # apps/api/.env.example, apps/api/.env.bc-local.example, contracts/.env.example
   '''(^|/)\.env(\.[\w-]+)?\.example$''',
+  # Unit test memakai secret palsu untuk HMAC/token.
+  '''(^|/)[\w.-]+\.test\.ts$''',
+  # Bukti cross-check Remix: on-chain key (bytes32 publik di Sepolia), bukan secret.
+  '''^docs/blockchain/''',
 ]
 regexes = [
   # Private key akun #0 dan #1 bawaan Hardhat (`npx hardhat node`) — publik, hanya untuk chain lokal.
