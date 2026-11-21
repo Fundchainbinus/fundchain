@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LIMITS } from '@fundchain/shared';
+import { Prisma } from '@prisma/client';
 import { AppError } from '../../common/app-error';
 import type { CurrentUserPayload } from '../../common/auth';
 import { publicDonorName } from '../../common/format';
@@ -36,13 +37,7 @@ export class DonationsService {
     }
 
     const existing = await this.prisma.donation.findUnique({ where: { idempotencyKey } });
-    if (existing) {
-      // Request yang sama diulang → kembalikan hasil yang sama; beda isi → konflik.
-      if (existing.donorId === user.id && existing.campaignId === campaignId && existing.amount === amount) {
-        return this.detail(existing.id, user);
-      }
-      throw new AppError('DONATION_DUPLICATE', 'Idempotency-Key sudah dipakai untuk donasi lain.');
-    }
+    if (existing) return this.replay(existing, campaignId, amount, user);
 
     const campaign = await this.prisma.campaign.findUnique({ where: { id: campaignId } });
     if (!campaign) throw new AppError('CAMPAIGN_NOT_FOUND', 'Campaign tidak ditemukan.');
@@ -50,33 +45,17 @@ export class DonationsService {
       throw new AppError('CAMPAIGN_NOT_ACTIVE', 'Campaign tidak sedang menerima donasi.');
     }
 
-    const donation = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.donation.create({
-        data: {
-          campaignId,
-          donorId: user.id,
-          amount,
-          isAnonymous: Boolean(input.anonymous),
-          idempotencyKey,
-          status: 'PENDING',
-        },
-      });
-      await tx.payment.create({
-        data: { donationId: created.id, provider: this.payments.gateway.name, amount, status: 'PENDING' },
-      });
-      await this.audit.log(
-        {
-          actorId: user.id,
-          action: 'DONATION_CREATED',
-          entityType: 'Donation',
-          entityId: created.id,
-          metadata: { campaignId, amount, provider: this.payments.gateway.name },
-          ipAddress: ip,
-        },
-        tx,
-      );
-      return created;
-    });
+    let donation: { id: string };
+    try {
+      donation = await this.createPending(campaignId, amount, Boolean(input.anonymous), idempotencyKey, user, ip);
+    } catch (e) {
+      // Dua request bersamaan dengan key sama: keduanya lolos pre-check, yang kalah kena unique
+      // violation (P2002). Perlakukan seperti replay, bukan 500.
+      if (!isUniqueViolation(e, 'idempotencyKey', 'idempotency_key')) throw e;
+      const winner = await this.prisma.donation.findUnique({ where: { idempotencyKey } });
+      if (!winner) throw e;
+      return this.replay(winner, campaignId, amount, user);
+    }
 
     try {
       const charge = await this.payments.gateway.createCharge({ orderId: donation.id, amount });
@@ -100,6 +79,56 @@ export class DonationsService {
     }
 
     return this.detail(donation.id, user);
+  }
+
+  /** Request ulang dengan Idempotency-Key yang sama → hasil yang sama; beda isi → konflik. */
+  private replay(
+    existing: { id: string; donorId: string; campaignId: string; amount: number },
+    campaignId: string,
+    amount: number,
+    user: CurrentUserPayload,
+  ) {
+    if (existing.donorId === user.id && existing.campaignId === campaignId && existing.amount === amount) {
+      return this.detail(existing.id, user);
+    }
+    throw new AppError('DONATION_DUPLICATE', 'Idempotency-Key sudah dipakai untuk donasi lain.');
+  }
+
+  private createPending(
+    campaignId: string,
+    amount: number,
+    anonymous: boolean,
+    idempotencyKey: string,
+    user: CurrentUserPayload,
+    ip: string | null,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.donation.create({
+        data: {
+          campaignId,
+          donorId: user.id,
+          amount,
+          isAnonymous: anonymous,
+          idempotencyKey,
+          status: 'PENDING',
+        },
+      });
+      await tx.payment.create({
+        data: { donationId: created.id, provider: this.payments.gateway.name, amount, status: 'PENDING' },
+      });
+      await this.audit.log(
+        {
+          actorId: user.id,
+          action: 'DONATION_CREATED',
+          entityType: 'Donation',
+          entityId: created.id,
+          metadata: { campaignId, amount, provider: this.payments.gateway.name },
+          ipAddress: ip,
+        },
+        tx,
+      );
+      return created;
+    });
   }
 
   /**
@@ -280,4 +309,16 @@ export class DonationsService {
     if (!donation) throw new AppError('DONATION_NOT_FOUND', 'Donasi tidak ditemukan.');
     return donation;
   }
+}
+
+/**
+ * Prisma unique violation (P2002) pada field `field` (atau kolom DB `column`).
+ * `meta.target` bisa berupa array nama field/kolom atau nama constraint; bila tidak ada, anggap cocok.
+ */
+export function isUniqueViolation(e: unknown, field: string, column = field): boolean {
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== 'P2002') return false;
+  const target = (e.meta as { target?: unknown } | undefined)?.target;
+  if (Array.isArray(target)) return target.includes(field) || target.includes(column);
+  if (typeof target === 'string') return target.includes(field) || target.includes(column);
+  return true;
 }

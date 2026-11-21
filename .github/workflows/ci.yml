@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Tidak ada DB di CI: tidak ada migrate/seed/test yang menyentuh database.
+      # Nilai dummy hanya agar `prisma generate` (postinstall) tidak bergantung pada .env.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+
+      # Root package.json belum punya field `packageManager`, jadi versi pnpm disebut di sini.
+      # pnpm 10 = versi yang dipakai Vercel (lihat pnpm-workspace.yaml).
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # postinstall root sudah menjalankan build @fundchain/shared + prisma generate.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck shared
+        run: pnpm --filter @fundchain/shared typecheck
+
+      - name: Typecheck api
+        run: pnpm --filter @fundchain/api typecheck
+
+      - name: Typecheck web
+        run: pnpm --filter @fundchain/web typecheck
+
+      - name: Test shared
+        run: pnpm --filter @fundchain/shared test
+
+      - name: Test api
+        run: pnpm --filter @fundchain/api test
+
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Pakai CLI resmi (bukan gitleaks-action) supaya tidak butuh GITLEAKS_LICENSE di repo organisasi.
+      - name: Run gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2             git /repo --config /repo/.gitleaks.toml --redact --verbose --exit-code 1

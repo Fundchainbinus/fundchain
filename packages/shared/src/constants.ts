@@ -20,7 +20,7 @@ export type DonationStatus = (typeof DONATION_STATUSES)[number];
 export const INTEGRITY_STATUSES = ['PENDING', 'VERIFIED', 'TAMPERED'] as const;
 export type IntegrityStatus = (typeof INTEGRITY_STATUSES)[number];
 
-export const PAYMENT_STATUSES = ['PENDING', 'SETTLED', 'FAILED', 'EXPIRED'] as const;
+export const PAYMENT_STATUSES = ['PENDING', 'SETTLED', 'FAILED', 'EXPIRED', 'REFUNDED'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 export const BLOCKCHAIN_STATUSES = ['QUEUED', 'SUBMITTED', 'CONFIRMED', 'FAILED', 'RETRYING'] as const;

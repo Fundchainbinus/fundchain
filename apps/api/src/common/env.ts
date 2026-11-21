@@ -69,6 +69,36 @@ export function env() {
 
 export type Env = ReturnType<typeof env>;
 
+/** Production = NODE_ENV=production atau berjalan di Vercel (VERCEL selalu di-set oleh platform). */
+export function isProductionLike(e: NodeJS.ProcessEnv = process.env): boolean {
+  return e.NODE_ENV === 'production' || !!e.VERCEL;
+}
+
+/**
+ * BFD-25: peringatan bila secret penting jatuh ke nilai default di production.
+ * Hanya peringatan — perilaku fallback tidak diubah supaya deploy lama tidak mendadak mati.
+ */
+export function insecureDefaultWarnings(e: NodeJS.ProcessEnv = process.env): string[] {
+  if (!isProductionLike(e)) return [];
+  const warnings: string[] = [];
+  if (!e.SESSION_SECRET) {
+    warnings.push(
+      'SESSION_SECRET tidak di-set — token sesi ditandatangani dengan secret turunan DATABASE_URL. Set SESSION_SECRET acak (>= 32 byte) di environment production.',
+    );
+  }
+  if (!e.MOCK_WEBHOOK_SECRET) {
+    warnings.push(
+      'MOCK_WEBHOOK_SECRET tidak di-set — webhook mock memakai secret default publik "dev-mock-webhook-secret". Set secret acak, atau pakai PAYMENT_PROVIDER=pakasir.',
+    );
+  }
+  return warnings;
+}
+
+/** BFD-44: dokumentasi OpenAPI aktif di non-production, atau bila ENABLE_API_DOCS=true. */
+export function apiDocsEnabled(e: NodeJS.ProcessEnv = process.env): boolean {
+  return e.NODE_ENV !== 'production' || bool(e.ENABLE_API_DOCS, false);
+}
+
 /** Cari file deployment Hardhat (contracts/deployments/<network>.json). */
 export function readDeploymentFile(network: string): { address: string; chainId: number } | null {
   const candidates = [

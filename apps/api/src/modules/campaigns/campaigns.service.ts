@@ -207,6 +207,40 @@ export class CampaignsService {
     return doc;
   }
 
+  /**
+   * Hapus campaign oleh pemiliknya (BFD-13). Soft-delete (`deletedAt`) agar jejak audit tetap ada.
+   * Hanya boleh saat DRAFT/REJECTED — belum pernah aktif, jadi belum ada dana yang terkumpul.
+   */
+  async remove(id: string, user: CurrentUserPayload, ip: string | null) {
+    const campaign = await this.getOwned(id, user);
+    if (!EDITABLE_STATUSES.includes(campaign.status as CampaignStatus)) {
+      throw new AppError('CAMPAIGN_INVALID_STATUS', 'Campaign hanya bisa dihapus saat DRAFT atau REJECTED.');
+    }
+    const deletedAt = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      // Atomic: gagal bila status berubah (mis. baru di-submit) atau sudah dihapus di tengah jalan.
+      const { count } = await tx.campaign.updateMany({
+        where: { id, status: { in: EDITABLE_STATUSES }, deletedAt: null },
+        data: { deletedAt },
+      });
+      if (count === 0) {
+        throw new AppError('CAMPAIGN_INVALID_STATUS', 'Status campaign sudah berubah, muat ulang halaman.');
+      }
+      await this.audit.log(
+        {
+          actorId: user.id,
+          action: 'CAMPAIGN_DELETED',
+          entityType: 'Campaign',
+          entityId: id,
+          metadata: { title: campaign.title, status: campaign.status },
+          ipAddress: ip,
+        },
+        tx,
+      );
+      return { id, deletedAt };
+    });
+  }
+
   /** Cek hak lihat dokumen: campaign publik, atau pemilik/admin. */
   async assertDocumentVisible(documentId: string, user?: CurrentUserPayload) {
     const doc = await this.prisma.campaignDocument.findUnique({ where: { id: documentId } });
@@ -418,6 +452,8 @@ export class CampaignsService {
 
   async getOwned(id: string, user: CurrentUserPayload) {
     const campaign = await this.findOrThrow(id);
+    // Campaign yang sudah dihapus pemiliknya tidak bisa diedit/di-submit lagi.
+    if (campaign.deletedAt) throw new AppError('CAMPAIGN_NOT_FOUND', 'Campaign tidak ditemukan.');
     if (campaign.creatorId !== user.id) {
       throw new AppError('CAMPAIGN_NOT_OWNED', 'Anda bukan pembuat campaign ini.');
     }
