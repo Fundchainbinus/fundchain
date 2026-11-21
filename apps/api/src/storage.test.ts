@@ -452,3 +452,62 @@ describe('driver db — jalur multipart tidak berubah', () => {
     expect(files.get(out.key)).toMatchObject({ storageDriver: 'supabase', data: null });
   });
 });
+
+describe('jalur attach/link yang dipakai web', () => {
+  beforeEach(useSupabaseEnv);
+
+  it('DisbursementsService.create dengan fileId → bukti diverifikasi & tercatat', async () => {
+    stubSupabase();
+    const prisma = fakePrisma({
+      campaign: {
+        findUnique: vi.fn(async () => ({ id: 'camp-1', creatorId: owner.id, status: 'ACTIVE', currentAmount: 1_000_000 })),
+        findUniqueOrThrow: vi.fn(async () => ({ id: 'camp-1', status: 'ACTIVE', currentAmount: 1_000_000 })),
+      },
+      disbursement: {
+        aggregate: vi.fn(async () => ({ _sum: { amount: 0 } })),
+        count: vi.fn(async () => 0),
+        create: vi.fn(async ({ data }: { data: Row }) => ({ id: 'd-1', ...data })),
+      },
+    });
+    prisma.db.$queryRaw = vi.fn(async () => []);
+    const storage = new StorageService(prisma.db);
+    const { fileId } = await storage.createUploadUrl(owner.id, {
+      purpose: 'disbursement-proof',
+      fileName: 'nota.png',
+      contentType: 'image/png',
+      size: 100,
+    });
+    const key = [...prisma.files.keys()][0];
+    stubSupabase({ [key]: { body: PNG, contentType: 'image/png' } });
+    const service = new DisbursementsService(prisma.db, new AuditService(prisma.db), storage);
+    const created = await service.create('camp-1', { amount: 1000, description: 'Pembelian buku tahap 1', fileId }, undefined, owner, null);
+    expect(created).toMatchObject({ proofKey: key, proofType: 'image/png', proofName: 'nota.png' });
+    expect(prisma.files.get(key)!.status).toBe('CONFIRMED');
+  });
+
+  it('proofLink: supabase → signed URL Storage; db → /files/:id bertanda tangan; orang lain 403', async () => {
+    stubSupabase();
+    const prisma = fakePrisma({
+      disbursement: { findUnique: vi.fn(async () => ({ id: 'd-1', requesterId: owner.id, proofKey: 'k/a.pdf' })) },
+    });
+    const base = { id: 'f-1', key: 'k/a.pdf', contentType: 'application/pdf', size: 1, status: 'CONFIRMED' };
+    prisma.files.set('k/a.pdf', { ...base, storageDriver: 'supabase', data: null });
+    const service = new DisbursementsService(prisma.db, new AuditService(prisma.db), new StorageService(prisma.db));
+    await expect(service.proofLink('d-1', stranger)).rejects.toThrowError(code('AUTH_FORBIDDEN'));
+    expect((await service.proofLink('d-1', admin)).url).toBe(`${SUPA}/storage/v1/object/sign/fundchain-files/k/a.pdf?token=dl-token`);
+    prisma.files.set('k/a.pdf', { ...base, storageDriver: 'db', data: new Uint8Array(PDF) });
+    expect((await service.proofLink('d-1', owner)).url).toMatch(/^\/api\/v1\/files\/f-1\?e=\d+&t=[0-9a-f]{64}$/);
+  });
+
+  it('documentDirectUrl: dokumen supabase → signed URL; dokumen db → null (link API lama)', async () => {
+    stubSupabase();
+    const prisma = fakePrisma();
+    const storage = new StorageService(prisma.db);
+    const campaigns = new CampaignsService(prisma.db, new AuditService(prisma.db), storage);
+    vi.spyOn(campaigns, 'assertDocumentVisible').mockResolvedValue({ storageKey: 'k/d.pdf' } as any);
+    prisma.files.set('k/d.pdf', { id: 'f-2', key: 'k/d.pdf', storageDriver: 'supabase', data: null, contentType: 'application/pdf' });
+    expect(await campaigns.documentDirectUrl('doc-1', owner)).toContain('/object/sign/fundchain-files/k/d.pdf');
+    prisma.files.get('k/d.pdf')!.storageDriver = 'db';
+    expect(await campaigns.documentDirectUrl('doc-1', owner)).toBeNull();
+  });
+});
