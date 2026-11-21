@@ -1,0 +1,17 @@
+title = "FundChain gitleaks config"
+
+# Pakai semua rule bawaan gitleaks; file ini hanya menambah pengecualian.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "File contoh env dan kunci dev Hardhat yang memang publik"
+paths = [
+  # apps/api/.env.example, apps/api/.env.bc-local.example, contracts/.env.example
+  '''(^|/)\.env(\.[\w-]+)?\.example$''',
+]
+regexes = [
+  # Private key akun #0 dan #1 bawaan Hardhat (`npx hardhat node`) — publik, hanya untuk chain lokal.
+  '''ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',
+  '''59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d''',
+]

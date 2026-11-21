@@ -92,6 +92,11 @@ export class PaymentsService {
     if (payment.status === 'SETTLED') {
       return { received: true, replayed: true, donationId, status: 'PAID' };
     }
+    // Sudah di-refund admin: final. Webhook SETTLED yang diputar ulang tidak boleh menghidupkan
+    // donasi lagi (hash baru, saldo naik dua kali).
+    if (payment.status === 'REFUNDED') {
+      return { received: true, replayed: true, donationId, status: payment.donation.status };
+    }
     if (event.status === 'PENDING') {
       return { received: true, replayed: false, donationId, status: payment.donation.status };
     }
@@ -127,7 +132,7 @@ export class PaymentsService {
     const replayed = await this.prisma.$transaction(async (tx) => {
       // Guard atomic: hanya satu proses yang berhasil men-settle.
       const { count } = await tx.payment.updateMany({
-        where: { id: payment.id, status: { not: 'SETTLED' } },
+        where: { id: payment.id, status: { notIn: ['SETTLED', 'REFUNDED'] } },
         data: {
           status: 'SETTLED',
           paidAt: new Date(),
