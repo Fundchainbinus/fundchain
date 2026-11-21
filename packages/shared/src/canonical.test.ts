@@ -54,10 +54,10 @@ describe('canonical payload', () => {
 /**
  * BFD-26 — TEST VECTOR BEKU (frozen). Lihat packages/shared/README.md.
  *
- * Nilai di bawah sudah tertanam di hash on-chain (Sepolia) dan di bukti cross-check Remix
- * (docs/blockchain/remix-crosscheck-and-work-allocation.md). JANGAN di-update supaya test
- * hijau: kalau test ini gagal, berarti format canonical berubah dan semua hash lama akan
- * terbaca TAMPERED. Perubahan format wajib lewat versi baru (v2), bukan mengubah v1.
+ * Format v1 sudah tertanam di semua hash on-chain (Sepolia); vector #2/#3 berasal dari
+ * bukti cross-check Remix (docs/blockchain/remix-crosscheck-and-work-allocation.md).
+ * JANGAN di-update supaya test hijau: kalau test ini gagal, berarti format canonical
+ * berubah dan semua hash lama akan terbaca TAMPERED. Perubahan format wajib lewat versi baru (v2), bukan mengubah v1.
  */
 const FROZEN_VECTORS: Array<{
   name: string;
