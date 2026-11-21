@@ -1,0 +1,91 @@
+{
+  "name": "gate1-e2e",
+  "generatedAt": "2026-11-21T17:57:16.328Z",
+  "runUrl": "https://github.com/Fundchainbinus/fundchain/actions/runs/44932667635",
+  "commit": "ecf517fd525176fcf4569fbddc444fb7669e9d0d",
+  "pass": 10,
+  "fail": 0,
+  "notRun": 0,
+  "steps": [
+    {
+      "id": "G1-01",
+      "name": "Login demo mahasiswa (UI)",
+      "expected": "Tombol \"Demo Mahasiswa\" → avatar akun Budi Santoso tampil",
+      "status": "PASS",
+      "actual": "Login demo mahasiswa berhasil sebagai Budi Santoso (budi.santoso@binus.ac.id)",
+      "durationMs": 1114
+    },
+    {
+      "id": "G1-02",
+      "name": "Buat campaign (simpan draft)",
+      "expected": "Draft tersimpan, URL /campaigns/:id/edit",
+      "status": "PASS",
+      "actual": "Draft 3c117965-6afa-4fdb-bcc2-26103c2ba292 tersimpan",
+      "durationMs": 1871
+    },
+    {
+      "id": "G1-03",
+      "name": "Unggah proposal PDF",
+      "expected": "proposal-contoh.pdf tercantum di form",
+      "status": "PASS",
+      "actual": "proposal-contoh.pdf terunggah (STORAGE_DRIVER=db)",
+      "durationMs": 182
+    },
+    {
+      "id": "G1-04",
+      "name": "Ajukan untuk review",
+      "expected": "Status PENDING_REVIEW",
+      "status": "PASS",
+      "actual": "Status PENDING_REVIEW",
+      "durationMs": 211
+    },
+    {
+      "id": "G1-05",
+      "name": "Login demo admin (UI) & setujui",
+      "expected": "Status ACTIVE",
+      "status": "PASS",
+      "actual": "Admin menyetujui → status ACTIVE",
+      "durationMs": 1553
+    },
+    {
+      "id": "G1-06",
+      "name": "Mahasiswa donasi Rp100.000 (checkout QRIS mock)",
+      "expected": "Halaman pembayaran dengan QRIS, status Menunggu pembayaran",
+      "status": "PASS",
+      "actual": "Donasi 69fcba53-4703-4138-a817-e1d41d9f9369 PENDING, QRIS mock tampil",
+      "durationMs": 1171
+    },
+    {
+      "id": "G1-07",
+      "name": "Simulasi bayar berhasil (webhook mock)",
+      "expected": "Donasi PAID (badge \"Lunas\")",
+      "status": "PASS",
+      "actual": "Webhook mock bertanda tangan diterima → donasi PAID",
+      "durationMs": 159
+    },
+    {
+      "id": "G1-08",
+      "name": "Worker menotarisasi di Hardhat",
+      "expected": "blockchain.status CONFIRMED, txHash & blockNumber terisi, chainId 31337",
+      "status": "PASS",
+      "actual": "CONFIRMED tx 0x41c50a6eb29b81357ac2000e0fdc59a5ab13b4b6ba9e308af21bbe247fcf1909 blok 9 (chain 31337)",
+      "durationMs": 1542
+    },
+    {
+      "id": "G1-09",
+      "name": "Halaman bukti: hash on-chain = DB, COCOK",
+      "expected": "Verdict \"COCOK\", hashOnChain = hashDb = currentHash, match=true",
+      "status": "PASS",
+      "actual": "hashDb = hashOnChain = currentHash = 0x41992b44a5331d5858df9d6ec9cbffce2c2881ccbe036686f845e2e052d375c0; match=true; UI \"COCOK\"",
+      "durationMs": 3830
+    },
+    {
+      "id": "G1-10",
+      "name": "Hitung ulang hash di browser",
+      "expected": "\"Cocok dengan hash DB\"",
+      "status": "PASS",
+      "actual": "Keccak-256 payload di browser = hash DB",
+      "durationMs": 129
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "firstDetection": {
+    "id": "50847915-f752-4697-9613-8b74c3e84876",
+    "actorId": null,
+    "action": "INTEGRITY_TAMPERED",
+    "entityType": "Donation",
+    "entityId": "a4a63dd3-8113-4d2d-90a2-df94b17773f0",
+    "metadata": {
+      "source": "DEMO",
+      "previousStatus": "VERIFIED",
+      "firstDetection": true,
+      "campaignId": "de42000e-2c95-4056-9b18-d013edd628b3",
+      "storedHash": "0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef",
+      "currentHash": "0xfd134fb0b6a3dcdc630ea7c9de7a02093fdbaacc01dc7126abd7a753419ba859",
+      "onChainHash": "0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef",
+      "txHash": "0x675afab74f15cc9503ce0c37586a01465f0ac50a2c2967f55401f3ad35fb6587",
+      "currentData": {
+        "amount": 900000,
+        "donatedAt": "2026-11-21T17:57:16.000Z"
+      },
+      "donationLastModifiedAt": "2026-11-21T17:57:18.962Z",
+      "detectedAt": "2026-11-21T17:57:20.211Z"
+    },
+    "ipAddress": null,
+    "userAgent": null,
+    "createdAt": "2026-11-21T17:57:20.215Z",
+    "actor": null
+  },
+  "manualCheck": {
+    "id": "a483b8a2-7eea-49f9-bec1-b3a872ec0982",
+    "actorId": "306bf8ac-9f6c-4ff9-8cf0-c38e52be2b78",
+    "action": "INTEGRITY_TAMPERED",
+    "entityType": "Donation",
+    "entityId": "a4a63dd3-8113-4d2d-90a2-df94b17773f0",
+    "metadata": {
+      "source": "MANUAL",
+      "previousStatus": "TAMPERED",
+      "firstDetection": false,
+      "campaignId": "de42000e-2c95-4056-9b18-d013edd628b3",
+      "storedHash": "0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef",
+      "currentHash": "0xfd134fb0b6a3dcdc630ea7c9de7a02093fdbaacc01dc7126abd7a753419ba859",
+      "onChainHash": "0x54d67a2ca1dfd7751401a536481e9c3ed72169250a75c1a344c9f8c7210148ef",
+      "txHash": "0x675afab74f15cc9503ce0c37586a01465f0ac50a2c2967f55401f3ad35fb6587",
+      "currentData": {
+        "amount": 900000,
+        "donatedAt": "2026-11-21T17:57:16.000Z"
+      },
+      "donationLastModifiedAt": "2026-11-21T17:57:20.213Z",
+      "detectedAt": "2026-11-21T17:57:20.399Z"
+    },
+    "ipAddress": "10.0.2.10",
+    "userAgent": "FundChain-QA-E2E/1.0",
+    "createdAt": "2026-11-21T17:57:20.401Z",
+    "actor": {
+      "id": "306bf8ac-9f6c-4ff9-8cf0-c38e52be2b78",
+      "name": "Admin BINUS",
+      "role": "ADMIN"
+    }
+  },
+  "campaignFrozen": {
+    "id": "a03e0dea-70c3-4696-aece-fe410e35cdac",
+    "actorId": null,
+    "action": "CAMPAIGN_FROZEN",
+    "entityType": "Campaign",
+    "entityId": "de42000e-2c95-4056-9b18-d013edd628b3",
+    "metadata": {
+      "reason": "Integrity check: donasi a4a63dd3-8113-4d2d-90a2-df94b17773f0 TAMPERED (hash DB ≠ hash on-chain)",
+      "previousStatus": "ACTIVE"
+    },
+    "ipAddress": null,
+    "userAgent": null,
+    "createdAt": "2026-11-21T17:57:20.219Z",
+    "actor": null
+  }
+}

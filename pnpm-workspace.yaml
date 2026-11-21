@@ -2,6 +2,8 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'contracts'
+  # Harness QA end-to-end (Playwright). Script-nya bernama `e2e`, jadi tidak ikut `pnpm -r test`.
+  - 'e2e'
 
 allowBuilds:
   '@prisma/client': true

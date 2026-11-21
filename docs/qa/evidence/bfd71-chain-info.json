@@ -1,0 +1,31 @@
+{
+  "info": {
+    "network": "localhost",
+    "chainId": 31337,
+    "contractAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "ready": true,
+    "reason": null,
+    "relayer": {
+      "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "balance": "9999.998529150368070016",
+      "lowBalance": false,
+      "minBalance": "0.02"
+    },
+    "explorerUrl": null
+  },
+  "donation": {
+    "id": "d6adc299-ef66-4969-b751-54599bf85329",
+    "blockchain": {
+      "status": "CONFIRMED",
+      "network": "localhost",
+      "chainId": 31337,
+      "contractAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "txHash": "0x0ef747c7779f09c887ed2aaabb98ec1215dec715c7ed9ae6be0ad0e58f65f85c",
+      "blockNumber": 13,
+      "retryCount": 0,
+      "submittedAt": "2026-11-21T17:58:47.303Z",
+      "confirmedAt": "2026-11-21T17:58:47.372Z",
+      "explorerUrl": null
+    }
+  }
+}

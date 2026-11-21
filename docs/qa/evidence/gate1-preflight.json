@@ -1,0 +1,59 @@
+{
+  "name": "gate1-preflight",
+  "generatedAt": "2026-11-21T17:57:03.820Z",
+  "runUrl": "https://github.com/Fundchainbinus/fundchain/actions/runs/44932667635",
+  "commit": "ecf517fd525176fcf4569fbddc444fb7669e9d0d",
+  "pass": 6,
+  "fail": 0,
+  "notRun": 0,
+  "steps": [
+    {
+      "id": "P1",
+      "name": "Migrasi Prisma terpasang (prisma migrate status)",
+      "expected": "Database schema is up to date",
+      "status": "PASS",
+      "actual": "exit 0, 7 migrasi ditemukan, \"Database schema is up to date\"",
+      "durationMs": 1469
+    },
+    {
+      "id": "P2",
+      "name": "Seed terisi (persona demo + campaign contoh)",
+      "expected": "login demo student/admin OK, >= 6 campaign seed",
+      "status": "PASS",
+      "actual": "persona student=budi.santoso@binus.ac.id, admin=admin@binus.ac.id; 6 campaign seed (status: ACTIVE, DRAFT, FROZEN, PENDING_REVIEW, REJECTED)",
+      "durationMs": 111
+    },
+    {
+      "id": "P3",
+      "name": "Health API & proxy web",
+      "expected": "GET /health = ok langsung dan lewat vite preview",
+      "status": "PASS",
+      "actual": "health ok (API :3000 dan proxy vite preview :5173)",
+      "durationMs": 50
+    },
+    {
+      "id": "P4",
+      "name": "Konfigurasi fallback demo",
+      "expected": "paymentProvider=mock, demoMode=true, chain localhost/31337",
+      "status": "PASS",
+      "actual": "paymentProvider=mock, demoMode=true, devTools=true, chain=localhost/31337, contract=0x5FbDB2315678afecb367f032d93F642f64180aa3, googleClientId kosong=true",
+      "durationMs": 52
+    },
+    {
+      "id": "P5",
+      "name": "DonationRegistry ter-deploy di Hardhat lokal",
+      "expected": "bytecode ada di alamat contracts/deployments/localhost.json",
+      "status": "PASS",
+      "actual": "DonationRegistry 0x5FbDB2315678afecb367f032d93F642f64180aa3 (bytecode 1674 byte) di chain 31337; API memakai alamat yang sama",
+      "durationMs": 53
+    },
+    {
+      "id": "P6",
+      "name": "Relayer memegang RELAYER_ROLE",
+      "expected": "hasRole(RELAYER_ROLE, relayer)=true, relayer != admin",
+      "status": "PASS",
+      "actual": "relayer 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 memegang RELAYER_ROLE; admin 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 tidak; saldo relayer 9999998996725537007339 wei",
+      "durationMs": 79
+    }
+  ]
+}

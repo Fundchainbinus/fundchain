@@ -1,0 +1,43 @@
+{
+  "name": "bfd71-fallback",
+  "generatedAt": "2026-11-21T17:58:49.922Z",
+  "runUrl": "https://github.com/Fundchainbinus/fundchain/actions/runs/44932667635",
+  "commit": "ecf517fd525176fcf4569fbddc444fb7669e9d0d",
+  "pass": 4,
+  "fail": 0,
+  "notRun": 0,
+  "steps": [
+    {
+      "id": "F-01",
+      "name": "Fallback pembayaran: gateway=mock",
+      "expected": "/config paymentProvider=mock; donasi + simulasi settlement → PAID; UI menampilkan \"Mock payment · mode demo\"",
+      "status": "PASS",
+      "actual": "provider=mock; donasi d6adc299-ef66-4969-b751-54599bf85329 PAID (payment SETTLED) lewat simulasi",
+      "durationMs": 1154
+    },
+    {
+      "id": "F-02",
+      "name": "Fallback chain: localhost (Hardhat)",
+      "expected": "/blockchain/info network=localhost chainId=31337 ready=true; donasi CONFIRMED di 31337 tanpa link Etherscan",
+      "status": "PASS",
+      "actual": "network=localhost chainId=31337 ready=true; donasi CONFIRMED tx 0x0ef747c7779f09c887ed2aaabb98ec1215dec715c7ed9ae6be0ad0e58f65f85c (tanpa explorer)",
+      "durationMs": 1591
+    },
+    {
+      "id": "F-03",
+      "name": "Google tidak tersedia → POST /auth/google ditolak rapi",
+      "expected": "401 AUTH_UNAUTHENTICATED \"Login Google belum dikonfigurasi di server.\"",
+      "status": "PASS",
+      "actual": "401 AUTH_UNAUTHENTICATED: Login Google belum dikonfigurasi di server.",
+      "durationMs": 23
+    },
+    {
+      "id": "F-04",
+      "name": "DEMO_MODE login saat Google tidak tersedia (UI)",
+      "expected": "Tombol Google menampilkan error; \"Demo Mahasiswa\" tetap berhasil login",
+      "status": "PASS",
+      "actual": "Login Google menampilkan \"Login Google belum dikonfigurasi.\"; login Demo Mahasiswa berhasil",
+      "durationMs": 1188
+    }
+  ]
+}

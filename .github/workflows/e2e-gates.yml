@@ -1,0 +1,193 @@
+name: E2E QA gates
+
+# Harness QA end-to-end (BFD-5/66 Gate 1, BFD-67/53 Gate 2, BFD-65 refund & milestone,
+# BFD-69 security, BFD-70 Gate 3 dry run, BFD-71 fallback).
+#
+# Semua berjalan di stack sekali pakai di runner: Postgres service container, Hardhat node lokal
+# (kunci dev publik), API (PAYMENT_PROVIDER=mock, DEMO_MODE=true, STORAGE_DRIVER=db) dan web hasil build
+# yang di-serve `vite preview`. Tidak ada `secrets.*`, tidak ada apps/api/.env, tidak ada akses ke
+# database/API production. Lihat docs/qa/*.md untuk hasil per gate.
+
+on:
+  push:
+    branches: [qa/e2e-gates]
+    paths:
+      - '.github/workflows/e2e-gates.yml'
+      - 'e2e/**'
+      - 'apps/**'
+      - 'packages/**'
+      - 'contracts/**'
+      - 'pnpm-lock.yaml'
+      - 'docs/qa/**'
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E gates (Playwright, stack lokal)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e
+          POSTGRES_DB: fundchain_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d fundchain_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # ---- Database: hanya service container di runner ----
+      DATABASE_URL: postgresql://e2e:e2e@localhost:5432/fundchain_e2e
+      DIRECT_URL: postgresql://e2e:e2e@localhost:5432/fundchain_e2e
+      # ---- Nilai sekali pakai khusus CI (bukan secret; stack dibuang setelah job) ----
+      SESSION_SECRET: e2e-ci-only-session-secret
+      MOCK_WEBHOOK_SECRET: e2e-ci-only-mock-webhook-secret
+      CRON_SECRET: e2e-ci-only-cron
+      # ---- Fallback demo (BFD-71): mock payment, Hardhat lokal, DEMO_MODE, tanpa Google ----
+      PAYMENT_PROVIDER: mock
+      ENABLE_DEV_TOOLS: 'true'
+      DEMO_MODE: 'true'
+      GOOGLE_CLIENT_ID: ''
+      STORAGE_DRIVER: db
+      BLOCKCHAIN_NETWORK: localhost
+      BLOCKCHAIN_RPC_URL: http://127.0.0.1:8545
+      CHAIN_ID: '31337'
+      # Akun #1 bawaan `hardhat node` (publik, di-allowlist .gitleaks.toml). Hanya untuk chain lokal.
+      RELAYER_PRIVATE_KEY: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d'
+      WORKER_ENABLED: 'true'
+      WORKER_MODE: interval
+      WORKER_POLL_MS: '2000'
+      # Hash checker otomatis: interval pendek supaya Gate 2 bisa membuktikan deteksi tanpa klik admin.
+      INTEGRITY_CHECK_INTERVAL_MS: '15000'
+      PORT: '3000'
+      WEB_URL: http://localhost:5173
+      # ---- Harness ----
+      E2E_WEB_URL: http://localhost:5173
+      E2E_API_URL: http://127.0.0.1:3000/api/v1
+      LOG_DIR: ${{ github.workspace }}/e2e/logs
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Guard - stack harus lokal & bukan production
+        run: |
+          case "$DATABASE_URL|$DIRECT_URL" in
+            postgresql://e2e:e2e@localhost:5432/fundchain_e2e\|postgresql://e2e:e2e@localhost:5432/fundchain_e2e) echo "OK: DB lokal" ;;
+            *) echo "::error::DATABASE_URL/DIRECT_URL bukan service postgres lokal"; exit 1 ;;
+          esac
+          test ! -e apps/api/.env || { echo "::error::apps/api/.env tidak boleh ada di CI"; exit 1; }
+          test "$PAYMENT_PROVIDER" = mock && test "$CHAIN_ID" = 31337 && test "$BLOCKCHAIN_NETWORK" = localhost
+          case "$BLOCKCHAIN_RPC_URL|$E2E_API_URL|$E2E_WEB_URL" in
+            *vercel.app*|*supabase*) echo "::error::URL remote terdeteksi"; exit 1 ;;
+          esac
+          mkdir -p "$LOG_DIR"
+
+      - name: Pre-flight - migrate & seed
+        run: |
+          pnpm --filter @fundchain/api exec prisma migrate deploy 2>&1 | tee "$LOG_DIR/migrate.log"
+          pnpm --filter @fundchain/api db:seed 2>&1 | tee "$LOG_DIR/seed.log"
+          pnpm --filter @fundchain/api exec prisma migrate status 2>&1 | tee "$LOG_DIR/migrate-status.log"
+
+      - name: Pre-flight - Hardhat node & deploy DonationRegistry
+        run: |
+          pnpm --filter @fundchain/contracts compile
+          nohup pnpm --filter @fundchain/contracts exec hardhat node --hostname 127.0.0.1 > "$LOG_DIR/hardhat.log" 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -X POST -H 'content-type: application/json' \
+              --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' http://127.0.0.1:8545 && break
+            sleep 1
+          done
+          echo
+          pnpm --filter @fundchain/contracts deploy:local 2>&1 | tee "$LOG_DIR/deploy.log"
+          cat contracts/deployments/localhost.json
+
+      - name: Build API & web
+        run: |
+          pnpm --filter @fundchain/api build
+          pnpm --filter @fundchain/web build
+
+      - name: Start API (worker aktif) & web (vite preview)
+        run: |
+          (cd apps/api && NODE_ENV=development nohup node dist/main.js > "$LOG_DIR/api.log" 2>&1 &)
+          (cd apps/web && nohup pnpm exec vite preview --port 5173 --strictPort > "$LOG_DIR/web.log" 2>&1 &)
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:3000/api/v1/health && break; sleep 1; done
+          echo
+          for i in $(seq 1 60); do curl -sf http://localhost:5173/api/v1/health && break; sleep 1; done
+          echo
+          curl -sf http://localhost:5173/api/v1/config | tee "$LOG_DIR/config.json"
+          echo
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @fundchain/e2e exec playwright install --with-deps chromium
+
+      - name: Typecheck harness
+        run: pnpm --filter @fundchain/e2e typecheck
+
+      - name: Run E2E gates
+        run: pnpm --filter @fundchain/e2e e2e
+
+      - name: Unit test API (skenario integritas, src/integrity.test.ts)
+        if: always()
+        run: pnpm --filter @fundchain/api test 2>&1 | tee "$LOG_DIR/api-unit-test.log"
+
+      - name: Secret scan (gitleaks, sama seperti job CI)
+        if: always()
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 \
+            git /repo --config /repo/.gitleaks.toml --redact --verbose --exit-code 1 2>&1 | tee "$LOG_DIR/gitleaks.log"
+          exit "${PIPESTATUS[0]}"
+
+      - name: Upload evidence (screenshot + JSON)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-evidence
+          path: e2e/evidence-out/
+          retention-days: 30
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-playwright-report
+          path: e2e/playwright-report/
+          retention-days: 30
+
+      - name: Upload video & trace (dry run Gate 3 + kegagalan)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-video-trace
+          path: e2e/test-results/
+          retention-days: 30
+
+      - name: Upload log stack
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-stack-logs
+          path: e2e/logs/
+          retention-days: 30

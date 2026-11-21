@@ -171,6 +171,12 @@ pnpm test
 
 Mencakup: canonical hash (deterministik & avalanche), smart contract (9 test), state machine, aturan pencairan, dan signature webhook. Guard skema: `rls.test.ts` (setiap tabel di migrasi wajib RLS, lihat D-003) dan `perf.test.ts` (setiap `@@index` punya `CREATE INDEX` di migrasi, query hot path dibatasi).
 
+### QA
+
+Dokumen QA (test matrix, risk register, integration contract, bug triage, fallback plan, metrics, release
+readiness) ada di [`docs/qa/`](docs/qa/README.md). Bug terbuka dilacak sebagai GitHub Issues berlabel
+[`qa-triage`](https://github.com/Fundchainbinus/fundchain/issues?q=label%3Aqa-triage) dengan severity S1–S4.
+
 ## Deploy (Vercel)
 
 Live: **https://fundchain-web.vercel.app** (web) · **https://fundchain-api.vercel.app/api/v1** (API)

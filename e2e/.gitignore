@@ -1,0 +1,5 @@
+evidence-out/
+test-results/
+playwright-report/
+logs/
+.playwright-cli/

@@ -212,3 +212,57 @@ Interface `PaymentGateway` **tidak** punya method `refund()`. Refund tetap dicat
 - Adapter `mock`/`pakasir` tidak dipaksa mengimplementasikan method yang tidak didukung gateway-nya.
 - **Ditinjau ulang** begitu API refund Sakurupiah diketahui: bila ada, tambahkan `refund?()` opsional di interface dan
   panggil dari `PaymentsService.refund`, lalu ganti D-001/D-007 dengan entri baru.
+
+---
+
+## D-008 — Deploy Sepolia final: `DonationRegistry` di `0x3Aa2…35b2` (BFD-8, BFD-81)
+
+**Status:** diterima (final untuk demo) · **Sumber:** `contracts/deployments/sepolia.json`,
+`docs/blockchain/evidence/SEPOLIA-E2E.md`. Disusun oleh tech lead mewakili QA, 22 Nov 2026.
+
+### Konteks
+
+Gate dan dokumen QA butuh satu alamat kontrak yang tidak berubah lagi sampai demo, supaya bukti notarisasi
+(16 event `DonationNotarized`) dan konfigurasi production tetap konsisten.
+
+### Keputusan
+
+| Item | Nilai |
+| --- | --- |
+| Network | Sepolia, chainId `11155111` |
+| Kontrak | `DonationRegistry` di `0x3Aa2DA59AAe8490188d84345827eb76d4C4835b2` |
+| Blok deploy | `11829714` (`deployedAt` 2026-10-02T14:55:22Z) |
+| Admin (`DEFAULT_ADMIN_ROLE`) | `0xfC2D0Cba3EFBfa62AFd17882Fb0281C725A8c1f3` |
+| Relayer (`RELAYER_ROLE`) | `0x04ae100476632717De6Fb2A622DB8062c9eBBF89` |
+
+1. Alamat ini **final**: `CONTRACT_ADDRESS` production (dicek lewat `GET /api/v1/config` dan `/blockchain/info`,
+   22 Nov 2026) sama dengan nilai di atas. Tidak ada redeploy sebelum demo.
+2. Kunci relayer yang bocor ditangani dengan rotasi role (`docs/blockchain/RELAYER-ROLE-RUNBOOK.md`), **bukan**
+   redeploy, karena redeploy membuat bukti on-chain lama tidak terbaca dari alamat baru.
+
+### Konsekuensi / item terbuka
+
+- **Source belum diverifikasi** di Etherscan/Sourcify per 21 Nov 2026. Verifikasi wajib sebelum demo
+  (`contracts/scripts/verify-contract.ts`, butuh `ETHERSCAN_API_KEY`). Lihat `docs/qa/RISK-REGISTER.md` R-03.
+- Bila redeploy tetap terpaksa, entri ini diganti entri baru, dan donasi lama tetap diverifikasi ke alamat lama.
+
+---
+
+## D-009 — Versi canonical final: v1 (BFD-8, BFD-81)
+
+**Status:** diterima (final) · **Sumber:** `packages/shared/README.md` (spesifikasi canonical payload v1),
+`packages/shared/src/canonical.test.ts`. Disusun oleh tech lead mewakili QA, 22 Nov 2026.
+
+### Keputusan
+
+1. Format canonical yang berlaku untuk rilis/demo adalah **v1**:
+   `v1|<donationId lowercase>|<integritySubjectId>|<amount>|<donatedAt detik Unix>`, di-hash `keccak256(UTF-8)`.
+2. `CANONICAL_VERSION=1` di dokumen planning dan prefix runtime `'v1'` berarti hal yang sama. Nilai runtime tidak
+   diubah karena prefix ikut di-hash.
+3. v1 **beku**: test vector di `canonical.test.ts` tidak boleh diubah agar test hijau. Perubahan format apa pun = v2
+   dengan prefix baru, test vector baru, dan review lintas tim (worker, integrity checker, kontrak).
+
+### Konsekuensi
+
+- Semua 16 notarisasi di Sepolia dan hash di DB memakai v1; integrity checker cukup memakai builder v1.
+- Test `prefix versi runtime tetap "v1"` dan test vector beku menjaga keputusan ini (CI run 44928137356 ✅).

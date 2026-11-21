@@ -1,0 +1,349 @@
+[
+  {
+    "req": "/campaigns?q='%20OR%20'1'%3D'1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?sdg='%20OR%20'1'%3D'1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?status='%20OR%20'1'%3D'1",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?cursor='%20OR%20'1'%3D'1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?limit='%20OR%20'1'%3D'1",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?action='%20OR%20'1'%3D'1&entityId='%20OR%20'1'%3D'1&cursor='%20OR%20'1'%3D'1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?from='%20OR%20'1'%3D'1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/donations?integrityStatus='%20OR%20'1'%3D'1&campaignId='%20OR%20'1'%3D'1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/donations/'%20OR%20'1'%3D'1",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?q='%3B%20DROP%20TABLE%20campaigns%3B--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?sdg='%3B%20DROP%20TABLE%20campaigns%3B--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?status='%3B%20DROP%20TABLE%20campaigns%3B--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?cursor='%3B%20DROP%20TABLE%20campaigns%3B--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?limit='%3B%20DROP%20TABLE%20campaigns%3B--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?action='%3B%20DROP%20TABLE%20campaigns%3B--&entityId='%3B%20DROP%20TABLE%20campaigns%3B--&cursor='%3B%20DROP%20TABLE%20campaigns%3B--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?from='%3B%20DROP%20TABLE%20campaigns%3B--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/donations?integrityStatus='%3B%20DROP%20TABLE%20campaigns%3B--&campaignId='%3B%20DROP%20TABLE%20campaigns%3B--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/donations/'%3B%20DROP%20TABLE%20campaigns%3B--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?q=%22%20OR%201%3D1%20--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?sdg=%22%20OR%201%3D1%20--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?status=%22%20OR%201%3D1%20--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?cursor=%22%20OR%201%3D1%20--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?limit=%22%20OR%201%3D1%20--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?action=%22%20OR%201%3D1%20--&entityId=%22%20OR%201%3D1%20--&cursor=%22%20OR%201%3D1%20--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?from=%22%20OR%201%3D1%20--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/donations?integrityStatus=%22%20OR%201%3D1%20--&campaignId=%22%20OR%201%3D1%20--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/donations/%22%20OR%201%3D1%20--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?q=1'%20UNION%20SELECT%20email%20FROM%20users--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?sdg=1'%20UNION%20SELECT%20email%20FROM%20users--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?status=1'%20UNION%20SELECT%20email%20FROM%20users--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?cursor=1'%20UNION%20SELECT%20email%20FROM%20users--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?limit=1'%20UNION%20SELECT%20email%20FROM%20users--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?action=1'%20UNION%20SELECT%20email%20FROM%20users--&entityId=1'%20UNION%20SELECT%20email%20FROM%20users--&cursor=1'%20UNION%20SELECT%20email%20FROM%20users--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?from=1'%20UNION%20SELECT%20email%20FROM%20users--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/donations?integrityStatus=1'%20UNION%20SELECT%20email%20FROM%20users--&campaignId=1'%20UNION%20SELECT%20email%20FROM%20users--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/donations/1'%20UNION%20SELECT%20email%20FROM%20users--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?q=%2527%2520OR%25201%253D1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?sdg=%2527%2520OR%25201%253D1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?status=%2527%2520OR%25201%253D1",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?cursor=%2527%2520OR%25201%253D1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?limit=%2527%2520OR%25201%253D1",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?action=%2527%2520OR%25201%253D1&entityId=%2527%2520OR%25201%253D1&cursor=%2527%2520OR%25201%253D1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?from=%2527%2520OR%25201%253D1",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/donations?integrityStatus=%2527%2520OR%25201%253D1&campaignId=%2527%2520OR%25201%253D1",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/donations/%2527%2520OR%25201%253D1",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?q=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?sdg=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?status=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?cursor=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/campaigns?limit=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?action=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--&entityId=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--&cursor=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/audit-logs?from=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/admin/donations?integrityStatus=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--&campaignId=%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--",
+    "status": 200,
+    "leak": false,
+    "nonPublic": 0
+  },
+  {
+    "req": "/donations/%5Cx27%3B%20SELECT%20pg_sleep(5)%3B--",
+    "status": 400,
+    "code": "VALIDATION_ERROR",
+    "leak": false,
+    "nonPublic": 0
+  }
+]
