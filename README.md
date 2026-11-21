@@ -128,6 +128,9 @@ FundChain_Complete_Planning_Docs   dokumen perencanaan (PRD, API spec, dll.)
 | Midtrans            | `mock` (default) + adapter `pakasir` (deprecated) → pindah ke Sakurupiah (BFD-107–111) | Keputusan tim; detail di [D-002](docs/DECISIONS.md#d-002--payment-gateway-pakasir--sakurupiah-bfd-107--bfd-111) |
 | Worker app terpisah | Worker di dalam proses API                                                | Satu perintah untuk jalan                           |
 | Refund (BFD-75)     | Manual oleh admin (wajib alasan), hanya donasi PAID di campaign FROZEN; status REFUNDED + audit, hash & catatan on-chain tidak diubah; uang dikembalikan di luar sistem | Bukti on-chain permanen; Pakasir tidak punya API refund. Detail di [D-001](docs/DECISIONS.md#d-001--kebijakan-refund-donasi-bfd-75) |
+| RLS (BFD-23)        | RLS deny-all di semua tabel tanpa policy; akses hanya lewat Prisma (role owner), kontrol akses di service; dijaga `rls.test.ts` | Tidak ada akses Supabase/PostgREST dari browser. Ditinjau ulang kalau itu berubah. Detail di [D-003](docs/DECISIONS.md#d-003--rls-deny-all-tetap-dipakai-bfd-23) |
+| Envelope `{ data, meta }` (BFD-40) | Tetap `{ success, data }` / `{ success: false, error }`; cursor list (`nextCursor`) di dalam `data` | Frontend sudah bergantung pada bentuk ini. Detail di [D-004](docs/DECISIONS.md#d-004--envelope-response-tetap--success-data--bfd-40) |
+| Backup (BFD-25)     | GitHub Actions harian 02:00 WIB: `pg_dump` terenkripsi GPG (artifact 14 hari) + uji restore otomatis | Tanpa infrastruktur tambahan. Detail di [docs/BACKUP.md](docs/BACKUP.md) |
 
 Log keputusan lengkap: [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
