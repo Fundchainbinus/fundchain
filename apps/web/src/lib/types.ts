@@ -29,9 +29,11 @@ export interface CampaignSummary {
   createdAt: string;
   creator: { id: string; name: string };
   donorCount: number;
+  /** Jumlah donasi PAID per status integritas (BFD-56: ikut di list agar beranda tidak fetch detail per kartu). */
+  integritySummary: Partial<Record<IntegrityStatus, number>>;
 }
 
-export interface CampaignDetail extends Omit<CampaignSummary, 'donorCount'> {
+export interface CampaignDetail extends Omit<CampaignSummary, 'donorCount' | 'integritySummary'> {
   creatorId: string;
   donorCount: number;
   documents: { id: string; originalName: string; size: number; createdAt: string }[];
@@ -114,15 +116,31 @@ export interface PointsEntry {
   earnedAt: string;
 }
 
-/**
- * Kontrak usulan GET /me/points (BFD-98 belum ada di BE).
- * `source: 'mock'` berarti dihitung di FE dari /me/donations.
- */
+/** Respons GET /me/points (BFD-98). Poin hanya dari donasi berstatus PAID. */
 export interface PointsSummary {
   total: number;
   entries: PointsEntry[];
   rule: string;
-  source: 'api' | 'mock';
+}
+
+/** Respons GET /campaigns/:id/milestones (buildMilestones di BE). REJECTED tidak termasuk. */
+export interface MilestoneStep {
+  step: number;
+  id: string;
+  description: string;
+  amount: number;
+  status: Exclude<DisbursementStatus, 'REJECTED'>;
+  requestedAt: string;
+  approvedAt: string | null;
+  paidAt: string | null;
+}
+
+export interface Milestones {
+  steps: MilestoneStep[];
+  completed: number;
+  total: number;
+  current: MilestoneStep | null;
+  canRequestNext: boolean;
 }
 
 export interface Disbursement {

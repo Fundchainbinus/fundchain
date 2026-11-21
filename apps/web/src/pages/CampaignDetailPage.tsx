@@ -347,7 +347,7 @@ export function CampaignDetailPage() {
                     </div>
                   ))}
                 </dl>
-                <MilestoneProgress target={c.targetAmount} funds={c.funds} disbursements={disbursements.data ?? []} />
+                <MilestoneProgress campaignId={c.id} target={c.targetAmount} funds={c.funds} />
                 {disbursements.data && disbursements.data.length > 0 ? (
                   <div className="overflow-x-auto rounded-md border border-slate-200">
                     <table className="tbl">

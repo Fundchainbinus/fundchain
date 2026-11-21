@@ -1,22 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Award, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
-import { EmptyState, ErrorBox, InfoNote, PageHeader, Panel, Spinner } from "../components/ui";
+import { EmptyState, ErrorBox, PageHeader, Panel, Spinner } from "../components/ui";
 import { date, rupiah } from "../lib/format";
 import { fetchMyPoints } from "../lib/points";
 import type { PointsSummary } from "../lib/types";
 
 const link = "text-ink hover:text-navy hover:underline";
 const num = (n: number) => n.toLocaleString("id-ID");
-
-function MockNotice() {
-  return (
-    <InfoNote tone="amber">
-      Poin ini masih dihitung sementara di aplikasi dari riwayat donasi Anda. Angka resmi akan mengikuti endpoint backend (BFD-98) setelah
-      siap, jadi jumlahnya bisa berubah.
-    </InfoNote>
-  );
-}
 
 function PointsSummaryCard({ data }: { data: PointsSummary }) {
   return (
@@ -85,22 +76,17 @@ export function PointsPage() {
         <Spinner />
       ) : q.error ? (
         <ErrorBox error={q.error} />
-      ) : !data ? null : (
+      ) : !data ? null : data.entries.length === 0 ? (
+        <EmptyState title="Belum ada poin comserve">
+          <p>Poin muncul setelah donasi Anda berstatus lunas. {data.rule}.</p>
+          <Link to="/" className="btn-primary btn-sm mt-4">Jelajahi kampanye</Link>
+        </EmptyState>
+      ) : (
         <>
-          {data.source === "mock" && <MockNotice />}
-          {data.entries.length === 0 ? (
-            <EmptyState title="Belum ada poin comserve">
-              <p>Poin muncul setelah donasi Anda berstatus lunas. {data.rule}.</p>
-              <Link to="/" className="btn-primary btn-sm mt-4">Jelajahi kampanye</Link>
-            </EmptyState>
-          ) : (
-            <>
-              <PointsSummaryCard data={data} />
-              <Panel title="Riwayat Poin">
-                <PointsHistory data={data} />
-              </Panel>
-            </>
-          )}
+          <PointsSummaryCard data={data} />
+          <Panel title="Riwayat Poin">
+            <PointsHistory data={data} />
+          </Panel>
         </>
       )}
     </div>
