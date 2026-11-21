@@ -20,10 +20,15 @@ import { IntegrityController } from './modules/integrity/integrity.controller';
 import { IntegrityService } from './modules/integrity/integrity.service';
 import { MockPaymentAdapter } from './modules/payments/adapters/mock.adapter';
 import { PakasirAdapter } from './modules/payments/adapters/pakasir.adapter';
-import { PAYMENT_GATEWAY } from './modules/payments/adapters/payment-gateway';
+import { PAYMENT_GATEWAY, type PaymentGateway } from './modules/payments/adapters/payment-gateway';
 import { PaymentsService } from './modules/payments/payments.service';
 import { StorageService } from './modules/storage/storage.service';
 import { UsersController } from './modules/users/users.controller';
+
+/** Pilih adapter pembayaran dari env PAYMENT_PROVIDER (selain 'pakasir' jatuh ke mock). */
+export function selectPaymentGateway(provider: string = env().paymentProvider): PaymentGateway {
+  return provider === 'pakasir' ? new PakasirAdapter() : new MockPaymentAdapter();
+}
 
 @Module({
   imports: [
@@ -51,7 +56,7 @@ import { UsersController } from './modules/users/users.controller';
     NotarizationWorker,
     {
       provide: PAYMENT_GATEWAY,
-      useFactory: () => (env().paymentProvider === 'pakasir' ? new PakasirAdapter() : new MockPaymentAdapter()),
+      useFactory: () => selectPaymentGateway(),
     },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: ActingUserGuard },
