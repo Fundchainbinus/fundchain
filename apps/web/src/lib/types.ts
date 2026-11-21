@@ -203,3 +203,36 @@ export interface ActivityItem {
   metadata: Record<string, unknown>;
   createdAt: string;
 }
+
+/**
+ * Respons GET /donations/:id/proof (IntegrityService.proof, BFD-59).
+ * Read-only: hash on-chain dibaca langsung dari RPC tiap panggilan (rate limit 30/menit).
+ */
+export interface DonationProof {
+  donationId: string;
+  campaignId: string;
+  integrityStatus: IntegrityStatus;
+  lastCheckedAt: string | null;
+  /** Hash yang disimpan DB saat settlement (yang dikirim ke chain). */
+  hashDb: string | null;
+  /** Hash dihitung ulang dari data DB saat ini; null bila donasi belum PAID. */
+  currentHash: string | null;
+  /** Hash yang benar-benar tersimpan di DonationRegistry; null bila belum CONFIRMED, tidak ada, atau RPC gagal. */
+  hashOnChain: string | null;
+  /** currentHash === hashOnChain; null bila salah satunya tidak tersedia. */
+  match: boolean | null;
+  txHash: string | null;
+  blockNumber: number | null;
+  /** Waktu notarisasi terkonfirmasi di blockchain. */
+  timestamp: string | null;
+  donatedAt: string | null;
+  notarizationStatus: BlockchainStatus | null;
+  network: string;
+  chainId: number;
+  contractAddress: string | null;
+  etherscanUrl: string | null;
+  /** Pesan error RPC saat membaca hash on-chain. */
+  onChainError: string | null;
+  /** Waktu server melakukan pengecekan ini. */
+  checkedAt: string;
+}
