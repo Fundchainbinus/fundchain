@@ -20,6 +20,8 @@ const PENDING_RECHECK_MS = 15_000;
 const INTEGRITY_SWEEP_MS = 60_000;
 /** Jeda antar pengecekan notarisasi macet (alert dikirim sekali per donasi). */
 const STUCK_CHECK_MS = 60_000;
+/** Batas baris per scan recoverStuck() per tick: tiap baris = panggilan RPC, jadi harus dibatasi di serverless. */
+export const RECOVER_BATCH = 20;
 
 /**
  * Worker notarisasi (in-process).
@@ -123,7 +125,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
   }
 
   private async process(job: BlockchainTransaction) {
-    const donation = await this.prisma.donation.findUnique({ where: { id: job.donationId } });
+    const donation = await this.prisma.donation.findUnique({ where: { id: job.donationId }, select: { status: true, hash: true } });
     if (!donation || donation.status !== 'PAID' || !donation.hash) {
       await this.fail(job, 'Donasi bukan PAID atau hash kosong (BR-BC-001)');
       return;
@@ -280,6 +282,8 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     // Tx yang sudah punya receipt cukup dikonfirmasi; tanpa receipt ditunggu sampai STUCK_SUBMITTED_MS.
     const pending = await this.prisma.blockchainTransaction.findMany({
       where: { status: 'SUBMITTED', txHash: { not: null }, submittedAt: { lt: new Date(Date.now() - 5_000) }, chainId: this.blockchain.target().chainId },
+      orderBy: { submittedAt: 'asc' },
+      take: RECOVER_BATCH,
     });
     for (const job of pending) {
       const receipt = await this.blockchain.getProvider().getTransactionReceipt(job.txHash!).catch(() => null);
@@ -293,6 +297,8 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
 
     const stuck = await this.prisma.blockchainTransaction.findMany({
       where: { status: 'SUBMITTED', submittedAt: { lt: new Date(Date.now() - STUCK_SUBMITTED_MS) }, chainId: this.blockchain.target().chainId },
+      orderBy: { submittedAt: 'asc' },
+      take: RECOVER_BATCH,
     });
     for (const job of stuck) {
       const notarized = await this.blockchain.contract().isNotarized(job.onchainKey).catch(() => null);
@@ -377,7 +383,8 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     if (!jobs.length) return;
 
     const alerted = await this.prisma.auditLog.findMany({
-      where: { action: 'BLOCKCHAIN_TX_STUCK', entityId: { in: jobs.map((j) => j.donationId) } },
+      // entityType ikut di filter supaya memakai index audit_logs(entity_type, entity_id).
+      where: { action: 'BLOCKCHAIN_TX_STUCK', entityType: 'Donation', entityId: { in: jobs.map((j) => j.donationId) } },
       select: { entityId: true },
     });
     const done = new Set(alerted.map((a) => a.entityId));

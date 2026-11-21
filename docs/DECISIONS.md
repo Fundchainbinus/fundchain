@@ -69,3 +69,69 @@ Integrasi awal memakai adapter `pakasir` (QRIS) di samping adapter `mock`.
 - Kapan adapter `pakasir` dihapus dari kode.
 - Apakah Sakurupiah punya API refund, dan apakah D-001 (refund manual di luar sistem) perlu ditinjau ulang.
   Sampai ada keputusan baru, D-001 tetap berlaku.
+
+---
+
+## D-003 — RLS deny-all tetap dipakai (BFD-23)
+
+**Status:** diterima (tech lead) · **Kode:** `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` di setiap migrasi
+(`apps/api/prisma/migrations/`), guard `apps/api/src/rls.test.ts`.
+
+### Konteks
+
+Supabase otomatis mengekspos semua tabel di schema `public` lewat Data API (PostgREST) ke role `anon` dan
+`authenticated`. Pertanyaannya: perlukah policy RLS per tabel (mis. donatur hanya melihat donasinya sendiri)?
+
+### Keputusan
+
+1. **RLS aktif tanpa policy (deny-all) di semua tabel**, termasuk `_prisma_migrations`. Role `anon`/`authenticated`
+   tidak bisa membaca atau menulis apa pun lewat Data API.
+2. **Aplikasi hanya mengakses DB lewat Prisma** di backend, dengan role owner yang mem-bypass RLS. Frontend tidak
+   memakai Supabase client, anon key, maupun PostgREST.
+3. **Kontrol akses ada di service NestJS** (`@Roles`, cek kepemilikan di service). Aturannya tidak diduplikasi
+   menjadi policy SQL.
+4. **Dijaga test.** `rls.test.ts` membaca semua file migrasi. Test gagal kalau ada tabel yang di-`CREATE TABLE`
+   tanpa `ENABLE ROW LEVEL SECURITY`, kalau RLS di-`DISABLE`, atau kalau ada `CREATE POLICY` untuk
+   `anon`/`authenticated`/`public` (policy tanpa klausa `TO` dihitung `public`).
+
+### Konsekuensi
+
+- Setiap migrasi yang menambah tabel **wajib** menambahkan `ALTER TABLE "<tabel>" ENABLE ROW LEVEL SECURITY;`.
+  Prisma tidak menulisnya otomatis.
+- Role database lain selain owner (mis. role read-only untuk backup, lihat `docs/BACKUP.md`) ikut terkena deny-all
+  dan butuh `BYPASSRLS` atau policy khusus untuk role itu.
+- Satu lapis pertahanan saja: kalau connection string owner bocor, RLS tidak melindungi apa pun.
+
+### Kapan ditinjau ulang
+
+- Begitu ada fitur yang memakai Supabase client, PostgREST, Realtime, atau Storage langsung dari browser. Saat itu
+  policy per tabel wajib ditulis dan diuji sebelum anon key dipakai.
+- Kalau backend pindah dari role owner ke role terbatas (mis. role per service).
+
+---
+
+## D-004 — Envelope response tetap `{ success, data }` (BFD-40)
+
+**Status:** diterima (tech lead) · **Menggantikan:** usulan envelope `{ data, meta }` di tiket BFD-40.
+**Kode:** `apps/api/src/common/http.ts` (interceptor sukses + exception filter).
+
+### Konteks
+
+BFD-40 mengusulkan mengganti envelope response menjadi `{ data, meta }`, dengan metadata pagination di `meta`.
+Implementasi saat ini, dan dokumen `08-API-SPEC.md` / `API SPEC DETAIL.md`, memakai `{ success: true, data }`
+untuk sukses dan `{ success: false, error: { code, message, details? } }` untuk error. Frontend (`apps/web`) sudah
+bergantung pada bentuk ini, termasuk `nextCursor` untuk infinite query.
+
+### Keputusan
+
+1. **Envelope tidak diubah.** Sukses → `{ success: true, data }`; error → `{ success: false, error: { code, message, details? } }`.
+2. **Endpoint list tetap menaruh cursor di dalam `data`**, mis. `{ success: true, data: { logs: [...], nextCursor } }`.
+   Tidak ada field `meta` di level atas.
+3. Usulan `{ data, meta }` di BFD-40 **tidak dipakai**. Tidak ada perubahan kode.
+
+### Konsekuensi
+
+- Tidak ada breaking change untuk frontend maupun koleksi Postman/OpenAPI.
+- Endpoint list baru mengikuti pola yang sama (`nextCursor` atau `hasMore` di dalam `data`).
+- Kalau kelak ada konsumen API eksternal yang butuh `meta` standar, buat versi API baru (`/api/v2`). Jangan ubah
+  envelope v1.
