@@ -19,6 +19,13 @@ export interface VerifyResult {
   checkedAt: Date;
 }
 
+/**
+ * Batas donasi per panggilan verify-all / verify per campaign. Tiap donasi = 1 panggilan RPC + 1 transaksi DB,
+ * jadi tanpa batas request admin bisa melewati batas waktu fungsi serverless. Panggil ulang untuk sisanya
+ * (urutan lastCheckedAt naik, jadi tiap panggilan maju ke donasi yang paling lama tidak dicek).
+ */
+export const VERIFY_MANY_MAX = 100;
+
 /** Asal pemicu pengecekan — dicatat di audit log sebagai bagian dari tamper tracing. */
 export type CheckSource = 'MANUAL' | 'SCHEDULED' | 'NOTARIZATION' | 'DEMO';
 
@@ -48,7 +55,8 @@ export class IntegrityService {
     const source = trace.source ?? 'MANUAL';
     const donation = await this.prisma.donation.findUnique({
       where: { id: donationId },
-      include: { donor: true, blockchain: true },
+      // Hanya pseudonim yang dibutuhkan untuk hash; jangan ikut memuat email/nama donatur.
+      include: { donor: { select: { integritySubjectId: true } }, blockchain: true },
     });
     if (!donation) throw new AppError('DONATION_NOT_FOUND', 'Donasi tidak ditemukan.');
     if (donation.status !== 'PAID' || !donation.donatedAt || !donation.blockchain) {
@@ -138,13 +146,19 @@ export class IntegrityService {
     };
   }
 
-  /** Verifikasi semua donasi PAID yang sudah ternotarisasi (per campaign atau seluruh sistem). */
+  /**
+   * Verifikasi donasi PAID yang sudah ternotarisasi (per campaign atau seluruh sistem), maksimal
+   * VERIFY_MANY_MAX per panggilan. `hasMore: true` → masih ada donasi yang belum dicek di panggilan ini.
+   */
   async verifyMany(actorId: string | null, campaignId?: string, trace: CheckTrace = {}) {
-    const donations = await this.prisma.donation.findMany({
+    const rows = await this.prisma.donation.findMany({
       where: { campaignId, status: 'PAID', blockchain: { status: 'CONFIRMED' } },
       select: { id: true },
-      orderBy: { donatedAt: 'asc' },
+      orderBy: [{ lastCheckedAt: { sort: 'asc', nulls: 'first' } }, { id: 'asc' }],
+      take: VERIFY_MANY_MAX + 1,
     });
+    const hasMore = rows.length > VERIFY_MANY_MAX;
+    const donations = rows.slice(0, VERIFY_MANY_MAX);
     const results: VerifyResult[] = [];
     const errors: { donationId: string; code: string; message: string }[] = [];
     for (const { id } of donations) {
@@ -153,6 +167,8 @@ export class IntegrityService {
       } catch (e) {
         if (e instanceof AppError && e.code === 'BLOCKCHAIN_RPC_ERROR') throw e;
         errors.push({ donationId: id, code: (e as AppError).code ?? 'INTERNAL_ERROR', message: (e as Error).message });
+        // Geser ke belakang urutan supaya donasi bermasalah tidak memenuhi batas di panggilan berikutnya.
+        await this.prisma.donation.update({ where: { id }, data: { lastCheckedAt: new Date() } }).catch(() => undefined);
       }
     }
     const skipped = await this.prisma.donation.count({
@@ -164,6 +180,7 @@ export class IntegrityService {
       tampered: results.filter((r) => r.status === 'TAMPERED').length,
       skippedNotNotarized: skipped,
       frozenCampaigns: [...new Set(results.filter((r) => r.campaignFrozen).map((r) => r.campaignId))],
+      hasMore,
       results,
       errors,
     };

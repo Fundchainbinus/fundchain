@@ -119,6 +119,9 @@ model Donation {
 
   @@index([campaignId, status])
   @@index([donorId])
+  @@index([donorId, createdAt])
+  @@index([status, createdAt])
+  @@index([status, lastCheckedAt])
   @@map("donations")
 }
 
@@ -139,6 +142,7 @@ model Payment {
 
   donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
 
+  @@index([status, expiresAt])
   @@map("payments")
 }
 
@@ -189,6 +193,7 @@ model Disbursement {
   admin     User?    @relation("DisbursementAdmin", fields: [adminId], references: [id])
 
   @@index([campaignId, status])
+  @@index([status, requestedAt])
   @@map("disbursements")
 }
 
@@ -208,6 +213,7 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([actorId, createdAt])
   @@map("audit_logs")
 }
 

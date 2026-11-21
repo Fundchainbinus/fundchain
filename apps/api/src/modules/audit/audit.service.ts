@@ -1,5 +1,25 @@
 import { Injectable } from '@nestjs/common';
+import { AppError } from '../../common/app-error';
 import { Db, PrismaService } from '../../common/prisma.service';
+
+export const AUDIT_LIST_DEFAULT = 50;
+export const AUDIT_LIST_MAX = 200;
+
+/** `limit` dari query string: bukan angka (mis. `?limit=abc` → NaN) jatuh ke default, lalu dibatasi 1..MAX. */
+export function clampAuditLimit(limit: number | undefined): number {
+  const n = Number.isFinite(limit) ? Math.trunc(limit as number) : AUDIT_LIST_DEFAULT;
+  return Math.min(Math.max(n, 1), AUDIT_LIST_MAX);
+}
+
+/** Tanggal filter dari query string. Tanggal tidak valid → 400, bukan Invalid Date yang membuat Prisma error (500). */
+function parseDate(value: string | undefined, field: 'from' | 'to'): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    throw new AppError('VALIDATION_ERROR', `Parameter ${field} bukan tanggal yang valid.`, { field });
+  }
+  return d;
+}
 
 export interface AuditEntry {
   actorId?: string | null;
@@ -40,7 +60,9 @@ export class AuditService {
     limit?: number;
     cursor?: string;
   }) {
-    const limit = Math.min(Math.max(filter.limit ?? 50, 1), 200);
+    const limit = clampAuditLimit(filter.limit);
+    const from = parseDate(filter.from, 'from');
+    const to = parseDate(filter.to, 'to');
     const logs = await this.prisma.auditLog.findMany({
       where: {
         actorId: filter.actorId || undefined,
@@ -48,8 +70,8 @@ export class AuditService {
         entityId: filter.entityId || undefined,
         action: filter.action ? { contains: filter.action, mode: 'insensitive' } : undefined,
         createdAt: {
-          gte: filter.from ? new Date(filter.from) : undefined,
-          lte: filter.to ? new Date(filter.to) : undefined,
+          gte: from,
+          lte: to,
         },
       },
       include: { actor: { select: { id: true, name: true, role: true } } },
