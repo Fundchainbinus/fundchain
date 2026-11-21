@@ -7,6 +7,7 @@ import { requestGoogleAccessToken } from '../lib/google';
 import { useConfig, useMe } from '../lib/hooks';
 import { AppSidebar } from './AppSidebar';
 import { RoleCard } from './RoleCard';
+import { Spinner } from './ui';
 import { useSession } from '../lib/session';
 
 function GoogleAuthButton() {
@@ -165,15 +166,29 @@ export function Avatar({ name }: { name: string }) {
   );
 }
 
-/** Toggle bahasa seperti di Figma. Aplikasi baru tersedia dalam Bahasa Indonesia. */
+/**
+ * Toggle bahasa seperti di Figma. Aplikasi baru tersedia dalam Bahasa Indonesia, jadi EN tampil
+ * sebagai tombol nonaktif ("Segera hadir"): tidak bisa difokus/diklik, tapi tetap terbaca jujur.
+ */
 function LanguageToggle() {
   return (
     <div className="hidden overflow-hidden rounded-full border border-line text-xs sm:flex" role="group" aria-label="Bahasa">
-      <span className="bg-accent px-3 py-1.5 text-white">ID</span>
-      <button type="button" disabled title="Bahasa Inggris belum tersedia" className="px-3 py-1.5 text-ink disabled:cursor-not-allowed">
+      <span className="bg-accent px-3 py-1.5 text-white" aria-current="true">
+        ID
+      </span>
+      <button type="button" disabled title="Segera hadir" aria-label="EN (segera hadir)" className="px-3 py-1.5 text-ink disabled:cursor-not-allowed">
         EN
       </button>
     </div>
+  );
+}
+
+/** Lonceng notifikasi hanya dekorasi Figma (belum ada fitur notifikasi): bukan tombol, tersembunyi dari pembaca layar. */
+function DecorativeBell() {
+  return (
+    <span className="hidden cursor-default sm:block" title="Segera hadir" aria-hidden>
+      <Bell size={20} className="text-slate-400" />
+    </span>
   );
 }
 
@@ -219,15 +234,16 @@ function StudentBanner() {
           </div>
         </div>
       </div>
-      <div className="no-scrollbar flex gap-6 overflow-x-auto px-4 pb-6 pt-[78px] sm:justify-between sm:gap-2" aria-label="Aplikasi BINUSMaya">
+      {/* Hanya FundChain yang berfungsi; ubin lain murni branding BINUSMaya (aria-hidden, tidak bisa difokus). */}
+      <div className="no-scrollbar flex gap-6 overflow-x-auto px-4 pb-6 pt-[78px] sm:justify-between sm:gap-2">
         {APPS.map(([key, label]) =>
           key === 'fundchain' ? (
-            <Link key={key} to="/" className="flex w-[84px] shrink-0 flex-col items-center gap-1.5 text-center" aria-current="page">
+            <Link key={key} to="/" className="flex w-[84px] shrink-0 flex-col items-center gap-1.5 text-center" aria-label="FundChain (aplikasi aktif)">
               <img src="/figma/app-fundchain-active.png" alt="" className="h-12 w-12" />
               <span className="text-[11px] font-bold text-navy-deep">{label}</span>
             </Link>
           ) : (
-            <span key={key} className="flex w-[84px] shrink-0 flex-col items-center gap-1.5 text-center" aria-hidden>
+            <span key={key} className="flex w-[84px] shrink-0 cursor-default select-none flex-col items-center gap-1.5 text-center" title="Segera hadir" aria-hidden>
               <img src={`/figma/app-${key}.png`} alt="" className="h-12 w-12" />
               <span className="text-[11px] text-ink">{label}</span>
             </span>
@@ -278,7 +294,7 @@ export function Layout() {
           </Link>
           <div className="ml-auto flex items-center gap-4">
             <LanguageToggle />
-            <Bell size={20} className="hidden text-slate-400 sm:block" aria-hidden />
+            <DecorativeBell />
             <GoogleAuthButton />
           </div>
         </div>
@@ -334,7 +350,13 @@ export function Layout() {
 /** Pembatas halaman yang butuh identitas. */
 export function RequireUser({ admin, children }: { admin?: boolean; children: React.ReactNode }) {
   const { me, isLoading, isAdmin } = useMe();
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[40vh] flex-1 items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
   if (!me || (admin && !isAdmin)) {
     return (
       <div className="card mx-auto my-8 max-w-lg p-8 text-center">

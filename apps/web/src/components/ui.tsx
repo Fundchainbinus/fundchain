@@ -141,10 +141,12 @@ export function ExplorerLink({ url, txHash }: { url: string | null; txHash: stri
   );
 }
 
-export function Spinner({ label = 'Memuat…' }: { label?: string }) {
+/** Indikator memuat; diumumkan pembaca layar lewat role="status". `hideLabel` menyembunyikan teks secara visual saja. */
+export function Spinner({ label = 'Memuat…', hideLabel }: { label?: string; hideLabel?: boolean }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500">
-      <Loader2 className="animate-spin" size={18} /> {label}
+    <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500" role="status" aria-live="polite">
+      <Loader2 className="animate-spin" size={18} aria-hidden />
+      <span className={hideLabel ? 'sr-only' : undefined}>{label}</span>
     </div>
   );
 }
