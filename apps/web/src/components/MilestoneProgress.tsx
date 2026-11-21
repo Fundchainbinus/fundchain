@@ -1,7 +1,9 @@
-import { CheckCircle2, CircleDashed, Clock, XCircle } from 'lucide-react';
-import type { CampaignDetail, Disbursement } from '../lib/types';
+import { useQuery } from '@tanstack/react-query';
+import { CheckCircle2, CircleDashed, Clock } from 'lucide-react';
+import { get } from '../lib/api';
+import type { CampaignDetail, Milestones } from '../lib/types';
 import { date, percent, rupiah } from '../lib/format';
-import { DisbursementBadge } from './ui';
+import { DisbursementBadge, ErrorBox } from './ui';
 
 type Funds = CampaignDetail['funds'];
 
@@ -16,19 +18,22 @@ const STEP = {
   PAID: { label: 'Selesai', icon: CheckCircle2, cls: 'text-emerald-600' },
   APPROVED: { label: 'Berjalan', icon: Clock, cls: 'text-navy' },
   REQUESTED: { label: 'Berjalan', icon: CircleDashed, cls: 'text-amber-600' },
-  REJECTED: { label: 'Ditolak', icon: XCircle, cls: 'text-red-600' },
 } as const;
 
-export function MilestoneProgress({ target, funds, disbursements }: { target: number; funds: Funds; disbursements: Disbursement[] }) {
+/** Bar dana + tahapan milestone. Tahapan dari GET /campaigns/:id/milestones (publik, BFD-97/BFD-103). */
+export function MilestoneProgress({ campaignId, target, funds }: { campaignId: string; target: number; funds: Funds }) {
+  const milestones = useQuery({
+    queryKey: ['campaign-milestones', campaignId],
+    queryFn: () => get<Milestones>(`/campaigns/${campaignId}/milestones`),
+  });
   const raised = funds.raised;
   const pct = percent(raised, target);
   const realPct = target > 0 ? Math.round((raised / target) * 100) : 0;
   // Penyebut = total semua segmen, agar bar tidak meluap meski komitmen > terkumpul (mis. setelah refund).
   const total = Math.max(raised, funds.disbursed + funds.approved + funds.requested + funds.available);
   const usedPct = total > 0 ? Math.round((funds.disbursed / total) * 100) : 0;
-  const steps = disbursements
-    .filter((d) => d.status !== 'REJECTED')
-    .sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
+  const m = milestones.data;
+  const steps = m?.steps ?? [];
 
   return (
     <div className="min-w-0 space-y-5 rounded-md border border-line p-4">
@@ -86,22 +91,37 @@ export function MilestoneProgress({ target, funds, disbursements }: { target: nu
       </div>
 
       <div>
-        <p className="text-sm font-semibold text-ink">Tahapan milestone</p>
-        {steps.length === 0 ? (
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <p className="text-sm font-semibold text-ink">Tahapan milestone</p>
+          {m && m.total > 0 && (
+            <p className="text-xs text-slate-500">
+              {m.completed} dari {m.total} selesai
+              {m.current ? ` · tahap ${m.current.step} berjalan` : ''}
+            </p>
+          )}
+        </div>
+        {milestones.isLoading ? (
+          <p className="mt-2 text-sm text-slate-500">Memuat milestone…</p>
+        ) : milestones.error ? (
+          <div className="mt-2"><ErrorBox error={milestones.error} /></div>
+        ) : steps.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">Belum ada milestone pencairan.</p>
         ) : (
           <ol className="mt-3">
-            {steps.map((d, i) => {
+            {steps.map((d) => {
               const st = STEP[d.status];
               const Icon = st.icon;
-              const last = i === steps.length - 1;
+              const last = d.step === steps.length;
               return (
                 <li key={d.id} className="relative flex gap-3 pb-4 last:pb-0">
                   {!last && <span className="absolute left-[9px] top-6 bottom-0 w-px bg-line" aria-hidden="true" />}
                   <Icon size={20} className={`relative shrink-0 bg-white ${st.cls}`} aria-hidden="true" />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                      <p className="text-sm text-ink [overflow-wrap:anywhere]">{d.description}</p>
+                      <p className="text-sm text-ink [overflow-wrap:anywhere]">
+                        <span className="text-slate-500">Tahap {d.step} · </span>
+                        {d.description}
+                      </p>
                       <p className="whitespace-nowrap text-sm font-semibold text-ink">{rupiah(d.amount)}</p>
                     </div>
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">

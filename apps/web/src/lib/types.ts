@@ -29,9 +29,13 @@ export interface CampaignSummary {
   createdAt: string;
   creator: { id: string; name: string };
   donorCount: number;
+  /** Jumlah donasi PAID per status integritas (BFD-56: ikut di list agar beranda tidak fetch detail per kartu). */
+  integritySummary: Partial<Record<IntegrityStatus, number>>;
+  /** Hanya di list admin: proposal terbaru (null = belum ada). */
+  proposal?: { id: string; originalName: string; size: number } | null;
 }
 
-export interface CampaignDetail extends Omit<CampaignSummary, 'donorCount'> {
+export interface CampaignDetail extends Omit<CampaignSummary, 'donorCount' | 'integritySummary'> {
   creatorId: string;
   donorCount: number;
   documents: { id: string; originalName: string; size: number; createdAt: string }[];
@@ -114,15 +118,31 @@ export interface PointsEntry {
   earnedAt: string;
 }
 
-/**
- * Kontrak usulan GET /me/points (BFD-98 belum ada di BE).
- * `source: 'mock'` berarti dihitung di FE dari /me/donations.
- */
+/** Respons GET /me/points (BFD-98). Poin hanya dari donasi berstatus PAID. */
 export interface PointsSummary {
   total: number;
   entries: PointsEntry[];
   rule: string;
-  source: 'api' | 'mock';
+}
+
+/** Respons GET /campaigns/:id/milestones (buildMilestones di BE). REJECTED tidak termasuk. */
+export interface MilestoneStep {
+  step: number;
+  id: string;
+  description: string;
+  amount: number;
+  status: Exclude<DisbursementStatus, 'REJECTED'>;
+  requestedAt: string;
+  approvedAt: string | null;
+  paidAt: string | null;
+}
+
+export interface Milestones {
+  steps: MilestoneStep[];
+  completed: number;
+  total: number;
+  current: MilestoneStep | null;
+  canRequestNext: boolean;
 }
 
 export interface Disbursement {
@@ -184,4 +204,37 @@ export interface ActivityItem {
   actor: { name: string; role: string };
   metadata: Record<string, unknown>;
   createdAt: string;
+}
+
+/**
+ * Respons GET /donations/:id/proof (IntegrityService.proof, BFD-59).
+ * Read-only: hash on-chain dibaca langsung dari RPC tiap panggilan (rate limit 30/menit).
+ */
+export interface DonationProof {
+  donationId: string;
+  campaignId: string;
+  integrityStatus: IntegrityStatus;
+  lastCheckedAt: string | null;
+  /** Hash yang disimpan DB saat settlement (yang dikirim ke chain). */
+  hashDb: string | null;
+  /** Hash dihitung ulang dari data DB saat ini; null bila donasi belum PAID. */
+  currentHash: string | null;
+  /** Hash yang benar-benar tersimpan di DonationRegistry; null bila belum CONFIRMED, tidak ada, atau RPC gagal. */
+  hashOnChain: string | null;
+  /** currentHash === hashOnChain; null bila salah satunya tidak tersedia. */
+  match: boolean | null;
+  txHash: string | null;
+  blockNumber: number | null;
+  /** Waktu notarisasi terkonfirmasi di blockchain. */
+  timestamp: string | null;
+  donatedAt: string | null;
+  notarizationStatus: BlockchainStatus | null;
+  network: string;
+  chainId: number;
+  contractAddress: string | null;
+  etherscanUrl: string | null;
+  /** Pesan error RPC saat membaca hash on-chain. */
+  onChainError: string | null;
+  /** Waktu server melakukan pengecekan ini. */
+  checkedAt: string;
 }
