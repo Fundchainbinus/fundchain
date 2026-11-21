@@ -121,6 +121,28 @@
           }
         },
         {
+          "name": "GET /auth/demo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/demo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "demo"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
           "name": "GET /auth/me",
           "request": {
             "method": "GET",
@@ -318,7 +340,38 @@
                 "campaigns"
               ],
               "variable": [],
-              "query": []
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sdg",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "q",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "mine",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
             }
           }
         },
@@ -927,6 +980,30 @@
           }
         },
         {
+          "name": "DELETE /campaigns/{id}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/campaigns/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "campaigns",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ],
+              "query": []
+            }
+          }
+        },
+        {
           "name": "GET /campaigns/{id}/activity",
           "request": {
             "method": "GET",
@@ -1472,6 +1549,32 @@
       "name": "disbursements",
       "item": [
         {
+          "name": "GET /disbursements/{id}/proof/link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/disbursements/:id/proof/link",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "disbursements",
+                ":id",
+                "proof",
+                "link"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ],
+              "query": []
+            }
+          }
+        },
+        {
           "name": "GET /disbursements/{id}/proof",
           "request": {
             "method": "GET",
@@ -1493,6 +1596,126 @@
                 }
               ],
               "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "files",
+      "item": [
+        {
+          "name": "GET /files/config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "config"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "POST /files/upload-url",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files/upload-url",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "upload-url"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purpose\": \"campaign-document\",\n  \"fileName\": \"proposal.pdf\",\n  \"contentType\": \"application/pdf\",\n  \"size\": 245760\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /files/{id}/link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files/:id/link",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":id",
+                "link"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "GET /files/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ],
+              "query": [
+                {
+                  "key": "e",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "t",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
             }
           }
         }

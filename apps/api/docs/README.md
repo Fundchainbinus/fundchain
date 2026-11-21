@@ -23,8 +23,32 @@ Path memakai prefix global `api/v1` supaya ikut ter-rewrite ke function di Verce
 
 Login di Swagger UI: panggil `POST /auth/google`, salin `data.token`, klik **Authorize**, isi token.
 
-DTO belum diberi dekorator `@ApiProperty`, jadi skema body/response belum lengkap — route,
-method, path param, dan query param sudah terdaftar.
+### Skema DTO (BFD-44)
+
+Skema body dan query dibuat otomatis oleh **plugin CLI `@nestjs/swagger`** yang terdaftar di
+`apps/api/nest-cli.json` (`classValidatorShim`, `introspectComments`). DTO tidak perlu
+`@ApiProperty`: tipe properti, wajib/opsional (`?`), dan batas class-validator (`@MinLength`,
+`@Min`, `@IsIn`, ...) ikut masuk ke skema, dan komentar JSDoc jadi `description`.
+
+- Plugin hanya memproses file dengan akhiran `dtoFileNameSuffix`: `.dto.ts` **dan**
+  `.controller.ts`, karena beberapa DTO dideklarasikan (tanpa export) di file controller.
+  DTO baru sebaiknya ditaruh di `*.dto.ts`.
+- Plugin adalah transformer TypeScript, jadi **hanya jalan di `nest build`** (termasuk build
+  Vercel). `ts-node` dan vitest tidak menjalankannya.
+- Response body belum punya skema (service mengembalikan tipe Prisma/objek biasa, bukan class).
+
+## Dokumen OpenAPI tanpa server
+
+```bash
+cd apps/api
+pnpm exec ts-node --transpile-only docs/openapi.ts --out openapi.json
+```
+
+`docs/openapi.ts` menjalankan `nest build -p tsconfig.openapi.json` (output ke `.openapi-build/`,
+di-ignore git; `dist/` tidak tersentuh), me-require controller hasil build, lalu membuat dokumen
+dengan semua dependency controller diganti stub. Tidak ada `.env`, database, worker, atau
+blockchain yang disentuh. `src/openapi.test.ts` memakai script yang sama dan gagal bila plugin
+dilepas dari `nest-cli.json`.
 
 ## Postman collection
 
@@ -33,7 +57,9 @@ method, path param, dan query param sudah terdaftar.
 - variable `baseUrl` (default `http://localhost:3000/api/v1`) dan `token`;
 - auth Bearer `{{token}}` di level collection (endpoint publik seperti `/health`, `/config`,
   `/auth/google` memakai *No Auth*);
-- query param terdaftar dalam keadaan nonaktif — centang yang dibutuhkan.
+- query param terdaftar dalam keadaan nonaktif — centang yang dibutuhkan;
+- body JSON berisi contoh: ditulis tangan untuk endpoint utama (`EXAMPLE_BODIES` di script),
+  sisanya diturunkan otomatis dari skema DTO; endpoint upload memakai form-data.
 
 Cara pakai: Import → pilih file → jalankan `POST /auth/google` dengan access token Google →
 salin `data.token` ke variable `token` collection.
@@ -47,9 +73,9 @@ cd apps/api
 pnpm exec ts-node --transpile-only docs/generate-postman.ts
 ```
 
-Script ini **tidak** menyentuh database: `AppModule` tidak di-import, semua dependency
-controller diganti stub, hanya metadata route yang dibaca. Bila menambah controller baru,
-daftarkan juga di array `controllers` pada script.
+Script ini **tidak** menyentuh database: dokumen dibangun oleh `docs/openapi.ts` (lihat di atas),
+`AppModule` tidak di-import, semua dependency controller diganti stub. Bila menambah controller
+baru, daftarkan juga di array `CONTROLLERS` pada `docs/openapi.ts`.
 
 ## Auth
 
