@@ -5,6 +5,7 @@ name: Cron tick
 # 10 menit (expireStale, antrean notarisasi, campaign lewat deadline).
 # Butuh secret repo CRON_SECRET = nilai CRON_SECRET di environment Vercel.
 # Catatan: schedule GitHub hanya jalan dari default branch dan bisa terlambat beberapa menit.
+# (22 Nov 2026: file disentuh ulang agar schedule terdaftar ulang, lihat issue #34.)
 
 on:
   schedule:
