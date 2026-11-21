@@ -1,12 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell, Blocks, LogIn, LogOut, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { errorMessage, get, post } from '../lib/api';
 import { requestGoogleAccessToken } from '../lib/google';
 import { useConfig, useMe } from '../lib/hooks';
 import { AppSidebar } from './AppSidebar';
+import { BottomNav } from './BottomNav';
+import { useFocusTrap } from './ConfirmDialog';
 import { RoleCard } from './RoleCard';
+import { Spinner } from './ui';
 import { useSession } from '../lib/session';
 
 function GoogleAuthButton() {
@@ -165,15 +168,29 @@ export function Avatar({ name }: { name: string }) {
   );
 }
 
-/** Toggle bahasa seperti di Figma. Aplikasi baru tersedia dalam Bahasa Indonesia. */
+/**
+ * Toggle bahasa seperti di Figma. Aplikasi baru tersedia dalam Bahasa Indonesia, jadi EN tampil
+ * sebagai tombol nonaktif ("Segera hadir"): tidak bisa difokus/diklik, tapi tetap terbaca jujur.
+ */
 function LanguageToggle() {
   return (
     <div className="hidden overflow-hidden rounded-full border border-line text-xs sm:flex" role="group" aria-label="Bahasa">
-      <span className="bg-accent px-3 py-1.5 text-white">ID</span>
-      <button type="button" disabled title="Bahasa Inggris belum tersedia" className="px-3 py-1.5 text-ink disabled:cursor-not-allowed">
+      <span className="bg-accent px-3 py-1.5 text-white" aria-current="true">
+        ID
+      </span>
+      <button type="button" disabled title="Segera hadir" aria-label="EN (segera hadir)" className="px-3 py-1.5 text-ink disabled:cursor-not-allowed">
         EN
       </button>
     </div>
+  );
+}
+
+/** Lonceng notifikasi hanya dekorasi Figma (belum ada fitur notifikasi): bukan tombol, tersembunyi dari pembaca layar. */
+function DecorativeBell() {
+  return (
+    <span className="hidden cursor-default sm:block" title="Segera hadir" aria-hidden>
+      <Bell size={20} className="text-slate-400" />
+    </span>
   );
 }
 
@@ -219,15 +236,16 @@ function StudentBanner() {
           </div>
         </div>
       </div>
-      <div className="no-scrollbar flex gap-6 overflow-x-auto px-4 pb-6 pt-[78px] sm:justify-between sm:gap-2" aria-label="Aplikasi BINUSMaya">
+      {/* Hanya FundChain yang berfungsi; ubin lain murni branding BINUSMaya (aria-hidden, tidak bisa difokus). */}
+      <div className="no-scrollbar flex gap-6 overflow-x-auto px-4 pb-6 pt-[78px] sm:justify-between sm:gap-2">
         {APPS.map(([key, label]) =>
           key === 'fundchain' ? (
-            <Link key={key} to="/" className="flex w-[84px] shrink-0 flex-col items-center gap-1.5 text-center" aria-current="page">
+            <Link key={key} to="/" className="flex w-[84px] shrink-0 flex-col items-center gap-1.5 text-center" aria-label="FundChain (aplikasi aktif)">
               <img src="/figma/app-fundchain-active.png" alt="" className="h-12 w-12" />
               <span className="text-[11px] font-bold text-navy-deep">{label}</span>
             </Link>
           ) : (
-            <span key={key} className="flex w-[84px] shrink-0 flex-col items-center gap-1.5 text-center" aria-hidden>
+            <span key={key} className="flex w-[84px] shrink-0 cursor-default select-none flex-col items-center gap-1.5 text-center" title="Segera hadir" aria-hidden>
               <img src={`/figma/app-${key}.png`} alt="" className="h-12 w-12" />
               <span className="text-[11px] text-ink">{label}</span>
             </span>
@@ -248,6 +266,11 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(() => inAdmin && isDesktop());
   const docked = inAdmin && isDesktop();
   useEffect(() => setSidebarOpen(inAdmin && isDesktop()), [inAdmin]);
+  // Laci (bukan sidebar menempel) = dialog modal: Esc menutup, fokus terjebak, lalu kembali ke tombol grid.
+  const drawerRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeDrawer = () => setSidebarOpen(false);
+  useFocusTrap(drawerRef, sidebarOpen && !docked, closeDrawer, undefined, menuButtonRef);
 
   const links = [
     { to: '/', label: 'FundChain', end: true },
@@ -258,10 +281,11 @@ export function Layout() {
     `-mb-px whitespace-nowrap border-b-2 px-5 py-3 text-[15px] transition ${isActive ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-ink'}`;
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="has-bottom-nav flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 border-b border-line bg-white">
         <div className="flex h-[54px] items-center gap-4 px-4">
           <button
+            ref={menuButtonRef}
             type="button"
             onClick={() => setSidebarOpen((o) => !o)}
             aria-label={sidebarOpen ? 'Tutup menu' : 'Buka menu'}
@@ -278,7 +302,7 @@ export function Layout() {
           </Link>
           <div className="ml-auto flex items-center gap-4">
             <LanguageToggle />
-            <Bell size={20} className="hidden text-slate-400 sm:block" aria-hidden />
+            <DecorativeBell />
             <GoogleAuthButton />
           </div>
         </div>
@@ -288,13 +312,27 @@ export function Layout() {
         {sidebarOpen && (
           <>
             {!docked && (
-              <div className="fixed inset-0 top-[55px] z-30 bg-black/40" onClick={() => setSidebarOpen(false)} aria-hidden />
+              <div className="fixed inset-0 top-[55px] z-30 bg-black/40" onClick={closeDrawer} aria-hidden />
             )}
             <aside
               id="app-sidebar"
-              className={`w-[232px] shrink-0 bg-navy ${docked ? '' : 'fixed bottom-0 left-0 top-[55px] z-40 overflow-y-auto shadow-xl'}`}
+              ref={drawerRef}
+              {...(docked ? {} : { role: 'dialog', 'aria-modal': true, 'aria-label': 'Menu navigasi', tabIndex: -1 })}
+              className={`w-[232px] shrink-0 bg-navy ${docked ? '' : 'fixed bottom-0 left-0 top-[55px] z-40 overflow-y-auto shadow-xl outline-none'}`}
             >
-              <AppSidebar inAdmin={inAdmin} onNavigate={docked ? undefined : () => setSidebarOpen(false)} />
+              {!docked && (
+                <div className="flex justify-end px-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeDrawer}
+                    aria-label="Tutup menu"
+                    className="flex h-11 w-11 items-center justify-center rounded text-white hover:bg-white/10"
+                  >
+                    <X size={20} aria-hidden />
+                  </button>
+                </div>
+              )}
+              <AppSidebar inAdmin={inAdmin} onNavigate={docked ? undefined : closeDrawer} />
             </aside>
           </>
         )}
@@ -327,6 +365,7 @@ export function Layout() {
           )}
         </div>
       </div>
+      <BottomNav />
     </div>
   );
 }
@@ -334,7 +373,13 @@ export function Layout() {
 /** Pembatas halaman yang butuh identitas. */
 export function RequireUser({ admin, children }: { admin?: boolean; children: React.ReactNode }) {
   const { me, isLoading, isAdmin } = useMe();
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[40vh] flex-1 items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
   if (!me || (admin && !isAdmin)) {
     return (
       <div className="card mx-auto my-8 max-w-lg p-8 text-center">
