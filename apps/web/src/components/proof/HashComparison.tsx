@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Clock, ShieldAlert, WifiOff } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Info, ShieldAlert, WifiOff } from 'lucide-react';
 import type { DonationProof } from '../../lib/types';
 import { type ProofVerdict, verdictText } from './proofState';
 
@@ -11,6 +11,7 @@ const STYLE: Record<ProofVerdict['kind'], { box: string; icon: typeof CheckCircl
   'notarize-failed': { box: 'border-red-300 bg-red-50 text-red-800', icon: AlertTriangle },
   pending: { box: 'border-slate-200 bg-slate-50 text-slate-700', icon: Clock },
   'not-paid': { box: 'border-slate-200 bg-slate-50 text-slate-700', icon: Clock },
+  'not-comparable': { box: 'border-sky-200 bg-[#EEF8FC] text-ink', icon: Info },
 };
 
 /** Teks yang tampil di kotak "hash on-chain" bila hash asli dari chain tidak tersedia. Tidak pernah memakai hash DB. */

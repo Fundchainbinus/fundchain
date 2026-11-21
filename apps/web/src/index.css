@@ -43,7 +43,6 @@
  * Tailwind (.flex, .btn-*) mengalahkan selektor elemen.
  */
 @media print {
-  @page { size: A4; margin: 16mm; }
   body:has(.proof-print-sheet) { background: #fff !important; }
   body:has(.proof-print-sheet) header,
   body:has(.proof-print-sheet) aside,

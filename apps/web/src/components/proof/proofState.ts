@@ -12,7 +12,7 @@ export function shouldPollDonation(status: DonationStatus | undefined, chain: Bl
 export type ProofVerdict =
   /** Permintaan /proof gagal (jaringan, 429, akses). */
   | { kind: 'request-error'; message: string }
-  /** Donasi belum lunas: tidak akan dinotarisasi. */
+  /** Donasi tidak pernah lunas (PENDING/EXPIRED/FAILED): tidak dinotarisasi. */
   | { kind: 'not-paid' }
   /** Lunas tapi transaksi notarisasi belum terkonfirmasi. */
   | { kind: 'pending'; status: BlockchainStatus | null }
@@ -23,7 +23,9 @@ export type ProofVerdict =
   /** CONFIRMED di DB tapi kontrak tidak menyimpan hash untuk donasi ini. */
   | { kind: 'missing-onchain' }
   | { kind: 'match' }
-  | { kind: 'mismatch' };
+  | { kind: 'mismatch' }
+  /** Hash on-chain terbaca, tapi hash dari data saat ini tidak dihitung (mis. donasi REFUNDED). */
+  | { kind: 'not-comparable'; donationStatus: DonationStatus };
 
 /**
  * Satu-satunya sumber kesimpulan bukti. Vonis cocok/tidak memakai `match` dari server
@@ -35,20 +37,23 @@ export function deriveVerdict(
   proof: DonationProof | undefined,
   requestError: unknown,
 ): ProofVerdict | null {
-  if (donationStatus !== 'PAID') return { kind: 'not-paid' };
+  // Donasi yang tidak pernah lunas tidak punya notarisasi. REFUNDED pernah lunas & dinotarisasi:
+  // bukti on-chain-nya tetap ada, jadi tunggu data /proof.
+  if (donationStatus === 'PENDING' || donationStatus === 'EXPIRED' || donationStatus === 'FAILED') return { kind: 'not-paid' };
   if (!proof) {
     if (requestError) return { kind: 'request-error', message: requestError instanceof Error ? requestError.message : String(requestError) };
     return null; // masih memuat
   }
   const s = proof.notarizationStatus;
+  if (!s) return { kind: 'not-paid' };
   if (s === 'FAILED') return { kind: 'notarize-failed' };
   if (s !== 'CONFIRMED') return { kind: 'pending', status: s };
   if (proof.onChainError) return { kind: 'rpc-error', message: proof.onChainError };
   if (!proof.hashOnChain) return { kind: 'missing-onchain' };
   if (proof.match === true) return { kind: 'match' };
   if (proof.match === false) return { kind: 'mismatch' };
-  // CONFIRMED + hash on-chain ada, tapi currentHash tidak bisa dihitung: anggap tidak terverifikasi.
-  return { kind: 'missing-onchain' };
+  // CONFIRMED + hash on-chain ada, tapi server tidak menghitung currentHash (donasi bukan PAID lagi).
+  return { kind: 'not-comparable', donationStatus };
 }
 
 export const RPC_ERROR_TEXT = 'Tidak bisa membaca blockchain saat ini. Coba cek ulang beberapa saat lagi.';
@@ -60,7 +65,7 @@ export function verdictText(v: ProofVerdict | null): string {
     case 'request-error':
       return `Gagal memuat bukti: ${v.message}`;
     case 'not-paid':
-      return 'Donasi belum lunas, sehingga tidak dicatat ke blockchain.';
+      return 'Donasi tidak lunas, sehingga tidak dicatat ke blockchain.';
     case 'pending':
       return 'Belum dinotarisasi: transaksi pencatatan ke blockchain belum terkonfirmasi.';
     case 'notarize-failed':
@@ -71,6 +76,10 @@ export function verdictText(v: ProofVerdict | null): string {
       return 'Hash untuk donasi ini tidak ditemukan di smart contract.';
     case 'match':
       return 'COCOK: hash dari data saat ini sama dengan hash di blockchain.';
+    case 'not-comparable':
+      return v.donationStatus === 'REFUNDED'
+        ? 'Hash tercatat di blockchain. Donasi ini sudah di-refund, sehingga data saat ini tidak lagi dibandingkan dengan hash on-chain.'
+        : 'Hash tercatat di blockchain, tetapi hash dari data saat ini tidak tersedia untuk dibandingkan.';
     case 'mismatch':
       return 'TAMPERED: hash dari data saat ini TIDAK sama dengan hash di blockchain. Data donasi telah diubah.';
   }

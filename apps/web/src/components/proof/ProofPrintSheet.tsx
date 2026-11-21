@@ -31,7 +31,7 @@ export function ProofPrintSheet({ d, proof, verdict }: { d: DonationDetail; proo
     ['Waktu verifikasi', proof ? dateTime(proof.checkedAt) : '—'],
   ];
   return (
-    <section className="proof-print-sheet hidden print:block" aria-hidden="true">
+    <section className="proof-print-sheet hidden print:block">
       <h1 className="text-xl font-semibold">FundChain · Bukti Donasi & Notarisasi Blockchain</h1>
       <p className="mt-1 text-xs">Dokumen ini dicetak dari halaman bukti donasi FundChain.</p>
       <p className="proof-print-verdict mt-4 border-2 border-black px-3 py-2 text-sm font-semibold">Hasil verifikasi: {verdictText(verdict)}</p>

@@ -110,6 +110,11 @@ export function PaymentPage() {
               <Loader2 size={28} className="animate-spin text-navy" aria-hidden />
               <p className="mt-3 text-sm font-semibold">Menyiapkan pembayaran…</p>
               <p className="mt-1 text-xs text-slate-500">Kode QRIS sedang dibuat oleh gateway. Halaman ini diperbarui otomatis.</p>
+              {d.payment?.paymentUrl && (
+                <a href={d.payment.paymentUrl} target="_blank" rel="noreferrer" className="btn-secondary btn-sm mt-3">
+                  Buka halaman pembayaran <ExternalLink size={12} aria-hidden />
+                </a>
+              )}
             </div>
           ) : d.status === 'REFUNDED' ? (
             <div className="space-y-4">
@@ -117,6 +122,7 @@ export function PaymentPage() {
                 <Info size={16} className="mt-0.5 shrink-0 text-navy" aria-hidden />
                 <span>Dana dikembalikan. Donasi ini telah di-refund ke donatur dan tidak lagi dihitung dalam perolehan campaign.</span>
               </div>
+              <Link to={`/donations/${d.id}`} className="btn-secondary w-full">Lihat bukti on-chain</Link>
               <Link to={`/campaigns/${d.campaign.id}`} className="btn-secondary w-full">Kembali ke campaign</Link>
             </div>
           ) : (
@@ -128,7 +134,14 @@ export function PaymentPage() {
         </div>
         <div className="card p-6">
           <h2 className="mb-4 font-semibold">Perjalanan donasi Anda</h2>
-          <NotarizationSteps d={d} />
+          {d.status === 'REFUNDED' ? (
+            // NotarizationSteps menandai status selain PAID/PENDING sebagai error; refund bukan kegagalan.
+            <p className="text-sm text-slate-600">
+              Donasi ini pernah lunas dan dicatat ke blockchain, lalu dana dikembalikan ke donatur. Bukti on-chain tetap permanen.
+            </p>
+          ) : (
+            <NotarizationSteps d={d} />
+          )}
         </div>
       </div>
     </div>

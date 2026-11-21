@@ -65,10 +65,8 @@ export function DonationProofPage() {
   const [local, setLocal] = useState<string | null>(null);
   const verify = useMutation({
     mutationFn: () => post<VerifyResult>(`/admin/donations/${id}/verify`),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['donation', id] });
-      void proof.refetch();
-    },
+    // Verifikasi bisa membekukan campaign → segarkan semua data (termasuk bukti on-chain).
+    onSuccess: () => qc.invalidateQueries(),
   });
 
   if (donation.isLoading) return <Spinner />;
@@ -82,7 +80,10 @@ export function DonationProofPage() {
   const tampered = mismatch || d.integrityStatus === 'TAMPERED';
   const txHash = p?.txHash ?? bc?.txHash ?? null;
   const explorerUrl = p?.etherscanUrl ?? bc?.explorerUrl ?? null;
-  const rechecking = proof.isFetching || donation.isFetching;
+  // Hanya proof: polling detail di latar belakang tidak boleh membuat tombol berkedip.
+  const rechecking = proof.isFetching;
+  // Gagal "Cek ulang" (mis. 429) sementara data lama masih ada: beri tahu, jangan diam-diam.
+  const staleProofError = p && proof.error ? proof.error : null;
 
   const recheck = () => {
     void donation.refetch();
@@ -126,6 +127,7 @@ export function DonationProofPage() {
               type="button"
               className="btn-primary btn-sm"
               onClick={() => window.print()}
+              disabled={proof.isLoading}
               title='Membuka dialog cetak browser: pilih "Save as PDF" / "Simpan sebagai PDF" sebagai printer'
               aria-describedby="pdf-hint"
             >
@@ -150,10 +152,15 @@ export function DonationProofPage() {
           title="Hash Database vs Hash On-chain"
           aside={p && <span className="text-xs text-slate-500">Dicek {dateTime(p.checkedAt)}</span>}
         >
-          {proof.isLoading && d.status === 'PAID' ? (
+          {proof.isLoading && verdict === null ? (
             <Spinner label="Membaca blockchain…" />
           ) : (
             <HashComparison proof={p} dbHash={d.hash} verdict={verdict} />
+          )}
+          {staleProofError && (
+            <p role="status" className="mt-3 text-xs text-amber-800">
+              Cek ulang gagal: {staleProofError instanceof Error ? staleProofError.message : String(staleProofError)} Hasil di atas dari pengecekan {p && dateTime(p.checkedAt)}.
+            </p>
           )}
         </Panel>
 
