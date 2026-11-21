@@ -35,3 +35,25 @@
   .tbl tbody tr { @apply border-t border-line even:bg-[#F8FAFC]; }
   .hash-box { @apply block w-full break-all rounded border border-line bg-[#FAFAFA] px-2 py-2 font-sans text-xs text-ink; }
 }
+
+/*
+ * Cetak / "Save as PDF" halaman bukti donasi (BFD-59). Hanya berlaku di halaman yang merender
+ * .proof-print-sheet, sehingga cetak halaman lain tidak terpengaruh. Chrome aplikasi (header,
+ * sidebar, banner, nav, footer, tombol) disembunyikan; !important dibutuhkan karena utilitas
+ * Tailwind (.flex, .btn-*) mengalahkan selektor elemen.
+ */
+@media print {
+  @page { size: A4; margin: 16mm; }
+  body:has(.proof-print-sheet) { background: #fff !important; }
+  body:has(.proof-print-sheet) header,
+  body:has(.proof-print-sheet) aside,
+  body:has(.proof-print-sheet) nav,
+  body:has(.proof-print-sheet) footer,
+  body:has(.proof-print-sheet) button,
+  body:has(.proof-print-sheet) :has(> main) > :not(main),
+  body:has(.proof-print-sheet) .fixed { display: none !important; }
+  body:has(.proof-print-sheet) main { padding: 0 !important; background: #fff !important; }
+  .proof-print-sheet { display: block !important; color: #000; font-size: 11pt; }
+  .proof-print-sheet tr { break-inside: avoid; }
+  .proof-print-sheet td { word-break: break-all; }
+}
