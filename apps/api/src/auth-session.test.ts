@@ -338,6 +338,14 @@ describe('DEMO_MODE (BFD-12)', () => {
     });
   });
 
+  it('audit gagal -> cookie sesi tidak dipasang', async () => {
+    process.env.DEMO_MODE = 'true';
+    audit.log.mockRejectedValueOnce(new Error('db down'));
+    const res = fakeRes();
+    await expect(controller().loginDemo('student', null, null, res as never)).rejects.toThrow('db down');
+    expect(res.cookie).not.toHaveBeenCalled();
+  });
+
   it('persona tidak dikenal -> VALIDATION_ERROR; user seed hilang -> NOT_FOUND (tidak membuat user)', async () => {
     process.env.DEMO_MODE = 'true';
     await expect(controller().loginDemo('root', null, null, fakeRes() as never)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });

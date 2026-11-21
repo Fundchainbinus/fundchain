@@ -12,15 +12,26 @@ interface SessionState {
   setSignedIn: (signedIn: boolean) => void;
 }
 
-// Bersihkan token Bearer lama (sebelum BFD-11) dari localStorage.
-try {
-  localStorage.removeItem('fundchain-session-google');
-} catch {
-  /* storage tidak tersedia */
+/**
+ * Migrasi sekali jalan: hapus token Bearer lama (sebelum BFD-11) dari localStorage. Bila tadinya ada,
+ * anggap "pernah login" supaya /auth/me dicoba — cookie mungkin sudah dipasang API baru; bila tidak,
+ * 401 akan mereset penanda ini.
+ */
+function migrateLegacyToken(): boolean {
+  try {
+    const legacy = localStorage.getItem('fundchain-session-google');
+    if (legacy === null) return false;
+    localStorage.removeItem('fundchain-session-google');
+    return legacy.includes('"token":"');
+  } catch {
+    return false;
+  }
 }
 
+const hadLegacyToken = migrateLegacyToken();
+
 export const useSession = create<SessionState>()(
-  persist((set) => ({ signedIn: false, setSignedIn: (signedIn) => set({ signedIn }) }), {
+  persist((set) => ({ signedIn: hadLegacyToken, setSignedIn: (signedIn) => set({ signedIn }) }), {
     name: 'fundchain-session',
   }),
 );

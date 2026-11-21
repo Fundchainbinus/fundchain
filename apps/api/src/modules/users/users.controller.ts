@@ -147,7 +147,7 @@ export class UsersController {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) throw new AppError('NOT_FOUND', 'User demo belum ada. Jalankan seed database terlebih dahulu.');
 
-    startSession(res, user);
+    // Audit dulu: bila pencatatan gagal, cookie sesi tidak pernah dipasang.
     await this.audit.log({
       actorId: user.id,
       action: 'AUTH_DEMO_LOGIN',
@@ -157,6 +157,7 @@ export class UsersController {
       ipAddress: ip,
       userAgent,
     });
+    startSession(res, user);
     return { user: publicUser(user) };
   }
 
