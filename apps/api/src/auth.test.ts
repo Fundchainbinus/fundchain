@@ -104,9 +104,11 @@ describe('ActingUserGuard', () => {
 describe('UsersController auth endpoints', () => {
   it('POST /auth/logout mencatat AUTH_LOGOUT di audit log', async () => {
     const audit = { log: vi.fn(async () => ({})) };
-    const controller = new UsersController({} as never, audit as never, {} as never, {} as never);
+    const prisma = { user: { update: vi.fn(async () => ({})) } };
+    const controller = new UsersController(prisma as never, audit as never, {} as never, {} as never);
     const user = { id: 'u-student', email: 's@x.id', name: 'Siswa', role: 'STUDENT' as const, integritySubjectId: 'STU-1' };
-    await expect(controller.logout(user, '10.0.0.1', 'vitest')).resolves.toEqual({ loggedOut: true });
+    const res = { clearCookie: vi.fn() };
+    await expect(controller.logout(user, '10.0.0.1', 'vitest', res as never)).resolves.toEqual({ loggedOut: true });
     expect(audit.log).toHaveBeenCalledWith({
       actorId: 'u-student',
       action: 'AUTH_LOGOUT',
