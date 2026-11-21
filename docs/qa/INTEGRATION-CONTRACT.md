@@ -31,26 +31,26 @@ Status semua endpoint di bawah: **✅ final** (dibekukan untuk demo; perubahan k
 | GET | `/config` | Publik | — | `{ googleClientId, devTools, demoMode, paymentProvider, chain{network, chainId, contractAddress} }` | `lib/hooks.ts` | ✅ final |
 | POST | `/auth/google` | Publik (throttle 10/menit) | `GoogleLoginDto { accessToken }` | `{ token, user }` + set cookie sesi | `components/Layout.tsx` | ✅ final |
 | GET | `/auth/demo?persona=student\|admin` | Publik, hanya bila DEMO_MODE aktif | query `persona` | `{ token, user }` + cookie; 404 `DEV_TOOLS_DISABLED` bila mati | `components/Layout.tsx` | ✅ final |
-| GET | `/auth/me` (alias `/me`) | Login | — | `{ id, name, email, role, integritySubjectId }` | `lib/hooks.ts` (`/auth/me`); `/me` tanpa konsumen FE | ✅ final |
-| POST | `/auth/logout` | Publik | — | `{}`; naikkan `sessionVersion`, hapus cookie | `components/Layout.tsx` | ✅ final |
-| GET | `/admin/audit-logs` | Admin | query `actorId, entityType, entityId, action, from, to, limit(1..200), cursor` | `{ items[], nextCursor }` | `pages/admin/AdminPages.tsx` | ✅ final |
-| GET | `/admin/stats` | Admin | — | agregat dashboard (campaign, donasi, integritas, biaya gas) | `pages/admin/AdminPages.tsx` | ✅ final |
+| GET | `/auth/me` (alias `/me`) | Login | — | `User { id, name, email, role, integritySubjectId }` | `lib/hooks.ts` (`/auth/me`); `/me` tanpa konsumen FE | ✅ final |
+| POST | `/auth/logout` | Publik | — | `{ loggedOut: true }`; naikkan `sessionVersion`, hapus cookie | `components/Layout.tsx` | ✅ final |
+| GET | `/admin/audit-logs` | Admin | query `actorId, entityType, entityId, action, from, to, limit(1..200), cursor` | `{ logs: AuditLog[], nextCursor }` | `pages/admin/AdminPages.tsx` | ✅ final |
+| GET | `/admin/stats` | Admin | — | `{ campaigns, donations, totalRaised, … }` (hitungan per status, termasuk blockchain, integritas, pencairan; biaya gas) | `pages/admin/AdminPages.tsx` | ✅ final |
 
 ### Campaign (BE Campaign · `campaigns.controller.ts`)
 
 | Method | Path | Auth | Request | Response `data` (ringkas) | Konsumen FE | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/campaigns` | Publik | `ListCampaignsQuery { status, sdg, q, mine, limit, cursor }` | `{ campaigns[] (+integritySummary), nextCursor }` | `pages/HomePage.tsx`, `pages/MyPages.tsx` | ✅ final |
+| GET | `/campaigns` | Publik | `ListCampaignsQuery { status, sdg, q, mine, limit, cursor }` | `{ campaigns: CampaignSummary[], nextCursor }` | `pages/HomePage.tsx`, `pages/MyPages.tsx` | ✅ final |
 | POST | `/campaigns` | Login | `CreateCampaignDto { title, description, sdgCategory, targetAmount, deadline }` | campaign (DRAFT) | `pages/CampaignFormPage.tsx` | ✅ final |
-| GET | `/campaigns/:id` | Publik (non-publik hanya pemilik/admin) | — | detail campaign + dokumen | `pages/CampaignDetailPage.tsx`, `CampaignFormPage.tsx`, `DisbursePage.tsx` | ✅ final |
+| GET | `/campaigns/:id` | Publik (non-publik hanya pemilik/admin) | — | `CampaignDetail` (dokumen, review, `funds`, `viewer`) | `pages/CampaignDetailPage.tsx`, `CampaignFormPage.tsx`, `DisbursePage.tsx`, `admin/AdminPages.tsx` | ✅ final |
 | PATCH | `/campaigns/:id` | Login (pemilik, DRAFT/REJECTED) | `UpdateCampaignDto` (semua opsional) | campaign | `pages/CampaignFormPage.tsx` | ✅ final |
 | DELETE | `/campaigns/:id` | Login (pemilik, DRAFT/REJECTED) | — | `{ id }`; soft-delete | Tanpa konsumen FE (belum ada tombol hapus di web) | ✅ final |
-| GET | `/campaigns/:id/activity` | Publik | — | ≤ 50 entri aktivitas | `pages/CampaignDetailPage.tsx` | ✅ final |
+| GET | `/campaigns/:id/activity` | Publik | — | `ActivityItem[]` (≤ 50) | `pages/CampaignDetailPage.tsx` | ✅ final |
 | POST | `/campaigns/:id/documents` | Login (pemilik) | multipart `file` atau `AttachDocumentDto { fileId }` | dokumen | `pages/CampaignFormPage.tsx` | ✅ final |
 | POST | `/campaigns/:id/submit` | Login (pemilik) | — | campaign (PENDING_REVIEW) | `CampaignDetailPage.tsx`, `CampaignFormPage.tsx`, `MyPages.tsx` | ✅ final |
-| GET | `/documents/:id/link` | Publik (dokumen non-publik: pemilik/admin) | — | `{ url }` (signed) | `CampaignDetailPage.tsx`, `CampaignFormPage.tsx`, `admin/AdminPages.tsx` | ✅ final |
+| GET | `/documents/:id/link` | Publik (dokumen non-publik: pemilik/admin) | — | `{ url }` (signed) | `components/FileButton.tsx` (dipakai `CampaignDetailPage.tsx`, `CampaignFormPage.tsx`, `admin/AdminPages.tsx`) | ✅ final |
 | GET | `/documents/:id/file` | Publik + URL bertanda tangan (`e`, `t`) | query `e, t` | stream file | via URL dari `/documents/:id/link` | ✅ final |
-| GET | `/admin/campaigns` | Admin | `ListCampaignsQuery` | `{ campaigns[] (+proposal), nextCursor }` | `pages/admin/AdminPages.tsx` | ✅ final |
+| GET | `/admin/campaigns` | Admin | `ListCampaignsQuery` | `{ campaigns: CampaignSummary[] (+proposal), nextCursor }` | `pages/admin/AdminPages.tsx` | ✅ final |
 | GET | `/admin/campaigns/:id` | Admin | — | detail campaign | Tanpa konsumen FE (web memakai `/campaigns/:id`) | ✅ final |
 | POST | `/admin/campaigns/:id/approve` | Admin | — | campaign (ACTIVE) | `CampaignDetailPage.tsx`, `admin/AdminPages.tsx` | ✅ final |
 | POST | `/admin/campaigns/:id/reject` | Admin | `ReasonDto { reason }` | campaign (REJECTED) | `CampaignDetailPage.tsx`, `admin/AdminPages.tsx` | ✅ final |
@@ -61,28 +61,28 @@ Status semua endpoint di bawah: **✅ final** (dibekukan untuk demo; perubahan k
 
 | Method | Path | Auth | Request | Response `data` (ringkas) | Konsumen FE | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| POST | `/campaigns/:id/donations` | Login | `CreateDonationDto { amount, anonymous? }` + header `Idempotency-Key` | donasi PENDING + `payment { qrString, paymentUrl, expiresAt }` | `pages/CampaignDetailPage.tsx` | ✅ final |
-| GET | `/campaigns/:id/donations` | Publik | — | donasi PAID (nama dipseudonimkan) | `pages/CampaignDetailPage.tsx` | ✅ final |
-| GET | `/donations/:id` | Publik (detail penuh: donatur/admin) | — | donasi + status payment & blockchain | `PaymentPage.tsx`, `DonationProofPage.tsx`, `CampaignDetailPage.tsx` | ✅ final |
-| GET | `/donations/:id/blockchain` | Publik | — | `{ status, txHash, blockNumber, explorerUrl }` | Tanpa konsumen FE (data sudah ada di `/donations/:id` dan `/proof`) | ✅ final |
-| GET | `/donations/:id/proof` | Publik | — | `{ hashDb, hashOnChain, match, txHash, timestamp, explorerUrl }` | `pages/DonationProofPage.tsx` | ✅ final |
-| GET | `/me/donations` | Login | — | daftar donasi milik user (belum berhalaman, [#27](https://github.com/Fundchainbinus/fundchain/issues/27)) | `pages/HomePage.tsx` | ✅ final |
-| GET | `/me/points` | Login | — | `{ total, entries[] }` poin comserve | `lib/points.ts` | ✅ final |
+| POST | `/campaigns/:id/donations` | Login | `CreateDonationDto { amount, anonymous? }` + header `Idempotency-Key` | `DonationDetail` (status PENDING, `payment`) | `pages/CampaignDetailPage.tsx` | ✅ final |
+| GET | `/campaigns/:id/donations` | Publik | — | `PublicDonation[]` (nama dipseudonimkan) | `pages/CampaignDetailPage.tsx` | ✅ final |
+| GET | `/donations/:id` | Publik (detail penuh: donatur/admin) | — | `DonationDetail` (payment, blockchain, `viewer`) | `pages/PaymentPage.tsx`, `pages/DonationProofPage.tsx` | ✅ final |
+| GET | `/donations/:id/blockchain` | Publik | — | `{ donationId, hash, integrityStatus, ...record blockchain }` | Tanpa konsumen FE (data sudah ada di `/donations/:id` dan `/proof`) | ✅ final |
+| GET | `/donations/:id/proof` | Publik | — | `DonationProof { hashDb, currentHash, hashOnChain, match, txHash, … }` | `pages/DonationProofPage.tsx` | ✅ final |
+| GET | `/me/donations` | Login | — | `MyDonation[]` (belum berhalaman, [#27](https://github.com/Fundchainbinus/fundchain/issues/27)) | `pages/HomePage.tsx`, `pages/MyPages.tsx` | ✅ final |
+| GET | `/me/points` | Login | — | `PointsSummary { total, entries[], rule }` | `lib/points.ts` | ✅ final |
 | GET | `/admin/donations` | Admin | query `campaignId, integrityStatus` | daftar donasi + integritas | `pages/admin/AdminPages.tsx` | ✅ final |
 | POST | `/admin/donations/:id/refund` | Admin | `RefundDto { reason }` | donasi REFUNDED (D-001) | Tanpa konsumen FE (Postman/admin manual) | ✅ final |
-| POST | `/webhooks/payment` | Secret (signature mock / re-fetch Pakasir) | body mentah gateway | `{ replayed }` | Tanpa konsumen FE (dipanggil gateway) | ✅ final |
-| POST | `/dev/payments/:donationId/simulate` | Login, hanya bila `ENABLE_DEV_TOOLS` | `SimulatePaymentDto { outcome?: settlement\|expire\|failed }` | hasil webhook tersimulasi | `PaymentPage.tsx`, `CampaignDetailPage.tsx` | ✅ final |
+| POST | `/webhooks/payment` | Secret (signature mock / re-fetch Pakasir) | body mentah gateway | hasil `PaymentsService.handleWebhook` | Tanpa konsumen FE (dipanggil gateway) | ✅ final |
+| POST | `/dev/payments/:donationId/simulate` | Login (donatur atau admin); hanya bila `ENABLE_DEV_TOOLS` aktif **dan** provider `mock` | `SimulatePaymentDto { outcome?: settlement\|expire\|failed }` | hasil webhook tersimulasi | `pages/PaymentPage.tsx`, `pages/CampaignDetailPage.tsx` | ✅ final |
 
 ### Pencairan (BE Disbursement · `disbursements.controller.ts`)
 
 | Method | Path | Auth | Request | Response `data` (ringkas) | Konsumen FE | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | POST | `/campaigns/:id/disbursements` | Login (pemilik) | multipart `amount, description, proof` atau `CreateDisbursementDto { amount, description, fileId }` | disbursement REQUESTED | `pages/DisbursePage.tsx` | ✅ final |
-| GET | `/campaigns/:id/disbursements` | Publik (bukti: pemilik/admin) | — | daftar pencairan | `DisbursePage.tsx`, `CampaignDetailPage.tsx` | ✅ final |
-| GET | `/campaigns/:id/milestones` | Publik | — | tahap pencairan + status | `components/MilestoneProgress.tsx` | ✅ final |
+| GET | `/campaigns/:id/disbursements` | Publik (bukti: pemilik/admin) | — | `Disbursement[]` | `pages/DisbursePage.tsx`, `pages/CampaignDetailPage.tsx` | ✅ final |
+| GET | `/campaigns/:id/milestones` | Publik | — | `Milestones { steps[], completed, total, current, canRequestNext }` | `components/MilestoneProgress.tsx` | ✅ final |
 | GET | `/disbursements/:id/proof/link` | Login (pemilik/admin) | — | `{ url }` signed | `pages/admin/AdminPages.tsx` | ✅ final |
 | GET | `/disbursements/:id/proof` | Login (pemilik/admin) | — | stream file | via URL dari `/proof/link` | ✅ final |
-| GET | `/admin/disbursements` | Admin | query `status` | daftar pencairan | `pages/admin/AdminPages.tsx` | ✅ final |
+| GET | `/admin/disbursements` | Admin | query `status` | `AdminDisbursement[]` | `pages/admin/AdminPages.tsx` | ✅ final |
 | POST | `/admin/disbursements/:id/approve` | Admin | — | APPROVED | `pages/admin/AdminPages.tsx` | ✅ final |
 | POST | `/admin/disbursements/:id/reject` | Admin | `ReasonDto { reason }` | REJECTED | `pages/admin/AdminPages.tsx` | ✅ final |
 | POST | `/admin/disbursements/:id/mark-paid` | Admin | — | PAID | `pages/admin/AdminPages.tsx` | ✅ final |
@@ -91,20 +91,20 @@ Status semua endpoint di bawah: **✅ final** (dibekukan untuk demo; perubahan k
 
 | Method | Path | Auth | Request | Response `data` (ringkas) | Konsumen FE | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/blockchain/info` | Publik | — | `{ network, chainId, contractAddress, ready, relayer{address, balance, lowBalance, minBalance}, explorerUrl }` (tanpa biaya gas) | `lib/hooks.ts` | ✅ final |
-| POST | `/admin/donations/:id/verify` | Admin | — | `{ status, currentHash, onChainHash, campaignFrozen }` | `pages/DonationProofPage.tsx`, `admin/AdminPages.tsx` | ✅ final |
+| GET | `/blockchain/info` | Publik | — | `ChainInfo { network, chainId, contractAddress, ready, reason, relayer, explorerUrl }` (tanpa biaya gas) | `lib/hooks.ts` | ✅ final |
+| POST | `/admin/donations/:id/verify` | Admin | — | `VerifyResult { status, currentHash, storedHash, onChainHash, campaignFrozen, … }` | `pages/DonationProofPage.tsx`, `admin/AdminPages.tsx` | ✅ final |
 | POST | `/admin/campaigns/:id/verify` | Admin | — | ringkasan verifikasi ≤ 100 donasi + `hasMore` | `pages/CampaignDetailPage.tsx` | ✅ final |
 | POST | `/admin/integrity/verify-all` | Admin | — | `{ checked, verified, tampered, skippedNotNotarized, frozenCampaigns[], hasMore, results[], errors[] }` | `pages/admin/AdminPages.tsx` | ✅ final |
 | POST | `/admin/blockchain/:donationId/retry` | Admin | — | job FAILED → QUEUED; 409 untuk status lain | `pages/admin/AdminPages.tsx` | ✅ final |
-| GET | `/cron/tick` | Secret (`Bearer CRON_SECRET`) | — | ringkasan tick (expire, notarisasi, integrity, housekeeping) | Tanpa konsumen FE (GitHub Actions `cron-tick.yml`, Vercel Cron) | ✅ final |
+| GET | `/cron/tick` | Secret (`Bearer CRON_SECRET`) | — | `{ ok: true, at }` (tick menjalankan expire, notarisasi, integrity, housekeeping) | Tanpa konsumen FE (GitHub Actions `cron-tick.yml`, Vercel Cron) | ✅ final |
 
 ### File (BE Infra · `files.controller.ts`)
 
 | Method | Path | Auth | Request | Response `data` (ringkas) | Konsumen FE | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/files/config` | Publik | — | `{ driver, maxBytes, directUpload }` | `lib/upload.ts` | ✅ final |
-| POST | `/files/upload-url` | Login | `UploadUrlDto { purpose, fileName, contentType, size }` | `{ fileId, uploadUrl, token }` (signed upload Supabase) | `lib/upload.ts` | ✅ final |
-| GET | `/files/:id/link` | Publik (sesuai hak akses file) | — | `{ url }` | Tanpa pemanggil langsung (FE memakai `/documents/:id/link` dan `/disbursements/:id/proof/link`) | ✅ final |
+| POST | `/files/upload-url` | Login | `UploadUrlDto { purpose, fileName, contentType, size }` | `{ fileId, uploadUrl, token, … }` (signed upload Supabase) | `lib/upload.ts` | ✅ final |
+| GET | `/files/:id/link` | Publik (sesuai hak akses file) | — | `{ url, expiresIn }` | Tanpa pemanggil langsung (FE memakai `/documents/:id/link` dan `/disbursements/:id/proof/link`) | ✅ final |
 | GET | `/files/:id` | Publik + URL bertanda tangan (`e`, `t`) | query `e, t` | stream file (driver db) | via URL bertanda tangan | ✅ final |
 
 ## Ringkasan
@@ -115,5 +115,5 @@ Status semua endpoint di bawah: **✅ final** (dibekukan untuk demo; perubahan k
 | Dipakai web | 45 |
 | Tanpa konsumen FE | 10: `/health`, `/me`, `DELETE /campaigns/:id`, `/admin/campaigns/:id`, `/donations/:id/blockchain`, `/admin/donations/:id/refund`, `/webhooks/payment`, `/cron/tick`, `/files/:id/link`, `/files/:id` (via URL bertanda tangan) |
 
-Catatan: kolom "Response" adalah ringkasan; schema response belum dibuat otomatis (`apps/api/docs/README.md`:
+Catatan: nama tipe di kolom "Response" (`CampaignDetail`, `DonationDetail`, …) adalah tipe FE di `apps/web/src/lib/types.ts`; bentuk lain diambil dari `return` di controller/service. Konsumen FE diambil dari pemanggilan `get(`/`post(`/`patch(`/`attachFile(`/`openSignedFile(` (bukan path router). Schema response belum dibuat otomatis (`apps/api/docs/README.md`:
 service mengembalikan objek biasa). Bentuk pasti ada di tipe FE `apps/web/src/lib/types.ts`.

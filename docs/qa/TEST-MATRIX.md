@@ -3,7 +3,10 @@
 > Disusun oleh tech lead mewakili QA, 22 Nov 2026.
 
 Sumber kasus: [`12-TESTING-PLAN.md`](../../FundChain_Complete_Planning_Docs/12-TESTING-PLAN.md) §8–§12, ditambah
-semua file test otomatis di repo. Status otomatis diambil dari run CI terakhir di `main`.
+semua file test otomatis di repo. Status otomatis diambil dari run CI terakhir di `main`. Kolom **Area** mengikuti
+bagian di [`03-BUSINESS-RULES.md`](../../FundChain_Complete_Planning_Docs/03-BUSINESS-RULES.md) (Authentication,
+Campaign/Review, Donation, Blockchain, Integrity, Disbursement); dokumen itu tidak memberi nomor per aturan, jadi
+pemetaan BR dilakukan per bagian.
 
 ## Dasar status
 
@@ -200,5 +203,6 @@ Tambahan di CI: job *Seed smoke test* (migrate + seed 2x ke Postgres kosong) dan
 - Test otomatis: **353** (api 322 + shared 12 + contracts 19), 0 gagal.
 - Celah utama: web tanpa test, validasi DTO (campaign/donasi) dan approve/reject pencairan hanya dicek manual, contracts tidak masuk CI.
 - **S1 outstanding = 0.** Tidak ada bug terbuka berlabel S1 (lihat [`BUG-TRIAGE.md`](BUG-TRIAGE.md)). Satu donasi TAMPERED
-  dan satu campaign FROZEN di production adalah hasil uji tamper (audit `INTEGRITY_TAMPERED`/`CAMPAIGN_FROZEN` sejak
-  2 Okt 2026): sistem bekerja sesuai desain, bukan defect. Asal datanya tetap perlu dikonfirmasi tim BC (BUG-TRIAGE, catatan T-1).
+  dan satu campaign FROZEN di production berasal dari data yang diubah: query agregat read-only (22 Nov) menunjukkan
+  kolom `amount` donasi itu berbeda dari nominal di `canonical_payload` yang di-hash. Jadi integrity checker bekerja sesuai
+  desain, bukan canonical mismatch. Siapa yang mengubah data tetap dikonfirmasi tim BC (BUG-TRIAGE, catatan T-1).

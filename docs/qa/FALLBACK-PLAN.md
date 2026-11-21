@@ -17,7 +17,7 @@ kontrak di Sepolia (D-008).
 | F-5 | Masalah DB Supabase (data rusak/hilang) | Restore dari backup terenkripsi ([`BACKUP.md`](../BACKUP.md)), atau Postgres lokal + seed | 15–30 menit | BE Infra + TL | Workflow *DB backup* run [44894748894](https://github.com/Fundchainbinus/fundchain/actions/runs/44894748894) (21 Nov, manual) lulus uji restore otomatis |
 | F-6 | Semua gagal / jaringan venue mati | Video backup demo | segera | PM | 🟡 GATE-3 |
 
-> Catatan: belum ada workflow e2e di `.github/workflows/` (hanya `ci.yml`, `backup.yml`, `cron-tick.yml`,
+> Catatan: per `main` @ `9fdba90` belum ada workflow e2e di `.github/workflows/` (hanya `ci.yml`, `backup.yml`, `cron-tick.yml`,
 > `relayer-balance.yml`). Kolom "Bukti" hanya menyebut test/CI yang benar-benar ada; eksekusi fallback end-to-end
 > dicatat di [`GATE-3.md`](GATE-3.md) dan gladi di [`DRY-RUN.md`](DRY-RUN.md).
 
@@ -45,6 +45,7 @@ Pemicu: Sakurupiah/Pakasir down, QR tidak muncul, webhook tidak datang.
    Per 22 Nov production melaporkan `devTools: false` di `GET /config`, jadi langkah ini perlu redeploy.
 3. Donasi → klik *Simulasikan bayar* → status PAID → notarisasi berjalan seperti biasa.
 4. Narasi ke juri: "gateway disimulasikan; verifikasi webhook asli diuji di test otomatis (PAY-07..09)".
+5. Setelah demo: kembalikan `ENABLE_DEV_TOOLS=false`, redeploy, pastikan `GET /config` → `devTools: false`.
 
 ### F-3 — Sepolia lambat → Hardhat lokal
 
@@ -79,7 +80,7 @@ Ikuti [`BACKUP.md`](../BACKUP.md) bagian *Restore manual*; ringkasnya:
    admin: hash harus tetap cocok dengan on-chain.
 5. Untuk demo saja: Postgres lokal + seed (`pnpm bc-local:db:setup`) lebih cepat daripada restore.
 
-Catatan risiko: workflow backup belum pernah jalan terjadwal ([#34](https://github.com/Fundchainbinus/fundchain/issues/34)),
+Catatan risiko: workflow backup baru jalan manual; run terjadwal pertama belum teramati ([#34](https://github.com/Fundchainbinus/fundchain/issues/34)),
 dan artifact ada di repo public ([#33](https://github.com/Fundchainbinus/fundchain/issues/33)). Jalankan backup manual
 H-1 demo.
 

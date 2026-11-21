@@ -34,7 +34,7 @@ Papan triase memakai **GitHub Issues** di `Fundchainbinus/fundchain` dengan labe
 | Issue | Bug | Severity | Area | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
 | [#33](https://github.com/Fundchainbinus/fundchain/issues/33) | QA-001 — Repo public sementara workflow DB backup mengunggah dump (terenkripsi) sebagai artifact | S2 | infra | TL + BE Infra | Open, butuh keputusan TL |
-| [#34](https://github.com/Fundchainbinus/fundchain/issues/34) | QA-002 — Cron tick, relayer balance, DB backup belum pernah jalan lewat `schedule` | S2 | infra | BE Infra | Open |
+| [#34](https://github.com/Fundchainbinus/fundchain/issues/34) | QA-002 — Cron tick belum pernah jalan lewat `schedule` (~6 jam setelah masuk `main`); backup & relayer balance belum lewat slot pertama | S2 | infra | BE Infra | Open |
 | [#27](https://github.com/Fundchainbinus/fundchain/issues/27) | BUG-009 — `GET /me/donations` tanpa batas, memuat relasi penuh | S3 | api, perf | BE Donation | Open |
 | [#28](https://github.com/Fundchainbinus/fundchain/issues/28) | BUG-010 — `GET /me/points` menjumlah di JS | S3 | api, perf | BE Donation | Open |
 | [#29](https://github.com/Fundchainbinus/fundchain/issues/29) | BUG-011 — `completeExpired` / `softDeleteFrozen` tanpa batas per tick | S3 | api, perf | BE Campaign | Open |
@@ -61,6 +61,6 @@ verify-all membaca `hasMore`), jadi tidak dibuatkan issue.
 
 | ID | Catatan | Tindak lanjut |
 | --- | --- | --- |
-| T-1 | DB production berisi 1 donasi `TAMPERED` dan 1 campaign `FROZEN`. Audit log mencatat `INTEGRITY_TAMPERED` sejak 2 Okt 2026 dan `CAMPAIGN_FROZEN` (2 Okt, 7 Okt). Ini perilaku yang benar dari integrity checker terhadap data yang diubah saat uji tamper, bukan defect kode | Tim BC mengonfirmasi asalnya dan memutuskan: biarkan sebagai bukti fitur, atau pulihkan lewat alur resmi. Jangan ubah DB langsung |
+| T-1 | DB production berisi 1 donasi `TAMPERED` dan 1 campaign `FROZEN`. Audit log mencatat `INTEGRITY_TAMPERED` sejak 2 Okt 2026 dan `CAMPAIGN_FROZEN` (2 Okt, 7 Okt). Query agregat read-only (22 Nov): `amount` donasi itu berbeda dari nominal di `canonical_payload`, jadi data diubah setelah notarisasi dan checker bereaksi benar. Bukan defect kode; siapa yang mengubah belum dikonfirmasi | Tim BC mengonfirmasi asalnya dan memutuskan: biarkan sebagai bukti fitur, atau pulihkan lewat alur resmi. Jangan ubah DB langsung |
 | T-2 | Login Google menerima akun non-BINUS (D-006); kasus AUTH-02 di test plan tidak berlaku | Keputusan PM, catat di DECISIONS bila dibatasi |
 | T-3 | Gateway down saat expiry → EXPIRED (bukan PENDING seperti test plan §7), sesuai D-005 | Tidak ada aksi; test plan perlu diselaraskan |

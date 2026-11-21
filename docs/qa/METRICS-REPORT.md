@@ -41,10 +41,10 @@ yang dibayar sebelum kontrak ada (antre sampai deploy), jadi angka yang mewakili
 | --- | --- |
 | Donasi yang pernah dicek (`last_checked_at` terisi) | 16 |
 | **Integrity pass rate** (VERIFIED / dicek) | **15 / 16 = 93,75%** |
-| TAMPERED | 1 (hasil uji tamper; campaign terkait FROZEN, lihat BUG-TRIAGE T-1) |
+| TAMPERED | 1: kolom `amount` berbeda dari nominal di `canonical_payload` (data diubah setelah notarisasi); campaign terkait FROZEN. Lihat BUG-TRIAGE T-1 |
 | Audit `INTEGRITY_VERIFIED` / `INTEGRITY_TAMPERED` | 45 / 5 (1 Okt – 21 Nov) |
 
-Satu-satunya TAMPERED adalah data uji, jadi pass rate untuk data yang tidak diubah = 100%.
+Satu-satunya TAMPERED adalah donasi yang nominalnya diubah di DB, jadi untuk data yang tidak diubah tidak ada mismatch (15/15).
 
 ## 4. Data lain production
 
