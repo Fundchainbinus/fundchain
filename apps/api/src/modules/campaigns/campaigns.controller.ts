@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -64,6 +65,12 @@ export class CampaignsController {
     @ClientIp() ip: string | null,
   ) {
     return this.campaigns.update(id, dto, user, ip);
+  }
+
+  /** Hapus campaign milik sendiri (soft-delete), hanya saat DRAFT/REJECTED (BFD-13). */
+  @Delete('campaigns/:id')
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: CurrentUserPayload, @ClientIp() ip: string | null) {
+    return this.campaigns.remove(id, user, ip);
   }
 
   @Post('campaigns/:id/documents')
