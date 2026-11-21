@@ -16,6 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LIMITS } from '@fundchain/shared';
 import type { Response } from 'express';
+import { IsOptional, IsUUID } from 'class-validator';
 import { memoryStorage } from 'multer';
 import { ClientIp, ClientUserAgent, CurrentUser, type CurrentUserPayload, Public, Roles } from '../../common/auth';
 import { createSignedQuery, verifySignedQuery } from '../../common/signed-link';
@@ -25,6 +26,13 @@ import { CampaignsService } from './campaigns.service';
 
 export const uploadInterceptor = (field: string) =>
   FileInterceptor(field, { storage: memoryStorage(), limits: { fileSize: LIMITS.FILE_MAX_BYTES, files: 1 } });
+
+/** JSON { fileId } untuk file yang sudah diunggah langsung ke Supabase (BFD-15); kosong untuk multipart. */
+export class AttachDocumentDto {
+  @IsOptional()
+  @IsUUID('all', { message: 'fileId tidak valid' })
+  fileId?: string;
+}
 
 @Controller()
 export class CampaignsController {
@@ -73,15 +81,17 @@ export class CampaignsController {
     return this.campaigns.remove(id, user, ip);
   }
 
+  /** multipart `file` (≤4MB, driver db/supabase) atau JSON { fileId } (upload langsung ≤10MB, driver supabase). */
   @Post('campaigns/:id/documents')
   @UseInterceptors(uploadInterceptor('file'))
   upload(
     @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: AttachDocumentDto,
     @CurrentUser() user: CurrentUserPayload,
     @ClientIp() ip: string | null,
   ) {
-    return this.campaigns.uploadDocument(id, file, user, ip);
+    return this.campaigns.uploadDocument(id, file, user, ip, body?.fileId);
   }
 
   @Post('campaigns/:id/submit')
@@ -93,8 +103,8 @@ export class CampaignsController {
   @Public()
   @Get('documents/:id/link')
   async link(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: CurrentUserPayload) {
-    await this.campaigns.assertDocumentVisible(id, user);
-    return { url: `/api/v1/documents/${id}/file?${createSignedQuery(`document:${id}`)}` };
+    const direct = await this.campaigns.documentDirectUrl(id, user);
+    return { url: direct ?? `/api/v1/documents/${id}/file?${createSignedQuery(`document:${id}`)}` };
   }
 
   @Public()

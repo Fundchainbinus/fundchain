@@ -17,7 +17,7 @@ import {
   Stat,
   SuccessBox,
 } from '../../components/ui';
-import { errorMessage, get, openProtectedFile, post } from '../../lib/api';
+import { errorMessage, get, openSignedFile, post } from '../../lib/api';
 import { date, dateTime, fileSize, rupiah, sdg, shortHash } from '../../lib/format';
 import type { AdminDisbursement, AuditLog, CampaignDetail, CampaignSummary, ChainInfo, VerifyResult } from '../../lib/types';
 
@@ -504,7 +504,7 @@ export function AdminDisbursementsPage() {
   const selected = list.find((d) => d.id === selectedId) ?? list[0];
   const openProof = (id: string) => {
     setProofError(null);
-    openProtectedFile(`/disbursements/${id}/proof`).catch((e) => setProofError(errorMessage(e)));
+    openSignedFile(`/disbursements/${id}/proof/link`).catch((e) => setProofError(errorMessage(e)));
   };
 
   return (

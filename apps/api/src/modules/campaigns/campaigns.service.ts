@@ -181,12 +181,24 @@ export class CampaignsService {
     return updated;
   }
 
-  async uploadDocument(id: string, file: Express.Multer.File | undefined, user: CurrentUserPayload, ip: string | null) {
+  /**
+   * Lampirkan proposal: multipart (`file`) atau `fileId` dari upload langsung ke Supabase (BFD-15);
+   * untuk fileId, magic bytes diverifikasi dari Storage sebelum file ditandai CONFIRMED.
+   */
+  async uploadDocument(
+    id: string,
+    file: Express.Multer.File | undefined,
+    user: CurrentUserPayload,
+    ip: string | null,
+    fileId?: string,
+  ) {
     const campaign = await this.getOwned(id, user);
     if (!EDITABLE_STATUSES.includes(campaign.status as CampaignStatus)) {
       throw new AppError('CAMPAIGN_INVALID_STATUS', 'Proposal hanya bisa diunggah saat DRAFT atau REJECTED.');
     }
-    const stored = await this.storage.save(file, `proposals/${id}`, ['pdf']);
+    const stored = fileId
+      ? await this.storage.confirmDirect(fileId, user.id, 'campaign-document')
+      : await this.storage.save(file, `proposals/${id}`, ['pdf']);
     const doc = await this.prisma.campaignDocument.create({
       data: {
         campaignId: id,
@@ -257,6 +269,12 @@ export class CampaignsService {
       throw e;
     }
     return doc;
+  }
+
+  /** Signed URL Supabase (5 menit) bila dokumen tersimpan di Supabase; null → pakai link API bertanda tangan. */
+  async documentDirectUrl(documentId: string, user?: CurrentUserPayload): Promise<string | null> {
+    const doc = await this.assertDocumentVisible(documentId, user);
+    return this.storage.signedDownloadUrl(await this.storage.findByKey(doc.storageKey));
   }
 
   /** `signedOk` = URL membawa tanda tangan valid (sudah diotorisasi saat link dibuat). */

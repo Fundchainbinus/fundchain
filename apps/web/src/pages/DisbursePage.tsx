@@ -2,9 +2,10 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { DisbursementBadge, ErrorBox, FilterTabs, InfoNote, Panel, Spinner, SuccessBox } from '../components/ui';
-import { api, get } from '../lib/api';
+import { get } from '../lib/api';
 import { date, rupiah } from '../lib/format';
 import type { CampaignDetail, Disbursement } from '../lib/types';
+import { attachFile, maxSizeLabel, useFilesConfig } from '../lib/upload';
 
 type CampaignRef = { id: string; title: string };
 
@@ -16,14 +17,20 @@ export function DisburseFormCard({ campaigns, initialId }: { campaigns: Campaign
   const [amount, setAmount] = useState(0);
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const filesConfig = useFilesConfig();
+  const [progress, setProgress] = useState<number | null>(null);
   const create = useMutation({
-    mutationFn: () => {
-      const fd = new FormData();
-      fd.append('amount', String(amount));
-      fd.append('description', description);
-      if (file) fd.append('proof', file);
-      return api.post(`/campaigns/${campaignId}/disbursements`, fd);
-    },
+    mutationFn: () =>
+      attachFile({
+        url: `/campaigns/${campaignId}/disbursements`,
+        file: file!,
+        purpose: 'disbursement-proof',
+        fileField: 'proof',
+        fields: { amount, description },
+        config: filesConfig,
+        onProgress: setProgress,
+      }),
+    onSettled: () => setProgress(null),
     onSuccess: () => {
       setAmount(0);
       setDescription('');
@@ -75,12 +82,12 @@ export function DisburseFormCard({ campaigns, initialId }: { campaigns: Campaign
         <div>
           <label className="label" htmlFor="disb-proof">Bukti milestone *</label>
           <input id="disb-proof" type="file" accept=".pdf,.png,.jpg,.jpeg" className="input" onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={frozen} />
-          <p className="mt-1 text-xs text-slate-500">Bukti wajib dilampirkan untuk setiap pengajuan.</p>
+          <p className="mt-1 text-xs text-slate-500">Bukti wajib dilampirkan untuk setiap pengajuan (PDF/PNG/JPG · maksimum {maxSizeLabel(filesConfig.maxBytes)}).</p>
         </div>
         <ErrorBox error={create.error} />
         {create.isSuccess && <SuccessBox>Pengajuan terkirim dan menunggu review admin.</SuccessBox>}
         <button className="btn-primary font-normal" disabled={frozen || create.isPending || !amount || !file || description.trim().length < 10}>
-          {create.isPending ? 'Mengirim…' : 'Ajukan pencairan'}
+          {create.isPending ? `Mengirim…${progress !== null ? ` ${progress}%` : ''}` : 'Ajukan pencairan'}
         </button>
       </form>
     </div>
