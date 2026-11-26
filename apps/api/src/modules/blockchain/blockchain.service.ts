@@ -38,6 +38,12 @@ export function toWei(value: unknown): bigint {
   return BigInt(String(value).split('.')[0] || '0');
 }
 
+/** Tempat sebuah donasi dinotarisasi (disimpan per baris blockchain_transactions). */
+export interface ChainOrigin {
+  chainId: number;
+  contractAddress: string | null;
+}
+
 export interface ChainTarget {
   network: string;
   chainId: number;
@@ -53,6 +59,7 @@ export class BlockchainService {
   private readonly logger = new Logger('Blockchain');
   private provider?: JsonRpcProvider;
   private wallet?: Wallet;
+  private readonly readProviders = new Map<number, JsonRpcProvider>();
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -119,9 +126,33 @@ export class BlockchainService {
     }
   }
 
-  async readOnchainHash(onchainKey: string): Promise<string> {
+  /**
+   * Kontrak untuk MEMBACA bukti donasi di chain tempat ia dinotarisasi. Setelah pindah jaringan
+   * (Sepolia → Binusian), donasi lama tetap dibaca dari Sepolia lewat BLOCKCHAIN_READ_RPCS.
+   */
+  private readContractFor(origin?: ChainOrigin): Contract {
+    const target = this.target();
+    const sameChain = !origin || origin.chainId === target.chainId;
+    const sameContract =
+      !origin?.contractAddress || !target.contractAddress || origin.contractAddress.toLowerCase() === target.contractAddress.toLowerCase();
+    if (sameChain && sameContract) return this.contract();
+    const address = origin!.contractAddress;
+    if (!address || !ethers.isAddress(address)) {
+      throw new AppError('BLOCKCHAIN_RPC_ERROR', `Alamat contract untuk chain ${origin!.chainId} tidak tercatat.`);
+    }
+    let provider: JsonRpcProvider | undefined = sameChain ? this.getProvider() : this.readProviders.get(origin!.chainId);
+    if (!provider) {
+      const url = env().blockchain.readRpcs[origin!.chainId];
+      if (!url) throw new AppError('BLOCKCHAIN_RPC_ERROR', `Tidak ada RPC baca untuk chain ${origin!.chainId} (BLOCKCHAIN_READ_RPCS).`);
+      provider = new JsonRpcProvider(url, origin!.chainId, { staticNetwork: true });
+      this.readProviders.set(origin!.chainId, provider);
+    }
+    return new Contract(address, DONATION_REGISTRY_ABI as unknown as string[], provider);
+  }
+
+  async readOnchainHash(onchainKey: string, origin?: ChainOrigin): Promise<string> {
     try {
-      return (await this.contract().verify(onchainKey)) as string;
+      return (await this.readContractFor(origin).verify(onchainKey)) as string;
     } catch (e) {
       if (e instanceof AppError) throw e;
       this.logger.warn(`verify() gagal: ${(e as Error).message}`);
@@ -210,13 +241,21 @@ export class BlockchainService {
       ready: health.ready,
       reason: health.reason ?? null,
       relayer,
-      explorerUrl: target.contractAddress ? explorerAddressUrl(target.chainId, target.contractAddress) : null,
+      explorerUrl: target.contractAddress
+        ? env().blockchain.explorerUrl
+          ? `${env().blockchain.explorerUrl}/address/${target.contractAddress}`
+          : explorerAddressUrl(target.chainId, target.contractAddress)
+        : null,
       ...(opts.fees === false ? {} : { fees: await this.feeStats() }),
     };
   }
 
   explorerTx(chainId: number, txHash: string | null) {
-    return txHash ? explorerTxUrl(chainId, txHash) : null;
+    if (!txHash) return null;
+    const custom = env().blockchain.explorerUrl;
+    // Explorer kustom hanya berlaku untuk chain aktif; tx lama di Sepolia tetap ke Etherscan.
+    if (custom && chainId === this.target().chainId) return `${custom}/tx/${txHash}`;
+    return explorerTxUrl(chainId, txHash);
   }
 
   /** Ambil nama custom error dari revert contract (AlreadyNotarized, ZeroHash, ...). */

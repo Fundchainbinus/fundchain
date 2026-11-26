@@ -66,7 +66,7 @@ export class IntegrityService {
       throw new AppError('BLOCKCHAIN_NOT_NOTARIZED', `Notarisasi masih berstatus ${donation.blockchain.status}.`);
     }
 
-    const onChainHash = await this.blockchain.readOnchainHash(donation.blockchain.onchainKey);
+    const onChainHash = await this.blockchain.readOnchainHash(donation.blockchain.onchainKey, donation.blockchain);
     if (this.blockchain.isZero(onChainHash)) {
       throw new AppError('BLOCKCHAIN_NOT_NOTARIZED', 'Hash donasi tidak ditemukan di blockchain.');
     }
@@ -256,7 +256,7 @@ export class IntegrityService {
     let onChainError: string | null = null;
     if (bc?.status === 'CONFIRMED') {
       try {
-        const h = await this.blockchain.readOnchainHash(bc.onchainKey);
+        const h = await this.blockchain.readOnchainHash(bc.onchainKey, bc);
         hashOnChain = this.blockchain.isZero(h) ? null : h;
       } catch (e) {
         onChainError = (e as Error).message;

@@ -204,7 +204,7 @@ export function DonationProofPage() {
                     </span>
                     {explorerUrl && (
                       <a href={explorerUrl} target="_blank" rel="noreferrer" className="btn-secondary btn-sm">
-                        Lihat di Etherscan <ExternalLink size={12} aria-hidden />
+                        Lihat di block explorer <ExternalLink size={12} aria-hidden />
                         <span className="sr-only">(tab baru)</span>
                       </a>
                     )}

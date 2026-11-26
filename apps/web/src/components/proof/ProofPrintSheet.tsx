@@ -27,7 +27,7 @@ export function ProofPrintSheet({ d, proof, verdict }: { d: DonationDetail; proo
     ['Waktu konfirmasi', dateTime(proof?.timestamp ?? bc?.confirmedAt ?? null)],
     ['Jaringan', `${proof?.network ?? bc?.network ?? '—'} (chain ID ${proof?.chainId ?? bc?.chainId ?? '—'})`],
     ['Smart contract', proof?.contractAddress ?? bc?.contractAddress ?? '—'],
-    ['Etherscan', proof?.etherscanUrl ?? bc?.explorerUrl ?? '—'],
+    ['Block explorer', proof?.etherscanUrl ?? bc?.explorerUrl ?? '—'],
     ['Waktu verifikasi', proof ? dateTime(proof.checkedAt) : '—'],
   ];
   return (
@@ -47,7 +47,7 @@ export function ProofPrintSheet({ d, proof, verdict }: { d: DonationDetail; proo
       </table>
       <p className="mt-4 text-[11px]">
         Hash adalah bukti integritas Keccak-256 atas data donasi, bukan transfer dana di blockchain. Tidak ada data pribadi yang disimpan on-chain.
-        Siapa pun dapat mencocokkan hash on-chain melalui URL Etherscan di atas.
+        Siapa pun dapat mencocokkan hash on-chain melalui URL block explorer di atas.
       </p>
     </section>
   );

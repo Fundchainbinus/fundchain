@@ -18,6 +18,12 @@ const config: HardhatUserConfig = {
       accounts: sepoliaAccounts,
       chainId: 11155111,
     },
+    // Jaringan privat Binusian (Hyperledger Besu QBFT, lihat infra/binusian-chain). D-013.
+    binusian: {
+      url: process.env.BINUSIAN_RPC_URL || 'http://127.0.0.1:8545',
+      accounts: sepoliaAccounts,
+      chainId: Number(process.env.BINUSIAN_CHAIN_ID || 2026),
+    },
   },
   // `npx hardhat verify` / scripts/verify-contract.ts. Key HANYA dari env, jangan di-commit.
   // hardhat-verify 2.x memakai Etherscan API v2 (satu key untuk semua chain, termasuk Sepolia).

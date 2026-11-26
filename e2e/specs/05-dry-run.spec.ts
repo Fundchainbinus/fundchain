@@ -150,7 +150,7 @@ test('Gate 3: gladi bersih skrip demo 13-DEMO-FLOW (video + trace)', async ({ br
       await expect(student.getByRole('status').filter({ hasText: 'CONFIRMED' })).toBeVisible({ timeout: 30_000 });
       await scrollToTop(student.getByRole('heading', { name: 'Hash Database vs Hash On-chain' }));
       await shot(student, 'gate3-05-transparansi-cocok');
-      await expect(student.getByRole('link', { name: /Lihat di Etherscan/ })).toHaveCount(0);
+      await expect(student.getByRole('link', { name: /Lihat di block explorer/ })).toHaveCount(0);
       const proof = await api.ok<{ match: boolean; etherscanUrl: string | null }>('GET', `/donations/${donationId}/proof`);
       expect(proof.match).toBe(true);
       const after = await api.ok<{ integrityStatus: string }>('GET', `/donations/${donationId}`);

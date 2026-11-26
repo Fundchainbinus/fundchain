@@ -56,6 +56,16 @@ export function env() {
       contractAddress: e.CONTRACT_ADDRESS || '',
       relayerPrivateKey: e.RELAYER_PRIVATE_KEY || '',
       /**
+       * Explorer chain aktif (mis. Blockscout jaringan privat Binusian). Kosong = pakai explorer bawaan
+       * (Etherscan untuk Sepolia) atau tanpa link.
+       */
+      explorerUrl: (e.BLOCKCHAIN_EXPLORER_URL || '').replace(/\/$/, ''),
+      /**
+       * RPC baca-saja untuk chain LAMA, agar bukti donasi yang dinotarisasi sebelum pindah jaringan tetap
+       * bisa diverifikasi. Format: "chainId=url,chainId=url". Sepolia publik selalu tersedia sebagai default.
+       */
+      readRpcs: parseReadRpcs(e.BLOCKCHAIN_READ_RPCS),
+      /**
        * BFD-48: jumlah konfirmasi blok sebelum notarisasi dianggap CONFIRMED (minimal 1).
        * Default 2; khusus Hardhat lokal (CHAIN_ID=31337, automine 1 blok per tx) default 1
        * karena blok kedua baru muncul saat ada tx lain. Nilai eksplisit selalu dipakai.
@@ -134,6 +144,17 @@ export function apiDocsEnabled(e: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 /** Cari file deployment Hardhat (contracts/deployments/<network>.json). */
+const DEFAULT_READ_RPCS: Record<number, string> = { 11155111: 'https://ethereum-sepolia-rpc.publicnode.com' };
+
+export function parseReadRpcs(value: string | undefined): Record<number, string> {
+  const out: Record<number, string> = { ...DEFAULT_READ_RPCS };
+  for (const part of (value || '').split(',')) {
+    const m = /^\s*(\d+)\s*=\s*(https?:\/\/\S+)\s*$/.exec(part);
+    if (m) out[Number(m[1])] = m[2];
+  }
+  return out;
+}
+
 export function readDeploymentFile(network: string): { address: string; chainId: number } | null {
   const candidates = [
     path.resolve(process.cwd(), '../../contracts/deployments', `${network}.json`),

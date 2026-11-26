@@ -350,3 +350,32 @@ test `apps/api/src/sakurupiah.test.ts`. Sumber: https://sakurupiah.id/developers
 - Template MoU dan proposal kemitraan untuk perusahaan (BFD-102, BizDev).
 - Desain final halaman sponsor (BFD-101); halaman saat ini memakai komponen yang sudah ada.
 - Rekening penampung dana CSR dan siapa yang berwenang mencatat kontribusi.
+
+---
+
+## D-013 — Pindah dari Sepolia publik ke jaringan privat Binusian (menggantikan sebagian D-008)
+
+**Status:** kode siap, **jaringan belum dibangun** · **Kode:** `apps/api/src/modules/blockchain/blockchain.service.ts`
+(`readContractFor`), `contracts/hardhat.config.ts` (network `binusian`), `infra/binusian-chain/`.
+
+### Konteks
+
+Product owner meminta notarisasi pindah dari Sepolia (publik) ke jaringan privat untuk Binusian. Kode lama selalu
+membaca bukti dari contract yang sedang dikonfigurasi, jadi setelah pindah, 16+ donasi yang sudah dinotarisasi di
+Sepolia akan gagal diverifikasi ("hash tidak ditemukan").
+
+### Keputusan
+
+1. Jaringan privat = Hyperledger Besu QBFT, 4 validator milik BINUS, chainId default 2026, gas price 0.
+2. Verifikasi membaca hash dari **chain & contract tempat donasi dinotarisasi** (`blockchain_transactions.chain_id`,
+   `contract_address`). Chain lama dibaca lewat `BLOCKCHAIN_READ_RPCS` (Sepolia publik sudah default).
+3. Notarisasi baru selalu ke chain aktif. Tidak ada migrasi hash lama: bukti Sepolia tetap sah di Sepolia.
+4. Link explorer: `BLOCKCHAIN_EXPLORER_URL` untuk chain aktif; tx Sepolia tetap ke Etherscan. Teks UI diganti
+   "block explorer".
+
+### Konsekuensi / perlu manusia
+
+- Siapa yang mengoperasikan validator (BINUS IT?), server, VPN untuk RPC, dan backup kunci validator.
+- Trade-off yang harus disetujui: jaringan privat tidak bisa diaudit publik seperti Etherscan; transparansi bergantung
+  pada explorer yang dibuka BINUS. Pertimbangkan tetap menulis checkpoint berkala ke chain publik.
+- Redeploy contract di jaringan baru dan ganti env production (langkah di `infra/binusian-chain/README.md`).

@@ -1,0 +1,50 @@
+# Jaringan privat Binusian: 4 validator Hyperledger Besu (QBFT, toleran 1 node gagal).
+# Jalankan generate.sh dulu. Hanya node1 yang membuka RPC, dan hanya ke localhost server;
+# API FundChain mengakses lewat reverse proxy/VPN kampus, bukan internet publik.
+name: binusian-chain
+
+x-besu: &besu
+  image: ${BESU_IMAGE:-hyperledger/besu:24.10.0}
+  restart: unless-stopped
+  command:
+    - --data-path=/data
+    - --genesis-file=/config/genesis.json
+    - --node-private-key-file=/keys/key
+    - --min-gas-price=0
+    - --p2p-port=30303
+    - --rpc-http-enabled
+    - --rpc-http-host=0.0.0.0
+    - --rpc-http-api=ETH,NET,WEB3,QBFT
+    - --host-allowlist=*
+    - --bootnodes=${BOOTNODE}
+    - --sync-min-peers=1
+
+services:
+  node1:
+    <<: *besu
+    volumes: ["./config:/config:ro", "./node1:/keys:ro", "node1-data:/data"]
+    ports: ["127.0.0.1:8545:8545"]
+    networks: { chain: { ipv4_address: 172.16.240.11 } }
+  node2:
+    <<: *besu
+    volumes: ["./config:/config:ro", "./node2:/keys:ro", "node2-data:/data"]
+    networks: { chain: { ipv4_address: 172.16.240.12 } }
+  node3:
+    <<: *besu
+    volumes: ["./config:/config:ro", "./node3:/keys:ro", "node3-data:/data"]
+    networks: { chain: { ipv4_address: 172.16.240.13 } }
+  node4:
+    <<: *besu
+    volumes: ["./config:/config:ro", "./node4:/keys:ro", "node4-data:/data"]
+    networks: { chain: { ipv4_address: 172.16.240.14 } }
+
+networks:
+  chain:
+    ipam:
+      config: [{ subnet: 172.16.240.0/24 }]
+
+volumes:
+  node1-data:
+  node2-data:
+  node3-data:
+  node4-data:
