@@ -8,7 +8,8 @@
  *   pnpm --filter @fundchain/api campaign:fix-content --all --apply
  *       ← perbaiki SEMUA campaign yang punya konten siap pakai (prisma/proposals.ts)
  *   pnpm --filter @fundchain/api campaign:fix-content --campaign <id> --apply [--description-file f.txt] [--sdg KODE]
- *       ← satu campaign; --description-file untuk judul yang belum punya konten siap pakai
+ *       ← satu campaign; --description-file untuk judul yang belum punya konten siap pakai;
+ *         --attach-proposal memaksa lampirkan proposal lengkap (mis. yang terunggah ternyata file presentasi)
  *
  * Yang diubah per campaign (hanya bila perlu):
  *   - deskripsi asal ketik → deskripsi siap pakai,
@@ -48,11 +49,11 @@ interface Plan {
   problems: string[];
 }
 
-function planFor(c: Row, overrides: { description?: string; sdg?: string } = {}): Plan {
+function planFor(c: Row, overrides: { description?: string; sdg?: string; attachProposal?: boolean } = {}): Plan {
   const problems: string[] = [];
   const descProblem = gibberishProblem(c.description);
   if (descProblem) problems.push(`deskripsi: ${descProblem}`);
-  const dummy = dummyProposal(c.documents);
+  const dummy = dummyProposal(c.documents) || Boolean(overrides.attachProposal);
   if (dummy) problems.push(`proposal dummy: ${c.documents.map((d) => `${d.originalName} (${d.size} B)`).join(', ') || 'tidak ada'}`);
 
   const newDesc = overrides.description ?? (descProblem ? PREPARED_DESCRIPTIONS[c.title] : undefined);
@@ -161,7 +162,12 @@ async function main() {
     const id = arg('--campaign');
     const doApply = process.argv.includes('--apply');
     const file = arg('--description-file');
-    const overrides = { description: file ? fs.readFileSync(file, 'utf8').trim() : undefined, sdg: arg('--sdg') };
+    const overrides = {
+      description: file ? fs.readFileSync(file, 'utf8').trim() : undefined,
+      sdg: arg('--sdg'),
+      // Proposal yang ada bukan proposal (mis. file presentasi) tapi tidak terdeteksi dummy.
+      attachProposal: process.argv.includes('--attach-proposal'),
+    };
 
     const rows = id ? await load(prisma, { id }) : await load(prisma);
     if (id && !rows.length) throw new Error(`Campaign ${id} tidak ditemukan.`);
