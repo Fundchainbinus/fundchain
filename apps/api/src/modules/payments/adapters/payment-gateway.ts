@@ -37,7 +37,7 @@ export interface PaymentGateway {
   /** Verifikasi keaslian webhook; lempar PAYMENT_SIGNATURE_INVALID bila palsu. */
   verifyWebhook(input: WebhookInput): Promise<GatewayEvent>;
   /** Fallback polling bila webhook tidak datang. */
-  fetchStatus?(orderId: string, amount: number): Promise<GatewayEvent | null>;
+  fetchStatus?(orderId: string, amount: number, externalId?: string | null): Promise<GatewayEvent | null>;
   /** Batalkan charge PENDING di sisi gateway (dipanggil saat expire). Best-effort. */
   cancelCharge?(orderId: string, amount: number): Promise<void>;
 }

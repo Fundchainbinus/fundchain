@@ -25,12 +25,27 @@ export function env() {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
     devTools: bool(e.ENABLE_DEV_TOOLS, true),
-    paymentProvider: (e.PAYMENT_PROVIDER || 'mock') as 'mock' | 'pakasir',
+    paymentProvider: (e.PAYMENT_PROVIDER || 'mock') as 'mock' | 'pakasir' | 'sakurupiah',
     mockWebhookSecret: e.MOCK_WEBHOOK_SECRET || 'dev-mock-webhook-secret',
     pakasir: {
       project: e.PAKASIR_PROJECT || '',
       apiKey: e.PAKASIR_API_KEY || '',
       baseUrl: (e.PAKASIR_BASE_URL || 'https://app.pakasir.com').replace(/\/$/, ''),
+    },
+    /** Sakurupiah (D-002). SAKURUPIAH_SANDBOX=true → endpoint api-sanbox (ejaan resmi Sakurupiah). */
+    sakurupiah: {
+      apiId: e.SAKURUPIAH_API_ID || '',
+      apiKey: e.SAKURUPIAH_API_KEY || '',
+      baseUrl: (
+        e.SAKURUPIAH_BASE_URL || (bool(e.SAKURUPIAH_SANDBOX, true) ? 'https://sakurupiah.id/api-sanbox' : 'https://sakurupiah.id/api')
+      ).replace(/\/$/, ''),
+      method: e.SAKURUPIAH_METHOD || 'QRIS',
+      /** URL publik webhook, mis. https://fundchain-api.vercel.app/api/v1/webhooks/payment */
+      callbackUrl: e.SAKURUPIAH_CALLBACK_URL || '',
+      /** Field phone wajib di Sakurupiah; FundChain tidak menyimpan HP donatur, jadi dipakai nomor merchant. */
+      phone: e.SAKURUPIAH_PHONE || '',
+      /** merchant = fee ditanggung FundChain (total = nominal donasi); customer = donatur bayar fee. */
+      feeBy: (e.SAKURUPIAH_FEE_BY === 'customer' ? 'customer' : 'merchant') as 'merchant' | 'customer',
     },
     /** Secret untuk endpoint cron (Vercel Cron mengirim Authorization: Bearer <CRON_SECRET>). */
     cronSecret: e.CRON_SECRET || '',
@@ -98,7 +113,7 @@ export function insecureDefaultWarnings(e: NodeJS.ProcessEnv = process.env): str
   }
   if (!e.MOCK_WEBHOOK_SECRET) {
     warnings.push(
-      'MOCK_WEBHOOK_SECRET tidak di-set — webhook mock memakai secret default publik "dev-mock-webhook-secret". Set secret acak, atau pakai PAYMENT_PROVIDER=pakasir.',
+      'MOCK_WEBHOOK_SECRET tidak di-set — webhook mock memakai secret default publik "dev-mock-webhook-secret". Set secret acak, atau pakai PAYMENT_PROVIDER=sakurupiah.',
     );
   }
   return warnings;

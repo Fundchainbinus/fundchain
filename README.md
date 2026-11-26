@@ -125,7 +125,7 @@ FundChain_Complete_Planning_Docs   dokumen perencanaan (PRD, API spec, dll.)
 | PostgreSQL          | PostgreSQL di Supabase (Prisma, pooler + direct URL)                      | Sesuai rencana deploy; RLS aktif di semua tabel     |
 | Redis + BullMQ      | Tabel `blockchain_transactions` sebagai antrean (outbox) + worker polling | Tanpa Redis; retry/backoff/FAILED tetap sesuai spec |
 | Microsoft SSO       | Persona switcher (`DEMO_MODE`)                                            | Permintaan: tanpa login                             |
-| Midtrans            | `mock` (default) + adapter `pakasir` (deprecated) → pindah ke Sakurupiah (BFD-107–111) | Keputusan tim; detail di [D-002](docs/DECISIONS.md#d-002--payment-gateway-pakasir--sakurupiah-bfd-107--bfd-111) |
+| Midtrans            | `mock` (default) + adapter `sakurupiah` (QRIS, belum diuji ke sandbox) + `pakasir` (deprecated) | Keputusan tim; detail di [D-002](docs/DECISIONS.md#d-002--payment-gateway-pakasir--sakurupiah-bfd-107--bfd-111) |
 | Worker app terpisah | Worker di dalam proses API                                                | Satu perintah untuk jalan                           |
 | Refund (BFD-75)     | Manual oleh admin (wajib alasan), hanya donasi PAID di campaign FROZEN; status REFUNDED + audit, hash & catatan on-chain tidak diubah; uang dikembalikan di luar sistem | Bukti on-chain permanen; Pakasir tidak punya API refund. Detail di [D-001](docs/DECISIONS.md#d-001--kebijakan-refund-donasi-bfd-75) |
 | RLS (BFD-23)        | RLS deny-all di semua tabel tanpa policy; akses hanya lewat Prisma (role owner), kontrol akses di service; dijaga `rls.test.ts` | Tidak ada akses Supabase/PostgREST dari browser. Ditinjau ulang kalau itu berubah. Detail di [D-003](docs/DECISIONS.md#d-003--rls-deny-all-tetap-dipakai-bfd-23) |
@@ -141,7 +141,7 @@ Log keputusan lengkap: [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 Salin `apps/api/.env.example` → `apps/api/.env` (file ini tidak di-commit). Variabel penting:
 
-- `PAYMENT_PROVIDER=mock|pakasir`, `PAKASIR_PROJECT`, `PAKASIR_API_KEY`. Webhook diarahkan ke `POST /api/v1/webhooks/payment`.
+- `PAYMENT_PROVIDER=mock|sakurupiah|pakasir`. Sakurupiah: `SAKURUPIAH_API_ID`, `SAKURUPIAH_API_KEY`, `SAKURUPIAH_SANDBOX`, `SAKURUPIAH_CALLBACK_URL`, `SAKURUPIAH_PHONE` (lihat `apps/api/.env.example` dan D-011). Webhook diarahkan ke `POST /api/v1/webhooks/payment`.
 - `BLOCKCHAIN_NETWORK`, `BLOCKCHAIN_RPC_URL`, `CHAIN_ID`, `CONTRACT_ADDRESS`, `RELAYER_PRIVATE_KEY`, `BLOCKCHAIN_CONFIRMATIONS`.
 - `DEMO_MODE`, `ENABLE_DEV_TOOLS`: **matikan di produksi.**
 

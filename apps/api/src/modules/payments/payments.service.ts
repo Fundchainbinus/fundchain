@@ -191,7 +191,7 @@ export class PaymentsService {
     if (!this.gateway.fetchStatus) return;
     const payment = await this.prisma.payment.findUnique({ where: { donationId } });
     if (!payment || payment.status !== 'PENDING') return;
-    const event = await this.gateway.fetchStatus(donationId, payment.amount).catch(() => null);
+    const event = await this.gateway.fetchStatus(donationId, payment.amount, payment.externalPaymentId).catch(() => null);
     if (event && event.status !== 'PENDING') await this.applyEvent(event).catch(() => undefined);
   }
 

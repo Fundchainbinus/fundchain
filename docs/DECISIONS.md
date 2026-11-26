@@ -297,3 +297,33 @@ diisi pembuat campaign. Product owner meminta pencairan dibatasi per 20% dana te
 - Form pencairan di web tidak lagi punya input nominal; nominal tampil otomatis.
 - Data seed "Air Bersih" disesuaikan: tahap 1 dan 2 masing-masing Rp270.000 (20% dari Rp1.350.000).
 - Pengajuan lama di production yang dibuat sebelum aturan ini tetap dihitung sebagai tahap yang sudah terpakai.
+
+---
+
+## D-011 — Adapter Sakurupiah (BFD-108 – BFD-110, melanjutkan D-002)
+
+**Status:** diterima, **belum diuji ke sandbox** · **Kode:** `apps/api/src/modules/payments/adapters/sakurupiah.adapter.ts`,
+test `apps/api/src/sakurupiah.test.ts`. Sumber: https://sakurupiah.id/developers/api-dokumentasi (dibaca 26 Nov 2026).
+
+### Keputusan
+
+1. `PAYMENT_PROVIDER=sakurupiah` memakai `create.php` (QRIS, form-urlencoded, `Authorization: Bearer <api_key>`),
+   signature `HMAC-SHA256(api_id + method + merchant_ref + amount, api_key)`. `merchant_ref` = `donation.id`.
+2. Callback diverifikasi dengan `X-Callback-Signature = HMAC-SHA256(raw body, api_key)` (perbandingan waktu-konstan),
+   dan `X-Callback-Event` harus `payment_status`.
+3. Callback tidak membawa nominal. Status `berhasil` dikonfirmasi ulang ke `status-transaction.php` (pakai `trx_id`)
+   untuk mengambil nominal yang dibandingkan dengan DB (BR-DON-002).
+4. Field `phone` wajib di Sakurupiah, tetapi FundChain tidak menyimpan nomor HP donatur. Dipakai nomor
+   merchant dari `SAKURUPIAH_PHONE`. Nama/email donatur tidak dikirim (minim PII).
+5. Fee: default `SAKURUPIAH_FEE_BY=merchant` (FundChain menanggung fee, donatur membayar persis nominal donasi).
+   `customer` membuat donatur membayar fee di atas nominal; nominal yang dibandingkan memakai `amount`, bukan `total`.
+6. Kedaluwarsa: Sakurupiah memakai satuan jam (minimal 1 jam). Batas 15 menit FundChain (D-005) tetap berlaku di DB;
+   pembayaran yang masuk setelah itu tetap diterima (`applyEvent` men-settle payment EXPIRED).
+7. Sakurupiah tidak punya API pembatalan di dokumentasi, jadi `cancelCharge` tidak diimplementasikan.
+
+### Perlu dicek manusia sebelum production
+
+- Akun merchant + KYC (BFD-107), `SAKURUPIAH_API_ID`/`SAKURUPIAH_API_KEY`, dan URL callback di dashboard.
+- Uji sandbox end-to-end (BFD-111): dokumentasi tidak menyebut parameter pasti `status-transaction.php` dan bentuk
+  respons errornya. Bila berbeda, sesuaikan `statusByTrx()`.
+- Keputusan fee (poin 5) oleh PM/bendahara.
