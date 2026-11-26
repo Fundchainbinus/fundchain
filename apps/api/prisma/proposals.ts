@@ -253,6 +253,83 @@ const PROPOSALS: Record<string, ProposalInput> = {
     schedule: ['Minggu 1-3: pengumpulan dan pemilahan buku donasi', 'Minggu 3-4: pembelian buku baru dan rak', 'Minggu 5-6: pengiriman dan kegiatan membaca bersama', 'Minggu 7: laporan akhir'],
     indicators: ['1.000 buku tercatat diterima empat taman baca, dengan tanda terima pengelola.', 'Foto dan daftar hadir kegiatan membaca bersama di setiap lokasi.', 'Nota pembelian diunggah di setiap tahap pencairan.'],
   },
+  'Penyediaan Laptop Belajar untuk Rumah Singgah Pelita': {
+    title: 'Penyediaan Laptop Belajar untuk Rumah Singgah Pelita',
+    sdg: '4 - Pendidikan Berkualitas',
+    location: 'Rumah Singgah Pelita, Jakarta Barat',
+    target: 5_000_000,
+    team: ['Ketua pelaksana - mahasiswa BINUS (pembuat campaign)', 'Dua relawan pengajar komputer', 'Pengurus Rumah Singgah Pelita'],
+    background: [
+      'Rumah Singgah Pelita menampung sekitar 40 anak usia sekolah yang belajar sepulang sekolah. Tugas sekolah kini banyak ' +
+        'dikerjakan dan dikumpulkan secara daring, tetapi rumah singgah hanya memiliki satu komputer lama yang sering rusak.',
+      'Akibatnya anak-anak bergantian memakai ponsel pengurus atau tidak mengumpulkan tugas tepat waktu.',
+    ],
+    goals: [
+      'Menyediakan 3 laptop rekondisi layak pakai untuk kegiatan belajar bersama.',
+      'Menyiapkan koneksi internet dan perangkat pendukung di ruang belajar.',
+      'Melatih anak-anak dasar penggunaan dokumen, presentasi, dan keamanan internet.',
+    ],
+    beneficiaries: 'Sekitar 40 anak usia 9-17 tahun penghuni dan peserta belajar Rumah Singgah Pelita.',
+    activities: [
+      'Pembelian 3 laptop rekondisi bergaransi beserta perangkat lunak pendidikan gratis.',
+      'Pemasangan router dan langganan internet untuk 6 bulan pertama.',
+      'Kelas komputer dasar dua kali seminggu selama 2 bulan oleh relawan mahasiswa.',
+      'Penyusunan jadwal pemakaian dan aturan perawatan laptop bersama pengurus.',
+    ],
+    budget: [
+      ['Laptop rekondisi bergaransi 6 bulan (3 unit)', 3_600_000],
+      ['Router dan langganan internet 6 bulan', 600_000],
+      ['Tas, mouse, dan stopkontak pengaman', 300_000],
+      ['Modul dan konsumsi kelas komputer', 300_000],
+      ['Dokumentasi dan laporan', 200_000],
+    ],
+    tranches: [
+      'laptop pertama.',
+      'laptop kedua.',
+      'laptop ketiga dan perlengkapan pendukung.',
+      'router, internet, dan modul kelas.',
+      'konsumsi kelas, dokumentasi, dan laporan akhir.',
+    ],
+    schedule: ['Minggu 1-2: pembelian laptop dan perangkat', 'Minggu 3: pemasangan internet dan aturan pemakaian', 'Minggu 3-10: kelas komputer dasar', 'Minggu 11: evaluasi dan laporan'],
+    indicators: ['3 laptop tercatat di inventaris rumah singgah dengan tanda terima pengurus.', 'Minimal 30 anak mengikuti kelas komputer dasar.', 'Nota pembelian diunggah di setiap tahap pencairan.'],
+  },
+  'Kelas Coding Gratis untuk Remaja Indonesia': {
+    title: 'Kelas Coding Gratis untuk Remaja Indonesia',
+    sdg: '4 - Pendidikan Berkualitas',
+    location: 'Jakarta Barat (luring) dan kelas daring',
+    target: 5_000_000,
+    team: ['Andi Wijaya - ketua', 'Empat mentor mahasiswa Computer Science BINUS', 'Karang taruna mitra sebagai penyedia tempat'],
+    background: [
+      'Banyak remaja putus sekolah dan lulusan SMA di Jakarta Barat belum memiliki keterampilan digital yang dibutuhkan untuk ' +
+        'pekerjaan tingkat pemula. Kursus pemrograman berbayar tidak terjangkau bagi mereka.',
+    ],
+    goals: [
+      'Mengadakan kelas pemrograman web dasar gratis selama 8 minggu untuk 30 peserta.',
+      'Setiap peserta lulus dengan satu proyek website sederhana sebagai portofolio.',
+    ],
+    beneficiaries: '30 remaja usia 15-19 tahun dari keluarga berpenghasilan rendah, diseleksi bersama karang taruna mitra.',
+    activities: [
+      'Kelas HTML, CSS, dan JavaScript dasar dua kali seminggu (luring dan daring).',
+      'Mentoring proyek mingguan oleh mahasiswa BINUS.',
+      'Demo day: peserta mempresentasikan website buatannya.',
+    ],
+    budget: [
+      ['Sewa 3 laptop untuk peserta tanpa perangkat (8 minggu)', 1_800_000],
+      ['Paket data internet peserta kelas daring (30 orang x 2 bulan)', 1_500_000],
+      ['Konsumsi kelas luring (16 pertemuan)', 1_000_000],
+      ['Sertifikat dan acara demo day', 500_000],
+      ['Dokumentasi dan laporan', 200_000],
+    ],
+    tranches: [
+      'sewa laptop bulan pertama.',
+      'paket data bulan pertama dan konsumsi.',
+      'sewa laptop bulan kedua.',
+      'paket data bulan kedua dan konsumsi.',
+      'demo day, sertifikat, dokumentasi, dan laporan.',
+    ],
+    schedule: ['Minggu 1: seleksi peserta', 'Minggu 2-9: kelas dan mentoring', 'Minggu 10: demo day dan laporan'],
+    indicators: ['Minimal 24 dari 30 peserta menyelesaikan kelas.', 'Setiap lulusan memiliki satu website yang dapat diakses.', 'Daftar hadir dan nota diunggah di setiap tahap pencairan.'],
+  },
 };
 
 /** Deskripsi campaign yang layak tampil untuk "Gerakan Seribu Buku" (pengganti teks asal ketik di production). */
@@ -261,6 +338,25 @@ export const SERIBU_BUKU_DESCRIPTION =
   'yang selama ini hanya memiliki puluhan buku untuk sekitar 300 anak. Sebanyak 600 buku berasal dari donasi buku civitas BINUS, ' +
   'dan dana dipakai untuk membeli 400 buku baru (Rp3.000.000), empat rak buku (Rp800.000), pengiriman ke empat lokasi (Rp600.000), ' +
   'kegiatan membaca bersama (Rp400.000), serta dokumentasi dan laporan (Rp200.000). Setiap tahap pencairan disertai nota dan tanda terima dari pengelola taman baca.';
+
+/** Konten siap pakai untuk campaign production yang deskripsinya asal ketik (dipakai fix-campaign-content.ts). */
+export const PREPARED_DESCRIPTIONS: Record<string, string> = {
+  'Gerakan Seribu Buku untuk Anak Negeri': SERIBU_BUKU_DESCRIPTION,
+  'Penyediaan Laptop Belajar untuk Rumah Singgah Pelita':
+    'Rumah Singgah Pelita di Jakarta Barat menampung sekitar 40 anak yang mengerjakan tugas sekolah secara daring, tetapi hanya punya satu komputer lama yang sering rusak. ' +
+    'Campaign ini menyediakan 3 laptop rekondisi bergaransi (Rp3.600.000), router dan internet 6 bulan (Rp600.000), perlengkapan pendukung (Rp300.000), ' +
+    'kelas komputer dasar oleh relawan mahasiswa BINUS (Rp300.000), serta dokumentasi dan laporan (Rp200.000).',
+  'Kelas Coding Gratis untuk Remaja Indonesia':
+    'Kelas pemrograman web dasar gratis selama 8 minggu untuk 30 remaja usia 15-19 tahun dari keluarga berpenghasilan rendah di Jakarta Barat, dibimbing mahasiswa Computer Science BINUS. ' +
+    'Dana dipakai untuk sewa laptop bagi peserta tanpa perangkat (Rp1.800.000), paket data kelas daring (Rp1.500.000), konsumsi 16 pertemuan (Rp1.000.000), ' +
+    'sertifikat dan demo day (Rp500.000), serta dokumentasi dan laporan (Rp200.000).',
+};
+
+/** Kategori SDG yang benar bila data production salah isi (mis. proyek buku tercatat SDG 14). */
+export const PREPARED_SDG: Record<string, string> = {
+  'Gerakan Seribu Buku untuk Anak Negeri': 'QUALITY_EDUCATION',
+  'Penyediaan Laptop Belajar untuk Rumah Singgah Pelita': 'QUALITY_EDUCATION',
+};
 
 export function proposalFor(title: string): PdfDocument | null {
   const p = PROPOSALS[title];
