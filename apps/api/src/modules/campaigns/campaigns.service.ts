@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CAMPAIGN_STATUSES, LIMITS, nextTranche, PUBLIC_CAMPAIGN_STATUSES, type CampaignStatus } from '@fundchain/shared';
+import { CAMPAIGN_STATUSES, gibberishProblem, LIMITS, nextTranche, PUBLIC_CAMPAIGN_STATUSES, type CampaignStatus } from '@fundchain/shared';
 import { Prisma } from '@prisma/client';
 import { AppError } from '../../common/app-error';
 import type { CurrentUserPayload } from '../../common/auth';
@@ -163,8 +163,15 @@ export class CampaignsService {
     };
   }
 
+  /** Tolak deskripsi asal ketik ("hasjdhjshd…") — dibaca donatur di halaman publik. */
+  private assertReadableDescription(description: string) {
+    const problem = gibberishProblem(description);
+    if (problem) throw new AppError('VALIDATION_ERROR', problem);
+  }
+
   async create(dto: CreateCampaignDto, user: CurrentUserPayload, ip: string | null) {
     this.assertMinDeadline(dto.deadline);
+    this.assertReadableDescription(dto.description);
     const campaign = await this.prisma.campaign.create({
       data: {
         creatorId: user.id,
@@ -192,6 +199,7 @@ export class CampaignsService {
     if (!EDITABLE_STATUSES.includes(campaign.status as CampaignStatus)) {
       throw new AppError('CAMPAIGN_INVALID_STATUS', 'Campaign hanya bisa diedit saat DRAFT atau REJECTED.');
     }
+    if (dto.description !== undefined) this.assertReadableDescription(dto.description);
     if (dto.deadline) {
       // Deadline yang tidak diubah cukup masih di masa depan; deadline baru wajib >= H+2.
       if (new Date(dto.deadline).getTime() === campaign.deadline.getTime()) this.assertFutureDeadline(dto.deadline);
@@ -323,6 +331,8 @@ export class CampaignsService {
     this.assertFutureDeadline(campaign.deadline.toISOString());
     const docs = await this.prisma.campaignDocument.count({ where: { campaignId: id } });
     if (docs === 0) throw new AppError('CAMPAIGN_PROPOSAL_MISSING', 'Unggah proposal (PDF) sebelum submit.');
+    // Draft lama bisa dibuat sebelum validasi ini ada; cek ulang sebelum masuk review admin.
+    this.assertReadableDescription(campaign.description);
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await this.transition(tx, id, campaign.status as CampaignStatus, 'PENDING_REVIEW', {

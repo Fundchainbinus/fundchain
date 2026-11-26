@@ -16,7 +16,8 @@
     "demo:tamper": "ts-node --transpile-only scripts/demo-tamper.ts",
     "db:deploy": "prisma migrate deploy",
     "db:setup": "prisma migrate deploy && prisma db seed",
-    "files:sync": "ts-node --transpile-only scripts/sync-files-to-db.ts"
+    "files:sync": "ts-node --transpile-only scripts/sync-files-to-db.ts",
+    "campaign:fix-content": "ts-node --transpile-only scripts/fix-campaign-content.ts"
   },
   "dependencies": {
     "@fundchain/shared": "workspace:*",

@@ -12,7 +12,8 @@ import { hashDonation, toOnchainKey } from '@fundchain/shared';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { buildSamplePdf } from './sample-pdf';
+import { milestoneProofFor, proposalFor } from './proposals';
+import { buildDocumentPdf, buildSamplePdf } from './sample-pdf';
 
 const prisma = new PrismaClient();
 const DAY = 24 * 60 * 60 * 1000;
@@ -30,14 +31,13 @@ function floorToSecond(d: Date) {
 
 async function saveProposal(campaignId: string, title: string) {
   const key = `proposals/${campaignId}/${randomUUID()}.pdf`;
-  const pdf = buildSamplePdf(`Proposal: ${title}`, [
-    'Latar belakang, tujuan, dan rencana penggunaan dana.',
-    'Dokumen contoh yang dibuat otomatis oleh seed FundChain.',
-  ]);
+  const doc = proposalFor(title);
+  const pdf = doc ? buildDocumentPdf(doc) : buildSamplePdf(`Proposal: ${title}`, ['Latar belakang, tujuan, dan rencana penggunaan dana.']);
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   // Simpan ke database (stored_files) agar terbaca di semua lingkungan, termasuk Vercel.
   await prisma.storedFile.create({ data: { key, data: new Uint8Array(pdf), contentType: 'application/pdf', size: pdf.length } });
   await prisma.campaignDocument.create({
-    data: { campaignId, originalName: 'proposal.pdf', storageKey: key, fileType: 'application/pdf', size: pdf.length },
+    data: { campaignId, originalName: `proposal-${slug}.pdf`, storageKey: key, fileType: 'application/pdf', size: pdf.length },
   });
 }
 
@@ -125,9 +125,9 @@ async function unpaidDonation(
 }
 
 /** Bukti pencairan disimpan di stored_files seperti StorageService.save. */
-async function saveDisbursementProof(campaignId: string, title: string) {
+async function saveDisbursementProof(campaignId: string, title: string, items: [string, number][]) {
   const key = `disbursements/${campaignId}/${randomUUID()}.pdf`;
-  const pdf = buildSamplePdf(title, ['Nota pembelian & rencana penggunaan dana.', 'Dokumen contoh yang dibuat otomatis oleh seed FundChain.']);
+  const pdf = buildDocumentPdf(milestoneProofFor(title, items));
   await prisma.storedFile.create({ data: { key, data: new Uint8Array(pdf), contentType: 'application/pdf', size: pdf.length } });
   return { proofKey: key, proofName: 'bukti-milestone.pdf', proofType: 'application/pdf' };
 }
@@ -150,13 +150,16 @@ async function main() {
   // File contoh untuk diunggah saat demo.
   const samplesDir = path.resolve(process.cwd(), '../../samples');
   fs.mkdirSync(samplesDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(samplesDir, 'proposal-contoh.pdf'),
-    buildSamplePdf('Proposal Campaign FundChain', ['Contoh proposal untuk demo upload.']),
-  );
+  fs.writeFileSync(path.join(samplesDir, 'proposal-contoh.pdf'), buildDocumentPdf(proposalFor('Gerakan Seribu Buku untuk Anak Negeri')!));
   fs.writeFileSync(
     path.join(samplesDir, 'bukti-milestone-contoh.pdf'),
-    buildSamplePdf('Bukti Milestone', ['Nota pembelian & rencana penggunaan dana tahap 1.']),
+    buildDocumentPdf(
+      milestoneProofFor('Bukti Milestone Tahap 1: Pembelian Buku', [
+        ['65 buku cerita bergambar (Toko Buku Gramedia, nota 0412)', 520_000],
+        ['65 buku pengetahuan dasar (Penerbit Erlangga, nota 1187)', 455_000],
+        ['Ongkos kirim ke sekretariat', 25_000],
+      ]),
+    ),
   );
 
   if ((await prisma.campaign.count()) > 0) {
@@ -278,7 +281,11 @@ async function main() {
       requesterId: budi.id,
       amount: 270_000,
       description: 'Milestone 1: pembelian pipa dan tandon air 1.000 liter.',
-      ...(await saveDisbursementProof(water.id, 'Bukti Milestone 1: Pipa & Tandon')),
+      ...(await saveDisbursementProof(water.id, 'Bukti Milestone 1: Pipa & Tandon', [
+        ['Pipa PVC 1,5 inci, 40 batang (TB Sinar Jaya, nota 2231)', 180_000],
+        ['Sambungan dan lem pipa (TB Sinar Jaya, nota 2232)', 45_000],
+        ['Ongkos angkut material ke lokasi', 45_000],
+      ])),
       status: 'PAID',
       adminId: admin.id,
       // Diajukan setelah donasi Rp1.000.000 (2 hari lalu) masuk, jadi saldo saat itu sudah cukup.
@@ -293,7 +300,10 @@ async function main() {
       requesterId: budi.id,
       amount: 270_000,
       description: 'Milestone 2: filter air dan pelatihan perawatan untuk warga.',
-      ...(await saveDisbursementProof(water.id, 'Bukti Milestone 2: Filter & Pelatihan')),
+      ...(await saveDisbursementProof(water.id, 'Rencana Milestone 2: Filter & Pelatihan', [
+        ['Media filter pasir silika dan karbon aktif (CV Tirta, penawaran 078)', 190_000],
+        ['Konsumsi pelatihan perawatan untuk 15 warga', 80_000],
+      ])),
       status: 'REQUESTED',
       requestedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
     },

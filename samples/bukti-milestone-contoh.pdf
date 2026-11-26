@@ -3,31 +3,50 @@
 << /Type /Catalog /Pages 2 0 R >>
 endobj
 2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+<< /Type /Pages /Kids [5 0 R] /Count 1 >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
-endobj
-4 0 obj
-<< /Length 127 >>
-stream
-BT /F1 20 Tf 60 770 Td (Bukti Milestone) Tj ET
-BT /F1 12 Tf 60 730 Td (Nota pembelian & rencana penggunaan dana tahap 1.) Tj ET
-endstream
-endobj
-5 0 obj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 6 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+6 0 obj
+<< /Length 987 >>
+stream
+BT /F2 18 Tf 60 780 Td (Bukti Milestone Tahap 1: Pembelian Buku) Tj ET
+BT /F1 11 Tf 60 757 Td (Laporan penggunaan dana dan daftar nota) Tj ET
+BT /F2 13 Tf 60 727 Td (Rincian pembelian) Tj ET
+BT /F2 10 Tf 425 709 Td (Nominal) Tj ET
+BT /F2 10 Tf 60 709 Td (Barang / jasa) Tj ET
+BT /F1 10 Tf 425 694 Td (Rp520.000) Tj ET
+BT /F1 10 Tf 60 694 Td (65 buku cerita bergambar \(Toko Buku Gramedia, nota 0412\)) Tj ET
+BT /F1 10 Tf 425 679 Td (Rp455.000) Tj ET
+BT /F1 10 Tf 60 679 Td (65 buku pengetahuan dasar \(Penerbit Erlangga, nota 1187\)) Tj ET
+BT /F1 10 Tf 425 664 Td (Rp25.000) Tj ET
+BT /F1 10 Tf 60 664 Td (Ongkos kirim ke sekretariat) Tj ET
+BT /F2 10 Tf 425 649 Td (Rp1.000.000) Tj ET
+BT /F2 10 Tf 60 649 Td (Total) Tj ET
+BT /F2 13 Tf 60 628 Td (Keterangan) Tj ET
+BT /F1 10.5 Tf 60 610 Td (Nota asli disimpan oleh ketua pelaksana dan dapat diperiksa admin BINUS. Foto barang) Tj ET
+BT /F1 10.5 Tf 60 594.5 Td (terlampir pada laporan akhir.) Tj ET
+BT /F1 9 Tf 475 40 Td (Halaman 1/1) Tj ET
+endstream
+endobj
 xref
-0 6
+0 7
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000241 00000 n 
-0000000419 00000 n 
+0000000185 00000 n 
+0000000260 00000 n 
+0000000396 00000 n 
 trailer
-<< /Size 6 /Root 1 0 R >>
+<< /Size 7 /Root 1 0 R >>
 startxref
-489
+1434
 %%EOF

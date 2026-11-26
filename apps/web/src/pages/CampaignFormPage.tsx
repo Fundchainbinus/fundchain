@@ -1,5 +1,5 @@
 import { FileButton } from '../components/FileButton';
-import { LIMITS, SDG_CATEGORIES, SDG_CODES } from '@fundchain/shared';
+import { gibberishProblem, LIMITS, SDG_CATEGORIES, SDG_CODES } from '@fundchain/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FileUp, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -13,7 +13,14 @@ import { attachFile, maxSizeLabel, useFilesConfig } from '../lib/upload';
 
 const schema = z.object({
   title: z.string().trim().min(LIMITS.TITLE_MIN, `Judul minimal ${LIMITS.TITLE_MIN} karakter`).max(LIMITS.TITLE_MAX),
-  description: z.string().trim().min(LIMITS.DESCRIPTION_MIN, `Deskripsi minimal ${LIMITS.DESCRIPTION_MIN} karakter`),
+  description: z
+    .string()
+    .trim()
+    .min(LIMITS.DESCRIPTION_MIN, `Deskripsi minimal ${LIMITS.DESCRIPTION_MIN} karakter`)
+    .superRefine((v, ctx) => {
+      const problem = gibberishProblem(v);
+      if (problem) ctx.addIssue({ code: 'custom', message: problem });
+    }),
   sdgCategory: z.enum(SDG_CODES as [string, ...string[]], { message: 'Pilih kategori SDG' }),
   targetAmount: z
     .number({ message: 'Target wajib diisi' })
@@ -23,6 +30,11 @@ const schema = z.object({
   deadline: z.string().min(1, 'Deadline wajib diisi'),
 });
 type Form = z.infer<typeof schema>;
+
+const DESCRIPTION_PLACEHOLDER =
+  'Contoh: Sebanyak 120 siswa SD di Desa Cikeusik belum punya akses buku bacaan selain buku paket. Kami akan membangun pojok baca berisi 1.000 buku, ' +
+  'melatih 10 relawan pendamping membaca, dan mengadakan kelas membaca mingguan selama 3 bulan. Dana dipakai untuk pembelian buku (60%), rak dan ' +
+  'perlengkapan (20%), transportasi relawan (15%), serta dokumentasi dan laporan (5%).';
 
 const toDateInput = (iso: string) => iso.slice(0, 10);
 /** Tanggal lokal (YYYY-MM-DD) paling awal yang boleh dipilih sebagai deadline. */
@@ -149,7 +161,17 @@ export function CampaignFormCard({ id, onCreated, onSubmitted }: { id?: string; 
           </div>
           <div>
             <label className="label" htmlFor="description">Deskripsi & rencana penggunaan dana *</label>
-            <textarea id="description" className="input min-h-[76px]" value={form.description} onChange={(e) => set('description', e.target.value)} />
+            <textarea
+              id="description"
+              className="input min-h-[160px]"
+              value={form.description}
+              onChange={(e) => set('description', e.target.value)}
+              placeholder={DESCRIPTION_PLACEHOLDER}
+              aria-describedby="description-hint"
+            />
+            <p id="description-hint" className="mt-1 text-xs text-slate-500">
+              Tulis dalam kalimat: masalah yang diatasi, siapa penerima manfaat, kegiatan, dan rincian penggunaan dana. Detail lengkap ada di proposal PDF.
+            </p>
             {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description}</p>}
           </div>
           <div>
