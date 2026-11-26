@@ -34,7 +34,7 @@ Papan triase memakai **GitHub Issues** di `Fundchainbinus/fundchain` dengan labe
 | Issue | Bug | Severity | Area | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
 | [#33](https://github.com/Fundchainbinus/fundchain/issues/33) | QA-001 — Repo public sementara workflow DB backup mengunggah dump (terenkripsi) sebagai artifact | S2 | infra | TL + BE Infra | Open, butuh keputusan TL |
-| [#34](https://github.com/Fundchainbinus/fundchain/issues/34) | QA-002 — Cron tick belum pernah jalan lewat `schedule` (~6 jam setelah masuk `main`); backup & relayer balance belum lewat slot pertama | S2 | infra | BE Infra | Open |
+| [#34](https://github.com/Fundchainbinus/fundchain/issues/34) | QA-002 — Cron tick belum pernah jalan lewat `schedule` (~6 jam setelah masuk `main`); backup & relayer balance belum lewat slot pertama. **Update 26 Nov:** ketiganya sudah jalan terjadwal (14/5/13 run, semua success); sisa masalah: jarak cron tick 5–11 jam, bukan 10 menit (BFD-113) | S2 | infra | BE Infra | Open |
 | [#27](https://github.com/Fundchainbinus/fundchain/issues/27) | BUG-009 — `GET /me/donations` tanpa batas, memuat relasi penuh | S3 | api, perf | BE Donation | Open |
 | [#28](https://github.com/Fundchainbinus/fundchain/issues/28) | BUG-010 — `GET /me/points` menjumlah di JS | S3 | api, perf | BE Donation | Open |
 | [#29](https://github.com/Fundchainbinus/fundchain/issues/29) | BUG-011 — `completeExpired` / `softDeleteFrozen` tanpa batas per tick | S3 | api, perf | BE Campaign | Open |

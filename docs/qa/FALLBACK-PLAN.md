@@ -80,7 +80,7 @@ Ikuti [`BACKUP.md`](../BACKUP.md) bagian *Restore manual*; ringkasnya:
    admin: hash harus tetap cocok dengan on-chain.
 5. Untuk demo saja: Postgres lokal + seed (`pnpm bc-local:db:setup`) lebih cepat daripada restore.
 
-Catatan risiko: workflow backup baru jalan manual; run terjadwal pertama belum teramati ([#34](https://github.com/Fundchainbinus/fundchain/issues/34)),
+Catatan risiko: per 26 Nov workflow backup sudah jalan terjadwal (5 run `schedule`, semua success; [#34](https://github.com/Fundchainbinus/fundchain/issues/34)),
 dan artifact ada di repo public ([#33](https://github.com/Fundchainbinus/fundchain/issues/33)). Jalankan backup manual
 H-1 demo.
 
