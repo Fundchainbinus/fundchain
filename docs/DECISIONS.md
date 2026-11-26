@@ -266,3 +266,34 @@ Gate dan dokumen QA butuh satu alamat kontrak yang tidak berubah lagi sampai dem
 
 - Semua 16 notarisasi di Sepolia dan hash di DB memakai v1; integrity checker cukup memakai builder v1.
 - Test `prefix versi runtime tetap "v1"` dan test vector beku menjaga keputusan ini (CI run 44928137356 ✅).
+
+---
+
+## D-010 — Pencairan bertahap 20/40/60/80/100% (BR-DIS-006)
+
+**Status:** diterima · **Kode:** `packages/shared/src/constants.ts` (`nextTranche`),
+`apps/api/src/modules/disbursements/disbursements.service.ts`.
+
+### Konteks
+
+BFD-97 membuat pencairan bertahap (satu milestone terbuka dalam satu waktu), tetapi nominal tiap milestone bebas
+diisi pembuat campaign. Product owner meminta pencairan dibatasi per 20% dana terkumpul.
+
+### Keputusan
+
+1. Maksimal **5 tahap**. Tahap ke-n membuka dana sampai **n × 20% dari dana terkumpul** (`currentAmount`), kumulatif.
+2. Nominal tahap = `floor(terkumpul × persen / 100) − jumlah pengajuan sebelumnya yang REQUESTED/APPROVED/PAID`.
+   Dihitung backend; field `amount` dari klien diterima tapi diabaikan.
+3. Pengajuan yang **ditolak tidak memakai tahap**: tahap yang sama bisa diajukan ulang.
+4. Basisnya dana **terkumpul**, bukan target. Donasi yang masuk setelah tahap tertentu ikut terbuka di tahap
+   berikutnya; tahap ke-5 mengambil seluruh sisa.
+5. Bila dana turun (refund) sampai tahap berikutnya bernilai 0 → `DISBURSEMENT_TRANCHE_EMPTY`. Kelima tahap
+   terpakai → `DISBURSEMENT_TRANCHES_EXHAUSTED`.
+
+### Konsekuensi
+
+- `GET /campaigns/:id` menambah `funds.nextTranche { step, percent, amount }`; `GET /campaigns/:id/milestones`
+  menambah `percent` per tahap dan `maxSteps`.
+- Form pencairan di web tidak lagi punya input nominal; nominal tampil otomatis.
+- Data seed "Air Bersih" disesuaikan: tahap 1 dan 2 masing-masing Rp270.000 (20% dari Rp1.350.000).
+- Pengajuan lama di production yang dibuat sebelum aturan ini tetap dihitung sebagai tahap yang sudah terpakai.

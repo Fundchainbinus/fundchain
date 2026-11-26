@@ -74,6 +74,33 @@ export const LIMITS = {
   RUPIAH_PER_POINT: 10_000,
 } as const;
 
+/**
+ * Pencairan bertahap: 5 tahap, masing-masing membuka 20% dana terkumpul secara kumulatif
+ * (20% → 40% → 60% → 80% → 100%). Tahap ke-n boleh membawa total pencairan sampai n×20% dana terkumpul.
+ */
+export const DISBURSEMENT_TRANCHE_PERCENTS = [20, 40, 60, 80, 100] as const;
+
+export interface NextTranche {
+  /** Nomor tahap berikutnya (1–5). */
+  step: number;
+  /** Persen kumulatif dana terkumpul yang terbuka setelah tahap ini. */
+  percent: number;
+  /** Nominal tahap ini = batas kumulatif − dana yang sudah dikunci pengajuan sebelumnya. */
+  amount: number;
+}
+
+/**
+ * Tahap pencairan berikutnya. `takenSteps` = pengajuan yang tidak ditolak (REQUESTED/APPROVED/PAID),
+ * `committed` = jumlah nominalnya. Null bila kelima tahap sudah terpakai.
+ * `amount` bisa 0 bila dana terkumpul turun (mis. refund) — pengajuan saat itu ditolak backend.
+ */
+export function nextTranche(raised: number, takenSteps: number, committed: number): NextTranche | null {
+  if (takenSteps >= DISBURSEMENT_TRANCHE_PERCENTS.length) return null;
+  const percent = DISBURSEMENT_TRANCHE_PERCENTS[takenSteps];
+  const cap = Math.floor((raised * percent) / 100);
+  return { step: takenSteps + 1, percent, amount: Math.max(cap - committed, 0) };
+}
+
 /** ABI minimal DonationRegistry (human-readable, ethers v6). */
 export const DONATION_REGISTRY_ABI = [
   'function notarize(bytes32 donationId, bytes32 hash)',

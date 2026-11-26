@@ -481,7 +481,8 @@ describe('jalur attach/link yang dipakai web', () => {
     stubSupabase({ [key]: { body: PNG, contentType: 'image/png' } });
     const service = new DisbursementsService(prisma.db, new AuditService(prisma.db), storage);
     const created = await service.create('camp-1', { amount: 1000, description: 'Pembelian buku tahap 1', fileId }, undefined, owner, null);
-    expect(created).toMatchObject({ proofKey: key, proofType: 'image/png', proofName: 'nota.png' });
+    // Nominal dari klien (1000) diabaikan: tahap 1 = 20% × 1.000.000.
+    expect(created).toMatchObject({ amount: 200_000, proofKey: key, proofType: 'image/png', proofName: 'nota.png' });
     expect(prisma.files.get(key)!.status).toBe('CONFIRMED');
   });
 

@@ -181,11 +181,10 @@ test('Gate 3: gladi bersih skrip demo 13-DEMO-FLOW (video + trace)', async ({ br
 
     await log.run('D-8', async () => {
       await student.goto(`/campaigns/${normal.id}/disburse`);
-      await student.locator('#disb-amount').fill('100000');
       await student.locator('#disb-desc').fill('Tahap 1: pembelian buku dan rak untuk perpustakaan keliling.');
       await student.locator('#disb-proof').setInputFiles(SAMPLE_MILESTONE);
       await student.waitForTimeout(PAUSE);
-      await student.getByRole('button', { name: 'Ajukan pencairan' }).click();
+      await student.getByRole('button', { name: /^Ajukan tahap \d/ }).click();
       await expect(student.getByText('Pengajuan terkirim dan menunggu review admin.')).toBeVisible();
       await shot(student, 'gate3-08-ajukan-pencairan');
       await admin!.goto('/admin/disbursements');

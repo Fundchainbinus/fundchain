@@ -14,7 +14,6 @@ export function DisburseFormCard({ campaigns, initialId }: { campaigns: Campaign
   const qc = useQueryClient();
   const [campaignId, setCampaignId] = useState(initialId ?? campaigns[0]?.id ?? '');
   const detail = useQuery({ queryKey: ['campaign', campaignId], queryFn: () => get<CampaignDetail>(`/campaigns/${campaignId}`), enabled: !!campaignId });
-  const [amount, setAmount] = useState(0);
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const filesConfig = useFilesConfig();
@@ -26,13 +25,12 @@ export function DisburseFormCard({ campaigns, initialId }: { campaigns: Campaign
         file: file!,
         purpose: 'disbursement-proof',
         fileField: 'proof',
-        fields: { amount, description },
+        fields: { description },
         config: filesConfig,
         onProgress: setProgress,
       }),
     onSettled: () => setProgress(null),
     onSuccess: () => {
-      setAmount(0);
       setDescription('');
       setFile(null);
       void qc.invalidateQueries();
@@ -44,6 +42,8 @@ export function DisburseFormCard({ campaigns, initialId }: { campaigns: Campaign
   }
   const c = detail.data;
   const frozen = c?.status === 'FROZEN';
+  const tranche = c?.funds.nextTranche ?? null;
+  const blocked = frozen || !tranche || tranche.amount <= 0;
   return (
     <div className="space-y-4">
       {c && (
@@ -55,6 +55,10 @@ export function DisburseFormCard({ campaigns, initialId }: { campaigns: Campaign
         </dl>
       )}
       {frozen && <InfoNote tone="red">Kampanye dibekukan karena integritas data bermasalah. Pencairan terkunci.</InfoNote>}
+      {!frozen && tranche && tranche.amount <= 0 && (
+        <InfoNote>Belum ada dana untuk tahap {tranche.step}: {tranche.percent}% dana terkumpul sudah dicairkan atau diajukan.</InfoNote>
+      )}
+      <InfoNote>Dana dicairkan dalam 5 tahap: 20% → 40% → 60% → 80% → 100% dari dana terkumpul. Tahap berikutnya bisa diajukan setelah tahap sebelumnya dibayar atau ditolak.</InfoNote>
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -70,24 +74,34 @@ export function DisburseFormCard({ campaigns, initialId }: { campaigns: Campaign
             </select>
           </div>
           <div>
-            <label className="label" htmlFor="disb-amount">Nominal pencairan (IDR) *</label>
-            <input id="disb-amount" type="number" className="input" min={1} max={c?.funds.available} value={amount || ''} onChange={(e) => setAmount(Number(e.target.value))} disabled={frozen} />
-            {c && <p className="mt-1 text-xs text-slate-500">Maksimal {rupiah(c.funds.available)}.</p>}
+            <p className="label" id="disb-amount-label">Nominal tahap ini</p>
+            {c ? (
+              tranche ? (
+                <>
+                  <p className="input bg-slate-50" aria-labelledby="disb-amount-label">{rupiah(tranche.amount)}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Tahap {tranche.step} dari 5 · membuka sampai {tranche.percent}% dana terkumpul. Nominal dihitung otomatis.
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-xs text-slate-500">Kelima tahap pencairan sudah diajukan.</p>
+              )
+            ) : null}
           </div>
         </div>
         <div>
           <label className="label" htmlFor="disb-desc">Deskripsi penggunaan *</label>
-          <input id="disb-desc" className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Contoh: Pengadaan 50 buku tahap pertama untuk pojok baca." disabled={frozen} />
+          <input id="disb-desc" className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Contoh: Pengadaan 50 buku tahap pertama untuk pojok baca." disabled={blocked} />
         </div>
         <div>
           <label className="label" htmlFor="disb-proof">Bukti milestone *</label>
-          <input id="disb-proof" type="file" accept=".pdf,.png,.jpg,.jpeg" className="input" onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={frozen} />
+          <input id="disb-proof" type="file" accept=".pdf,.png,.jpg,.jpeg" className="input" onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={blocked} />
           <p className="mt-1 text-xs text-slate-500">Bukti wajib dilampirkan untuk setiap pengajuan (PDF/PNG/JPG · maksimum {maxSizeLabel(filesConfig.maxBytes)}).</p>
         </div>
         <ErrorBox error={create.error} />
         {create.isSuccess && <SuccessBox>Pengajuan terkirim dan menunggu review admin.</SuccessBox>}
-        <button className="btn-primary font-normal" disabled={frozen || create.isPending || !amount || !file || description.trim().length < 10}>
-          {create.isPending ? `Mengirim…${progress !== null ? ` ${progress}%` : ''}` : 'Ajukan pencairan'}
+        <button className="btn-primary font-normal" disabled={blocked || create.isPending || !file || description.trim().length < 10}>
+          {create.isPending ? `Mengirim…${progress !== null ? ` ${progress}%` : ''}` : tranche ? `Ajukan tahap ${tranche.step} (${tranche.percent}%)` : 'Ajukan pencairan'}
         </button>
       </form>
     </div>

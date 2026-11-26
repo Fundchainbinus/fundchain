@@ -84,3 +84,8 @@ BR-DIS-003 --- Admin harus approve sebelum transfer.
 BR-DIS-004 --- FROZEN campaign tidak dapat dicairkan.
 
 BR-DIS-005 --- Semua keputusan disbursement masuk audit log.
+
+BR-DIS-006 --- Dana dicairkan dalam 5 tahap kumulatif: 20%, 40%, 60%,
+80%, 100% dari dana terkumpul. Nominal tiap tahap dihitung backend
+(batas kumulatif dikurangi pengajuan sebelumnya yang tidak ditolak),
+bukan diisi pembuat campaign. Lihat `docs/DECISIONS.md` D-010.

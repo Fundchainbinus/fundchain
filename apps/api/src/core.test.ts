@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { nextTranche } from '@fundchain/shared';
 import { publicDonorName, floorToSecond } from './common/format';
 import { assertTransition, canTransition } from './modules/campaigns/campaign-status';
-import { assertDisbursable, assertNoOpenMilestone, buildMilestones } from './modules/disbursements/disbursements.service';
+import { assertDisbursable, assertNoOpenMilestone, assertTranche, buildMilestones } from './modules/disbursements/disbursements.service';
 import { computePoints } from './modules/donations/points';
 import { signMockBody, verifyMockSignature } from './modules/payments/adapters/mock.adapter';
 
@@ -65,6 +66,47 @@ describe('milestone pencairan bertahap (BFD-97)', () => {
   it('boleh ajukan berikutnya kalau semua tahap selesai atau belum ada', () => {
     expect(buildMilestones([]).canRequestNext).toBe(true);
     expect(buildMilestones([row('a', 'PAID', 1), row('b', 'REJECTED', 2)]).canRequestNext).toBe(true);
+  });
+
+  it('memberi persen kumulatif per tahap dan berhenti di tahap ke-5', () => {
+    const five = [1, 2, 3, 4, 5].map((d) => row(`s${d}`, 'PAID', d));
+    expect(buildMilestones(five.slice(0, 2)).steps.map((s) => s.percent)).toEqual([20, 40]);
+    const m = buildMilestones(five);
+    expect(m.maxSteps).toBe(5);
+    expect(m.steps.at(-1)?.percent).toBe(100);
+    expect(m.canRequestNext).toBe(false);
+  });
+});
+
+describe('pencairan 20/40/60/80/100%', () => {
+  it('tahap pertama = 20% dana terkumpul', () => {
+    expect(nextTranche(5_000_000, 0, 0)).toEqual({ step: 1, percent: 20, amount: 1_000_000 });
+  });
+
+  it('tahap berikutnya = batas kumulatif dikurangi dana yang sudah dikunci', () => {
+    expect(nextTranche(5_000_000, 2, 2_000_000)).toEqual({ step: 3, percent: 60, amount: 1_000_000 });
+  });
+
+  it('donasi baru setelah tahap sebelumnya ikut terbuka di tahap berikutnya', () => {
+    // Tahap 1 dicairkan saat terkumpul 1jt (200rb); sekarang terkumpul 2jt → batas 40% = 800rb.
+    expect(nextTranche(2_000_000, 1, 200_000)).toEqual({ step: 2, percent: 40, amount: 600_000 });
+  });
+
+  it('tahap ke-5 mengambil seluruh sisa, termasuk pembulatan', () => {
+    expect(nextTranche(1_000_003, 4, 800_000)).toEqual({ step: 5, percent: 100, amount: 200_003 });
+  });
+
+  it('kelima tahap terpakai → null → DISBURSEMENT_TRANCHES_EXHAUSTED', () => {
+    expect(nextTranche(5_000_000, 5, 5_000_000)).toBeNull();
+    expect(() => assertTranche(null)).toThrowError(expect.objectContaining({ code: 'DISBURSEMENT_TRANCHES_EXHAUSTED' }));
+  });
+
+  it('dana turun (refund) sampai tahap kosong → DISBURSEMENT_TRANCHE_EMPTY', () => {
+    const t = nextTranche(1_000_000, 1, 300_000); // batas 40% = 400rb, sudah 300rb → 100rb
+    expect(t?.amount).toBe(100_000);
+    const empty = nextTranche(500_000, 1, 300_000); // batas 40% = 200rb < 300rb
+    expect(empty?.amount).toBe(0);
+    expect(() => assertTranche(empty)).toThrowError(expect.objectContaining({ code: 'DISBURSEMENT_TRANCHE_EMPTY' }));
   });
 });
 

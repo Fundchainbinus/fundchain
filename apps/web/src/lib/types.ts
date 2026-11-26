@@ -41,7 +41,15 @@ export interface CampaignDetail extends Omit<CampaignSummary, 'donorCount' | 'in
   documents: { id: string; originalName: string; size: number; createdAt: string }[];
   reviews: { id: string; decision: 'APPROVE' | 'REJECT'; reason: string | null; createdAt: string; admin: { name: string } }[];
   integritySummary: Partial<Record<IntegrityStatus, number>>;
-  funds: { raised: number; disbursed: number; approved: number; requested: number; available: number };
+  funds: {
+    raised: number;
+    disbursed: number;
+    approved: number;
+    requested: number;
+    available: number;
+    /** Tahap pencairan berikutnya (20/40/60/80/100% dana terkumpul); null bila 5 tahap sudah diajukan. */
+    nextTranche: { step: number; percent: number; amount: number } | null;
+  };
   viewer: { isOwner: boolean; isAdmin: boolean };
 }
 
@@ -128,6 +136,8 @@ export interface PointsSummary {
 /** Respons GET /campaigns/:id/milestones (buildMilestones di BE). REJECTED tidak termasuk. */
 export interface MilestoneStep {
   step: number;
+  /** Persen kumulatif dana terkumpul yang terbuka sampai tahap ini (20/40/60/80/100). */
+  percent: number;
   id: string;
   description: string;
   amount: number;
@@ -141,6 +151,7 @@ export interface Milestones {
   steps: MilestoneStep[];
   completed: number;
   total: number;
+  maxSteps: number;
   current: MilestoneStep | null;
   canRequestNext: boolean;
 }

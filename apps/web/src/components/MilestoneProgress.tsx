@@ -95,7 +95,7 @@ export function MilestoneProgress({ campaignId, target, funds }: { campaignId: s
           <p className="text-sm font-semibold text-ink">Tahapan milestone</p>
           {m && m.total > 0 && (
             <p className="text-xs text-slate-500">
-              {m.completed} dari {m.total} selesai
+              {m.completed} dari {m.maxSteps} tahap selesai
               {m.current ? ` · tahap ${m.current.step} berjalan` : ''}
             </p>
           )}
@@ -105,7 +105,7 @@ export function MilestoneProgress({ campaignId, target, funds }: { campaignId: s
         ) : milestones.error ? (
           <div className="mt-2"><ErrorBox error={milestones.error} /></div>
         ) : steps.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">Belum ada milestone pencairan.</p>
+          <p className="mt-2 text-sm text-slate-500">Belum ada milestone pencairan. Dana dicairkan dalam 5 tahap: 20%, 40%, 60%, 80%, 100%.</p>
         ) : (
           <ol className="mt-3">
             {steps.map((d) => {
@@ -119,7 +119,7 @@ export function MilestoneProgress({ campaignId, target, funds }: { campaignId: s
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                       <p className="text-sm text-ink [overflow-wrap:anywhere]">
-                        <span className="text-slate-500">Tahap {d.step} · </span>
+                        <span className="text-slate-500">Tahap {d.step} ({d.percent}%) · </span>
                         {d.description}
                       </p>
                       <p className="whitespace-nowrap text-sm font-semibold text-ink">{rupiah(d.amount)}</p>

@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { LIMITS, type CampaignStatus, type DisbursementStatus } from '@fundchain/shared';
+import {
+  DISBURSEMENT_TRANCHE_PERCENTS,
+  LIMITS,
+  nextTranche,
+  type CampaignStatus,
+  type DisbursementStatus,
+  type NextTranche,
+} from '@fundchain/shared';
 import { AppError } from '../../common/app-error';
 import type { CurrentUserPayload } from '../../common/auth';
 import { Db, PrismaService } from '../../common/prisma.service';
@@ -50,10 +57,37 @@ export function buildMilestones(rows: MilestoneRow[]) {
   const steps = rows
     .filter((d) => d.status !== 'REJECTED')
     .sort((a, b) => a.requestedAt.getTime() - b.requestedAt.getTime())
-    .map((d, i) => ({ step: i + 1, ...d }));
+    .map((d, i) => ({ step: i + 1, percent: DISBURSEMENT_TRANCHE_PERCENTS[i] ?? 100, ...d }));
   const completed = steps.filter((s) => s.status === 'PAID').length;
   const current = steps.find((s) => (OPEN as string[]).includes(s.status)) ?? null;
-  return { steps, completed, total: steps.length, current, canRequestNext: current === null };
+  return {
+    steps,
+    completed,
+    total: steps.length,
+    maxSteps: DISBURSEMENT_TRANCHE_PERCENTS.length,
+    current,
+    canRequestNext: current === null && steps.length < DISBURSEMENT_TRANCHE_PERCENTS.length,
+  };
+}
+
+/**
+ * Pencairan 20/40/60/80/100%: nominal tiap tahap dihitung backend dari dana terkumpul,
+ * bukan dari input pembuat campaign.
+ */
+export function assertTranche(t: NextTranche | null): NextTranche {
+  if (!t) {
+    throw new AppError(
+      'DISBURSEMENT_TRANCHES_EXHAUSTED',
+      `Kelima tahap pencairan (${DISBURSEMENT_TRANCHE_PERCENTS.join('/')}%) sudah diajukan.`,
+    );
+  }
+  if (t.amount <= 0) {
+    throw new AppError(
+      'DISBURSEMENT_TRANCHE_EMPTY',
+      `Belum ada dana untuk tahap ${t.step} (${t.percent}% dana terkumpul sudah dicairkan atau diajukan).`,
+    );
+  }
+  return t;
 }
 
 export function assertDisbursable(status: string) {
@@ -81,6 +115,16 @@ export class DisbursementsService {
     return currentAmount - (agg._sum.amount ?? 0);
   }
 
+  /** Tahap berikutnya dari pengajuan yang tidak ditolak (REQUESTED/APPROVED/PAID). */
+  async tranche(db: Db, campaignId: string, raised: number) {
+    const agg = await db.disbursement.aggregate({
+      where: { campaignId, status: { in: COMMITTED } },
+      _sum: { amount: true },
+      _count: true,
+    });
+    return nextTranche(raised, agg._count ?? 0, agg._sum.amount ?? 0);
+  }
+
   openCount(db: Db, campaignId: string) {
     return db.disbursement.count({ where: { campaignId, status: { in: OPEN } } });
   }
@@ -98,7 +142,7 @@ export class DisbursementsService {
 
   async create(
     campaignId: string,
-    input: { amount: number; description: string; fileId?: string },
+    input: { amount?: number; description: string; fileId?: string },
     file: Express.Multer.File | undefined,
     user: CurrentUserPayload,
     ip: string | null,
@@ -110,16 +154,11 @@ export class DisbursementsService {
     }
     assertDisbursable(campaign.status);
     if (!file && !input.fileId) throw new AppError('DISBURSEMENT_PROOF_REQUIRED', 'Bukti milestone / rencana penggunaan dana wajib diunggah.');
-    if (!Number.isInteger(input.amount) || input.amount <= 0) {
-      throw new AppError('VALIDATION_ERROR', 'Nominal pencairan harus bilangan bulat positif.');
-    }
     if (!input.description || input.description.trim().length < LIMITS.REASON_MIN) {
       throw new AppError('VALIDATION_ERROR', `Deskripsi minimal ${LIMITS.REASON_MIN} karakter.`);
     }
     assertNoOpenMilestone(await this.openCount(this.prisma, campaignId));
-    if (input.amount > (await this.available(this.prisma, campaignId, campaign.currentAmount))) {
-      throw new AppError('DISBURSEMENT_AMOUNT_EXCEEDS', 'Nominal melebihi sisa dana yang dapat dicairkan.');
-    }
+    assertTranche(await this.tranche(this.prisma, campaignId, campaign.currentAmount));
 
     const proof = input.fileId
       ? await this.storage.confirmDirect(input.fileId, user.id, 'disbursement-proof')
@@ -130,14 +169,16 @@ export class DisbursementsService {
       const fresh = await tx.campaign.findUniqueOrThrow({ where: { id: campaignId } });
       assertDisbursable(fresh.status);
       assertNoOpenMilestone(await this.openCount(tx, campaignId));
-      if (input.amount > (await this.available(tx, campaignId, fresh.currentAmount))) {
+      const t = assertTranche(await this.tranche(tx, campaignId, fresh.currentAmount));
+      // Pengaman: tahap tidak pernah melebihi saldo yang belum dikunci.
+      if (t.amount > (await this.available(tx, campaignId, fresh.currentAmount))) {
         throw new AppError('DISBURSEMENT_AMOUNT_EXCEEDS', 'Nominal melebihi sisa dana yang dapat dicairkan.');
       }
       const created = await tx.disbursement.create({
         data: {
           campaignId,
           requesterId: user.id,
-          amount: input.amount,
+          amount: t.amount,
           description: input.description.trim(),
           proofKey: proof.key,
           proofName: proof.originalName,
@@ -150,7 +191,7 @@ export class DisbursementsService {
           action: 'DISBURSEMENT_REQUESTED',
           entityType: 'Campaign',
           entityId: campaignId,
-          metadata: { disbursementId: created.id, amount: created.amount },
+          metadata: { disbursementId: created.id, amount: created.amount, step: t.step, percent: t.percent },
           ipAddress: ip,
         },
         tx,

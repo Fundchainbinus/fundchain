@@ -21,10 +21,12 @@ import { uploadInterceptor } from '../campaigns/campaigns.controller';
 import { DisbursementsService } from './disbursements.service';
 
 class CreateDisbursementDto {
+  /** Diabaikan: nominal tahap (20/40/60/80/100%) dihitung backend. Tetap diterima demi klien lama. */
+  @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'Nominal harus bilangan bulat rupiah' })
   @Min(1)
-  amount!: number;
+  amount?: number;
 
   @IsString()
   @MaxLength(2000)
@@ -40,7 +42,7 @@ class CreateDisbursementDto {
 export class DisbursementsController {
   constructor(private readonly disbursements: DisbursementsService) {}
 
-  /** multipart/form-data: amount, description, proof (PDF/PNG/JPG ≤4MB) — atau JSON dengan fileId (≤10MB, driver supabase). */
+  /** multipart/form-data: description, proof (PDF/PNG/JPG ≤4MB) — atau JSON dengan fileId (≤10MB, driver supabase). */
   @Post('campaigns/:id/disbursements')
   @UseInterceptors(uploadInterceptor('proof'))
   create(

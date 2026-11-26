@@ -269,14 +269,14 @@ async function main() {
     await unpaidDonation('EXPIRED', books.id, budi.id, 25_000, 2),
   ];
 
-  // Pencairan bertahap di campaign ACTIVE "Air Bersih" (saldo 1.350.000): milestone 1 sudah PAID,
-  // milestone 2 masih REQUESTED. Total terikat 900.000 <= currentAmount (aturan saldo) dan hanya
-  // satu milestone terbuka (aturan BFD-97).
+  // Pencairan bertahap 20/40/60/80/100% di campaign ACTIVE "Air Bersih" (terkumpul 1.350.000):
+  // tahap 1 (20% = 270.000) sudah PAID, tahap 2 (sampai 40% = 540.000) masih REQUESTED.
+  // Hanya satu milestone terbuka (aturan BFD-97).
   const paidDisbursement = await prisma.disbursement.create({
     data: {
       campaignId: water.id,
       requesterId: budi.id,
-      amount: 500_000,
+      amount: 270_000,
       description: 'Milestone 1: pembelian pipa dan tandon air 1.000 liter.',
       ...(await saveDisbursementProof(water.id, 'Bukti Milestone 1: Pipa & Tandon')),
       status: 'PAID',
@@ -291,7 +291,7 @@ async function main() {
     data: {
       campaignId: water.id,
       requesterId: budi.id,
-      amount: 400_000,
+      amount: 270_000,
       description: 'Milestone 2: filter air dan pelatihan perawatan untuk warga.',
       ...(await saveDisbursementProof(water.id, 'Bukti Milestone 2: Filter & Pelatihan')),
       status: 'REQUESTED',

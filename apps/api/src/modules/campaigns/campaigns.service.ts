@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CAMPAIGN_STATUSES, LIMITS, PUBLIC_CAMPAIGN_STATUSES, type CampaignStatus } from '@fundchain/shared';
+import { CAMPAIGN_STATUSES, LIMITS, nextTranche, PUBLIC_CAMPAIGN_STATUSES, type CampaignStatus } from '@fundchain/shared';
 import { Prisma } from '@prisma/client';
 import { AppError } from '../../common/app-error';
 import type { CurrentUserPayload } from '../../common/auth';
@@ -136,12 +136,14 @@ export class CampaignsService {
         by: ['status'],
         where: { campaignId: id },
         _sum: { amount: true },
+        _count: true,
       }),
       this.prisma.donation.count({ where: { campaignId: id, status: 'PAID' } }),
     ]);
 
     const sumBy = (s: string) => disbursed.find((d) => d.status === s)?._sum.amount ?? 0;
     const committed = sumBy('REQUESTED') + sumBy('APPROVED') + sumBy('PAID');
+    const takenSteps = disbursed.filter((d) => d.status !== 'REJECTED').reduce((n, d) => n + (d._count ?? 0), 0);
 
     return {
       ...campaign,
@@ -154,6 +156,8 @@ export class CampaignsService {
         approved: sumBy('APPROVED'),
         requested: sumBy('REQUESTED'),
         available: Math.max(campaign.currentAmount - committed, 0),
+        /** Tahap pencairan berikutnya (20/40/60/80/100%); null bila kelima tahap sudah diajukan. */
+        nextTranche: nextTranche(campaign.currentAmount, takenSteps, committed),
       },
       viewer: { isOwner, isAdmin },
     };

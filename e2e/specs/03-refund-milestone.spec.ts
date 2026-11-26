@@ -100,14 +100,14 @@ test('BFD-65: milestone bertahap & refund campaign FROZEN', async ({ browser }) 
 
   let m3Id = '';
   await log.run('M-05', async () => {
-    const before = await api.ok<{ funds: { available: number } }>('GET', `/campaigns/${water!.id}`, { token: student.token });
-    const amount = Math.min(100_000, before.funds.available);
+    // Nominal tahap dihitung backend (20/40/60/80/100% dana terkumpul), tidak diisi di form.
+    const before = await api.ok<{ funds: { nextTranche: { step: number; amount: number } | null } }>('GET', `/campaigns/${water!.id}`, { token: student.token });
+    const amount = before.funds.nextTranche?.amount ?? 0;
     expect(amount).toBeGreaterThan(0);
     await studentPage.goto(`/campaigns/${water!.id}/disburse`);
-    await studentPage.locator('#disb-amount').fill(String(amount));
     await studentPage.locator('#disb-desc').fill('Milestone 3: cat tandon dan papan informasi perawatan untuk warga.');
     await studentPage.locator('#disb-proof').setInputFiles(SAMPLE_MILESTONE);
-    await studentPage.getByRole('button', { name: 'Ajukan pencairan' }).click();
+    await studentPage.getByRole('button', { name: /^Ajukan tahap \d/ }).click();
     await expect(studentPage.getByText('Pengajuan terkirim dan menunggu review admin.')).toBeVisible();
     await shot(studentPage, 'bfd65-03-mahasiswa-ajukan-milestone3');
     const m = await milestones();
