@@ -19,10 +19,12 @@ file ini disiapkan tanpa Docker yang aktif. Uji di server staging dulu.
 4. Deploy contract: di `contracts/.env` isi `DEPLOYER_PRIVATE_KEY`, `RELAYER_ADDRESS`, `BINUSIAN_RPC_URL`,
    lalu `pnpm --filter @fundchain/contracts deploy:binusian` → `contracts/deployments/binusian.json`.
 5. Ekspos RPC node1 ke API FundChain lewat VPN/reverse proxy kampus dengan autentikasi (jangan RPC terbuka ke internet).
-6. Ganti env API (Vercel): `BLOCKCHAIN_NETWORK=binusian`, `CHAIN_ID=2026`, `BLOCKCHAIN_RPC_URL=<rpc>`,
+6. Pastikan antrean notarisasi Sepolia kosong (Admin → Integritas: tidak ada QUEUED/RETRYING). Worker hanya
+   memproses antrean milik chain aktif, jadi antrean Sepolia yang tersisa akan tertahan setelah pindah.
+7. Ganti env API (Vercel): `BLOCKCHAIN_NETWORK=binusian`, `CHAIN_ID=2026`, `BLOCKCHAIN_RPC_URL=<rpc>`,
    `CONTRACT_ADDRESS=<dari binusian.json>`, `RELAYER_PRIVATE_KEY=<relayer>`, `BLOCKCHAIN_CONFIRMATIONS=1`
    (QBFT final), opsional `BLOCKCHAIN_EXPLORER_URL` bila memasang Blockscout. Redeploy.
-7. Verifikasi: donasi baru → CONFIRMED di chain baru; donasi lama (Sepolia) → halaman bukti masih VERIFIED.
+8. Verifikasi: donasi baru → CONFIRMED di chain baru; donasi lama (Sepolia) → halaman bukti masih VERIFIED.
 
 Bila Besu menolak `cancunTime` di genesis, hapus baris itu dan kompilasi ulang contract dengan `evmVersion: 'paris'`
 sebelum deploy.

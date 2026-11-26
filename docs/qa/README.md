@@ -17,6 +17,7 @@ Rencana uji sumber: [`12-TESTING-PLAN.md`](../../FundChain_Complete_Planning_Doc
 | [`E2E-REFUND-MILESTONE.md`](E2E-REFUND-MILESTONE.md) | E2E refund & milestone | (disusun terpisah) |
 | [`SECURITY-TEST.md`](SECURITY-TEST.md) | Eksekusi security test §12 | (disusun terpisah) |
 | [`DRY-RUN.md`](DRY-RUN.md) | Gladi demo | (disusun terpisah) |
+| [`E2E-HUMAN-VS-AUTO.md`](E2E-HUMAN-VS-AUTO.md) | Peta alur E2E: langkah otomatis, butuh pemicu cron, atau butuh manusia | — |
 
 Keputusan terkait: [`DECISIONS.md`](../DECISIONS.md) D-008 (deploy Sepolia final) dan D-009 (canonical v1 final).
 Riwayat bug: [`BUGS.md`](../BUGS.md).
