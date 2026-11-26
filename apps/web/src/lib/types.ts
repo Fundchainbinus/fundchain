@@ -258,3 +258,22 @@ export interface DonationProof {
   /** Waktu server melakukan pengecekan ini. */
   checkedAt: string;
 }
+
+/** GET /csr/companies — mitra CSR + kontribusi PAID per campaign. */
+export interface CsrCompany {
+  id: string;
+  name: string;
+  sector: string;
+  website: string | null;
+  description: string | null;
+  totalContributed: number;
+  campaigns: { id: string; title: string; status: string; amount: number }[];
+}
+
+/** GET /campaigns/:id/csr-sponsors */
+export interface CsrSponsor {
+  id: string;
+  name: string;
+  sector: string;
+  amount: number;
+}

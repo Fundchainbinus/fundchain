@@ -1,4 +1,4 @@
-import { Award, Banknote, ClipboardCheck, House, LayoutDashboard, ScrollText, ShieldCheck, UserRound } from 'lucide-react';
+import { Award, Banknote, Building2, ClipboardCheck, House, LayoutDashboard, ScrollText, ShieldCheck, UserRound } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useMe } from '../lib/hooks';
 import { RoleCard } from './RoleCard';
@@ -8,6 +8,7 @@ const ADMIN_MENU = [
   { to: '/admin/reviews', label: 'Review Campaign', icon: ClipboardCheck, end: false, filled: false },
   { to: '/admin/integrity', label: 'Integritas', icon: ShieldCheck, end: false, filled: false },
   { to: '/admin/disbursements', label: 'Pencairan', icon: Banknote, end: false, filled: false },
+  { to: '/admin/csr', label: 'Mitra CSR', icon: Building2, end: false, filled: false },
   { to: '/admin/audit', label: 'Audit Log', icon: ScrollText, end: false, filled: false },
 ];
 
@@ -21,6 +22,7 @@ export function AppSidebar({ inAdmin, onNavigate }: { inAdmin: boolean; onNaviga
     ? ADMIN_MENU
     : [
         { to: '/', label: 'FundChain', icon: House, end: true, filled: false },
+        { to: '/csr', label: 'Mitra CSR', icon: Building2, end: false, filled: false },
         ...(me
           ? [
               { to: '/my/campaigns', label: 'Ruang Mahasiswa', icon: UserRound, end: false, filled: false },

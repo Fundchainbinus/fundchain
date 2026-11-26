@@ -1,4 +1,5 @@
-export const ROLES = ['STUDENT', 'ADMIN'] as const;
+/** COMPANY = akun pencatat donasi mitra CSR (email sintetis, tidak bisa login). */
+export const ROLES = ['STUDENT', 'ADMIN', 'COMPANY'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const CAMPAIGN_STATUSES = [

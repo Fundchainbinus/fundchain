@@ -21,7 +21,7 @@ model User {
   microsoftId        String?  @unique @map("microsoft_id")
   email              String   @unique
   name               String
-  role               String   @default("STUDENT") // STUDENT | ADMIN
+  role               String   @default("STUDENT") // STUDENT | ADMIN | COMPANY (akun pencatat donasi CSR, tidak bisa login)
   /// Pseudonim stabil untuk canonical payload (on-chain). Bukan email/nama.
   integritySubjectId String   @unique @map("integrity_subject_id")
   /// BFD-11: dinaikkan saat logout; token sesi dengan versi lain ditolak (revokasi).
@@ -35,6 +35,7 @@ model User {
   disbursements Disbursement[]   @relation("DisbursementRequester")
   approvals     Disbursement[]   @relation("DisbursementAdmin")
   auditLogs     AuditLog[]
+  company       Company?
 
   @@map("users")
 }
@@ -245,4 +246,20 @@ model StoredFile {
   createdAt     DateTime @default(now()) @map("created_at")
 
   @@map("stored_files")
+}
+
+/// Mitra CSR. Kontribusinya = donasi PAID atas nama `user` (role COMPANY) sehingga ikut hash & notarisasi.
+model Company {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  sector      String
+  website     String?
+  description String?
+  userId      String   @unique @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("companies")
 }

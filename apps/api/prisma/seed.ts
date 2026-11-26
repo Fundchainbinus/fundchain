@@ -147,6 +147,28 @@ async function main() {
   const siti = users['siti.rahma@binus.ac.id'];
   const andi = users['andi.wijaya@binus.ac.id'];
 
+  // Mitra CSR contoh (fiktif). Akun role COMPANY dengan email .invalid: hanya pencatat donasi, tidak bisa login.
+  const csrUser = await prisma.user.upsert({
+    where: { email: 'csr+nusantara-hijau-lestari@fundchain.invalid' },
+    update: {},
+    create: {
+      email: 'csr+nusantara-hijau-lestari@fundchain.invalid',
+      name: 'PT Nusantara Hijau Lestari',
+      role: 'COMPANY',
+      integritySubjectId: 'CSR-00001',
+    },
+  });
+  await prisma.company.upsert({
+    where: { name: 'PT Nusantara Hijau Lestari' },
+    update: {},
+    create: {
+      name: 'PT Nusantara Hijau Lestari',
+      sector: 'Energi terbarukan',
+      description: 'Program CSR fokus pada pendidikan dan lingkungan di wilayah pesisir Banten.',
+      userId: csrUser.id,
+    },
+  });
+
   // File contoh untuk diunggah saat demo.
   const samplesDir = path.resolve(process.cwd(), '../../samples');
   fs.mkdirSync(samplesDir, { recursive: true });
@@ -260,6 +282,8 @@ async function main() {
   await paidDonation(water.id, admin.id, admin.integritySubjectId, 1_000_000, 2);
   await paidDonation(books.id, budi.id, budi.integritySubjectId, 150_000, 5);
   await paidDonation(books.id, andi.id, andi.integritySubjectId, 500_000, 1);
+  // Dana CSR (transfer sesuai MoU) — tercatat & dinotarisasi seperti donasi lain.
+  await paidDonation(books.id, csrUser.id, csrUser.integritySubjectId, 2_000_000, 3);
   // Donasi PAID di campaign FROZEN — kandidat demo refund manual (BFD-75).
   await paidDonation(hydro.id, budi.id, budi.integritySubjectId, 200_000, 8);
   await paidDonation(hydro.id, siti.id, siti.integritySubjectId, 300_000, 5);
@@ -327,7 +351,7 @@ async function main() {
   }
 
   console.log(
-    'Seed selesai: 4 user, 6 campaign (termasuk 1 FROZEN), 11 donasi (7 PAID antre notarisasi, 2 PENDING, 2 EXPIRED), 2 pencairan (PAID + REQUESTED).',
+    'Seed selesai: 4 user + 1 mitra CSR, 6 campaign (termasuk 1 FROZEN), 12 donasi (8 PAID antre notarisasi, 2 PENDING, 2 EXPIRED), 2 pencairan (PAID + REQUESTED).',
   );
 }
 

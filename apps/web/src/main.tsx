@@ -37,6 +37,7 @@ const router = createBrowserRouter([
       // Publik
       { path: '/', element: <HomePage /> },
       { path: '/campaigns/:id', element: <CampaignDetailPage /> },
+      { path: '/csr', element: page(() => import('./pages/CsrPage'), 'CsrPage') },
       { path: '/donations/:id', element: page(() => import('./pages/DonationProofPage'), 'DonationProofPage') },
       // Mahasiswa
       { path: '/campaigns/new', element: user(page(() => import('./pages/CampaignFormPage'), 'CampaignFormPage')) },
@@ -56,6 +57,7 @@ const router = createBrowserRouter([
           { path: 'integrity', element: page(loadAdmin, 'AdminIntegrityPage') },
           { path: 'disbursements', element: page(loadAdmin, 'AdminDisbursementsPage') },
           { path: 'audit', element: page(loadAdmin, 'AdminAuditPage') },
+          { path: 'csr', element: page(() => import('./pages/admin/AdminCsrPage'), 'AdminCsrPage') },
         ],
       },
       {

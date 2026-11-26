@@ -20,6 +20,8 @@ import { IntegrityController } from './modules/integrity/integrity.controller';
 import { IntegrityService } from './modules/integrity/integrity.service';
 import { MockPaymentAdapter } from './modules/payments/adapters/mock.adapter';
 import { PakasirAdapter } from './modules/payments/adapters/pakasir.adapter';
+import { CsrController } from './modules/csr/csr.controller';
+import { CsrService } from './modules/csr/csr.service';
 import { SakurupiahAdapter } from './modules/payments/adapters/sakurupiah.adapter';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './modules/payments/adapters/payment-gateway';
 import { PaymentsService } from './modules/payments/payments.service';
@@ -48,6 +50,7 @@ export function selectPaymentGateway(provider: string = env().paymentProvider): 
     IntegrityController,
     DisbursementsController,
     FilesController,
+    CsrController,
   ],
   providers: [
     AuditService,
@@ -58,6 +61,7 @@ export function selectPaymentGateway(provider: string = env().paymentProvider): 
     PaymentsService,
     DonationsService,
     DisbursementsService,
+    CsrService,
     NotarizationWorker,
     {
       provide: PAYMENT_GATEWAY,

@@ -274,6 +274,7 @@ export function Layout() {
 
   const links = [
     { to: '/', label: 'FundChain', end: true },
+    { to: '/csr', label: 'Mitra CSR' },
     ...(me ? [{ to: '/my/campaigns', label: 'Ruang Mahasiswa' }] : []),
     ...(isAdmin ? [{ to: '/admin', label: 'Admin' }] : []),
   ];

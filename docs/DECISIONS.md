@@ -327,3 +327,26 @@ test `apps/api/src/sakurupiah.test.ts`. Sumber: https://sakurupiah.id/developers
 - Uji sandbox end-to-end (BFD-111): dokumentasi tidak menyebut parameter pasti `status-transaction.php` dan bentuk
   respons errornya. Bila berbeda, sesuaikan `statusByTrx()`.
 - Keputusan fee (poin 5) oleh PM/bendahara.
+
+---
+
+## D-012 — Mitra CSR perusahaan (BFD-101, BFD-102)
+
+**Status:** diterima · **Kode:** `apps/api/src/modules/csr/`, `apps/web/src/pages/CsrPage.tsx`,
+`apps/web/src/pages/admin/AdminCsrPage.tsx`, migrasi `20261126000000_csr_companies`.
+
+### Keputusan
+
+1. Perusahaan tidak login. Admin mendaftarkan mitra (`POST /admin/csr/companies`); sistem membuat akun pencatat
+   role `COMPANY` dengan email sintetis `@fundchain.invalid` dan pseudonim `CSR-…` untuk canonical payload.
+2. Dana CSR masuk lewat transfer bank sesuai MoU (bukan QRIS; batas QRIS Sakurupiah Rp2.000.000). Setelah dana diterima,
+   admin mencatatnya (`POST /admin/csr/contributions`) dengan nomor referensi transfer/MoU yang unik.
+3. Pencatatan memakai jalur settlement yang sama dengan webhook (`PaymentsService.applyEvent`): donasi PAID,
+   hash, saldo campaign, antre notarisasi. Kontribusi CSR punya bukti blockchain yang sama dan ikut D-010.
+4. Publik: `GET /csr/companies` (halaman `/csr`) dan `GET /campaigns/:id/csr-sponsors` (panel di halaman campaign).
+
+### Perlu manusia
+
+- Template MoU dan proposal kemitraan untuk perusahaan (BFD-102, BizDev).
+- Desain final halaman sponsor (BFD-101); halaman saat ini memakai komponen yang sudah ada.
+- Rekening penampung dana CSR dan siapa yang berwenang mencatat kontribusi.

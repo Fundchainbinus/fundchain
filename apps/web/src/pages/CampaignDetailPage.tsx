@@ -1,5 +1,6 @@
 import { FileButton } from '../components/FileButton';
 import { MilestoneProgress } from '../components/MilestoneProgress';
+import { CsrSponsors } from './CsrPage';
 import { LIMITS } from '@fundchain/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, CreditCard, ExternalLink, HandCoins, Pencil, Send, ShieldCheck, Snowflake, Sun } from 'lucide-react';
@@ -412,6 +413,8 @@ export function CampaignDetailPage() {
               </div>
             )}
           </Panel>
+
+          <CsrSponsors campaignId={c.id} />
 
           <Panel title="Donasi & bukti blockchain" aside={<span className="text-xs text-slate-500">{c.donorCount} donasi lunas</span>}>
             {donations.data && donations.data.length > 0 ? (
