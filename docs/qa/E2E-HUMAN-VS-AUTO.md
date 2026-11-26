@@ -21,7 +21,7 @@ Jalankan *Cron tick* manual (Actions → Cron tick → Run workflow) sebelum lan
 | --- | --- | --- | --- | --- |
 | C1 | Login Google | Manusia | Mahasiswa klik login. Role ADMIN otomatis dari `ADMIN_EMAILS` | `01-gate1` (persona), manual sekali dengan akun asli |
 | C2 | Isi form campaign | Manusia | Judul, deskripsi, SDG, target, deadline | `01-gate1` |
-| C3 | Validasi deskripsi asal ketik | Otomatis | `gibberishProblem`: kata >30 huruf, pola berulang, <8 kata, nyaris tanpa vokal (D-012 terkait konten) | unit `text-quality.test.ts`; manual: ketik "hasjdhjshd…" → ditolak |
+| C3 | Validasi deskripsi asal ketik | Otomatis | `gibberishProblem`: kata >30 huruf, pola berulang, <8 kata, nyaris tanpa vokal | unit `text-quality.test.ts`; manual: ketik "hasjdhjshd…" → ditolak |
 | C4 | Unggah proposal PDF | Manusia | Magic bytes PDF dicek otomatis | `04-security` (magic bytes) |
 | C5 | Submit review | Manusia | Deskripsi dicek ulang otomatis | `01-gate1` |
 | C6 | **Review admin (approve/reject)** | **Manusia** | Keputusan admin, alasan wajib saat reject | `01-gate1` |
