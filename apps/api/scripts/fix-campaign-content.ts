@@ -137,7 +137,25 @@ async function apply(prisma: PrismaClient, c: Row, p: Plan) {
   return true;
 }
 
+/** Host & nama database tujuan, tanpa user/password — supaya operator yakin DB mana yang disentuh. */
+function target() {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) {
+    throw new Error(
+      'DATABASE_URL belum di-set di terminal ini. PowerShell: $env:DATABASE_URL = "<session pooler URL>"; $env:DIRECT_URL = $env:DATABASE_URL',
+    );
+  }
+  try {
+    const u = new URL(raw);
+    return `${u.hostname}:${u.port || '5432'}/${u.pathname.replace(/^\//, '')}`;
+  } catch {
+    throw new Error('DATABASE_URL bukan URL yang valid (password dengan karakter khusus harus di-URL-encode).');
+  }
+}
+
 async function main() {
+  console.log(`Database: ${target()}\n`);
+  if (!process.env.DIRECT_URL) process.env.DIRECT_URL = process.env.DATABASE_URL;
   const prisma = new PrismaClient();
   try {
     const id = arg('--campaign');
