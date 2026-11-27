@@ -1,5 +1,5 @@
 import { SDG_CATEGORIES } from "@fundchain/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -18,7 +18,7 @@ import {
 import { get, post } from "../lib/api";
 import { date, rupiah } from "../lib/format";
 import { useMe } from "../lib/hooks";
-import type { CampaignSummary, MyDonation } from "../lib/types";
+import type { CampaignSummary, MyDonationsPage } from "../lib/types";
 import { CampaignFormCard } from "./CampaignFormPage";
 import { DisbursementHistory, DisburseFormCard } from "./DisbursePage";
 
@@ -138,12 +138,25 @@ function MyCampaignsCard({ campaigns, onEdit }: { campaigns: CampaignSummary[]; 
   );
 }
 
-function MyDonationsCard({ donations }: { donations: MyDonation[] }) {
+/**
+ * "Donasi Saya" per halaman (BUG-009 / #27). Tab = filter di server, jumlah per tab & total lunas
+ * dari ringkasan DB, jadi tetap benar walau baru halaman pertama yang dimuat.
+ */
+function MyDonationsCard() {
   const [tab, setTab] = useState("ALL");
-  const failed = (d: MyDonation) => d.status === "FAILED" || d.status === "EXPIRED";
-  const shown = donations.filter((d) => tab === "ALL" || (tab === "FAILED" ? failed(d) : d.status === tab));
-  const paidTotal = donations.filter((d) => d.status === "PAID").reduce((n, d) => n + d.amount, 0);
-  if (!donations.length) {
+  const q = useInfiniteQuery({
+    queryKey: ["me", "donations", "list", tab],
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      get<MyDonationsPage>("/me/donations", { status: tab === "ALL" ? undefined : tab, cursor: pageParam, limit: 20 }),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  });
+  if (q.isLoading) return <Spinner />;
+  if (q.error) return <ErrorBox error={q.error} />;
+  const shown = q.data?.pages.flatMap((p) => p.donations) ?? [];
+  const summary = q.data?.pages[0]?.summary;
+  const counts = summary?.counts ?? { ALL: 0, PAID: 0, PENDING: 0, FAILED: 0 };
+  if (counts.ALL === 0) {
     return (
       <p className="text-[13px] text-slate-500">
         Belum ada donasi. <Link to="/" className="text-navy underline">Jelajahi kampanye</Link>
@@ -156,10 +169,10 @@ function MyDonationsCard({ donations }: { donations: MyDonation[] }) {
         value={tab}
         onChange={setTab}
         items={[
-          { value: "ALL", label: "Semua", count: donations.length },
-          { value: "PAID", label: "Paid", count: donations.filter((d) => d.status === "PAID").length },
-          { value: "PENDING", label: "Pending", count: donations.filter((d) => d.status === "PENDING").length },
-          { value: "FAILED", label: "Failed", count: donations.filter(failed).length },
+          { value: "ALL", label: "Semua", count: counts.ALL },
+          { value: "PAID", label: "Paid", count: counts.PAID },
+          { value: "PENDING", label: "Pending", count: counts.PENDING },
+          { value: "FAILED", label: "Failed", count: counts.FAILED },
         ]}
       />
       <div className="overflow-x-auto rounded border border-line">
@@ -191,7 +204,14 @@ function MyDonationsCard({ donations }: { donations: MyDonation[] }) {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-slate-500">Total donasi lunas Anda {rupiah(paidTotal)}.</p>
+      {q.hasNextPage && (
+        <button type="button" className="btn-secondary btn-sm" disabled={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
+          {q.isFetchingNextPage ? "Memuat…" : "Muat lebih banyak"}
+        </button>
+      )}
+      <p className="text-xs text-slate-500">
+        Menampilkan {shown.length} dari {tab === "ALL" ? counts.ALL : counts[tab as keyof typeof counts]} donasi · Total donasi lunas Anda {rupiah(summary?.paidTotal ?? 0)}.
+      </p>
     </div>
   );
 }
@@ -203,7 +223,6 @@ export function MyCampaignsPage() {
     queryKey: ["campaigns", "mine"],
     queryFn: () => get<{ campaigns: CampaignSummary[] }>("/campaigns", { mine: "true", limit: 100 }),
   });
-  const donationsQ = useQuery({ queryKey: ["me", "donations"], queryFn: () => get<MyDonation[]>("/me/donations") });
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const campaigns = campaignsQ.data?.campaigns ?? [];
   const fundable = campaigns.filter((c) => ["ACTIVE", "COMPLETED", "FROZEN"].includes(c.status)).map((c) => ({ id: c.id, title: c.title }));
@@ -235,7 +254,7 @@ export function MyCampaignsPage() {
             )}
           </section>
           <Panel title="Donasi Saya" aside={<Link to="/my/points" className="btn-secondary btn-sm">Poin Comserve</Link>}>
-            {donationsQ.isLoading ? <Spinner /> : donationsQ.error ? <ErrorBox error={donationsQ.error} /> : <MyDonationsCard donations={donationsQ.data ?? []} />}
+            <MyDonationsCard />
           </Panel>
         </div>
 
@@ -267,7 +286,6 @@ export function MyCampaignsPage() {
 }
 
 export function MyDonationsPage() {
-  const q = useQuery({ queryKey: ["me", "donations"], queryFn: () => get<MyDonation[]>("/me/donations") });
   return (
     <div className="space-y-6">
       <PageHeader
@@ -275,7 +293,7 @@ export function MyDonationsPage() {
         subtitle="Riwayat donasi beserta status pencatatan blockchain."
         actions={<Link to="/my/points" className="btn-secondary btn-sm">Poin Comserve</Link>}
       />
-      <Panel>{q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : <MyDonationsCard donations={q.data ?? []} />}</Panel>
+      <Panel><MyDonationsCard /></Panel>
     </div>
   );
 }

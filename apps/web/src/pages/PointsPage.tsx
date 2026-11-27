@@ -23,7 +23,7 @@ function PointsSummaryCard({ data }: { data: PointsSummary }) {
       </div>
       <div className="min-w-0 space-y-1 sm:text-right">
         <p className="text-[13px] text-ink">
-          Dari <span className="font-semibold">{num(data.entries.length)}</span> donasi lunas
+          Dari <span className="font-semibold">{num(data.count)}</span> donasi lunas
         </p>
         <p className="text-xs text-slate-500 [overflow-wrap:anywhere]">{data.rule}</p>
       </div>

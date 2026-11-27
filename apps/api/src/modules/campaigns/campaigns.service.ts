@@ -27,6 +27,9 @@ const LIST_SELECT = {
   _count: { select: { donations: { where: { status: 'PAID' } } } },
 } satisfies Prisma.CampaignSelect;
 
+/** BUG-011 / #29: maksimal campaign per tick cron, agar satu tick tidak melewati batas waktu Vercel Function. */
+export const HOUSEKEEPING_BATCH = 50;
+
 @Injectable()
 export class CampaignsService {
   constructor(
@@ -464,6 +467,8 @@ export class CampaignsService {
     const stale = await this.prisma.campaign.findMany({
       where: { status: 'FROZEN', deletedAt: null, frozenAt: { lte: cutoff } },
       select: { id: true, frozenAt: true },
+      orderBy: { frozenAt: 'asc' },
+      take: HOUSEKEEPING_BATCH, // BUG-011: sisanya diambil tick berikutnya
     });
     for (const { id, frozenAt } of stale) {
       await this.prisma.$transaction(async (tx) => {
@@ -491,6 +496,8 @@ export class CampaignsService {
     const expired = await this.prisma.campaign.findMany({
       where: { status: 'ACTIVE', deadline: { lte: new Date() } },
       select: { id: true },
+      orderBy: { deadline: 'asc' },
+      take: HOUSEKEEPING_BATCH, // BUG-011: sisanya diambil tick berikutnya
     });
     for (const { id } of expired) {
       await this.prisma.$transaction(async (tx) => {

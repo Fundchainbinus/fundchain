@@ -7,7 +7,7 @@ import { EmptyState, ErrorBox, FilterTabs, InfoNote, Spinner, Stat } from '../co
 import { get } from '../lib/api';
 import { rupiah } from '../lib/format';
 import { useMe } from '../lib/hooks';
-import type { CampaignSummary, MyDonation } from '../lib/types';
+import type { CampaignSummary, MyDonationsPage } from '../lib/types';
 
 const PUBLIC = 'ACTIVE,COMPLETED,FROZEN';
 
@@ -18,9 +18,10 @@ function SummaryStats() {
     queryFn: () => get<{ campaigns: CampaignSummary[] }>('/campaigns', { status: PUBLIC, limit: 100 }),
   });
   const cs = all.data?.campaigns ?? [];
-  const mine = useQuery({ queryKey: ['me', 'donations'], queryFn: () => get<MyDonation[]>('/me/donations'), enabled: !!me });
+  // Hanya ringkasan yang dipakai di sini (dihitung di DB), jadi cukup minta 1 baris.
+  const mine = useQuery({ queryKey: ['me', 'donations', 'summary'], queryFn: () => get<MyDonationsPage>('/me/donations', { limit: 1 }), enabled: !!me });
   const by = (s: string) => cs.filter((c) => c.status === s).length;
-  const paid = (mine.data ?? []).filter((d) => d.status === 'PAID');
+  const mySummary = mine.data?.summary;
   // integritySummary ikut di respons list (BFD-56), jadi tidak perlu fetch detail per kampanye.
   const integ = (k: 'VERIFIED' | 'TAMPERED' | 'PENDING') => cs.reduce((n, c) => n + (c.integritySummary?.[k] ?? 0), 0);
   const totalDonations = cs.reduce((n, c) => n + c.donorCount, 0);
@@ -32,8 +33,8 @@ function SummaryStats() {
       <Stat
         large
         label={me ? <>Donasi saya · <b className="font-semibold text-ink">{me.name.split(' ')[0]}</b></> : 'Donasi saya'}
-        value={me ? rupiah(paid.reduce((n, d) => n + d.amount, 0)) : '—'}
-        hint={me ? `${paid.length} pembayaran berhasil` : 'Login untuk melihat donasi Anda'}
+        value={me ? rupiah(mySummary?.paidTotal ?? 0) : '—'}
+        hint={me ? `${mySummary?.counts.PAID ?? 0} pembayaran berhasil` : 'Login untuk melihat donasi Anda'}
       />
       <Stat
         large

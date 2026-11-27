@@ -152,7 +152,11 @@ test('BFD-65: milestone bertahap & refund campaign FROZEN', async ({ browser }) 
     return `${r.status} ${r.body.error?.code}; donasi tetap ${still.status}`;
   });
 
-  const mine = await api.ok<{ id: string; amount: number; status: string; campaign: { id: string } }[]>('GET', '/me/donations', { token: student.token });
+  const { donations: mine } = await api.ok<{ donations: { id: string; amount: number; status: string; campaign: { id: string } }[] }>(
+    'GET',
+    '/me/donations?status=PAID&limit=100',
+    { token: student.token },
+  );
   const refundTarget = mine.find((d) => d.campaign.id === hydro!.id && d.status === 'PAID');
 
   await log.run('R-02', async () => {

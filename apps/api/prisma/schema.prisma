@@ -66,6 +66,7 @@ model Campaign {
 
   @@index([status, deadline])
   @@index([creatorId])
+  @@index([status, createdAt])
   @@map("campaigns")
 }
 
@@ -80,6 +81,7 @@ model CampaignDocument {
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
+  @@index([campaignId, createdAt])
   @@map("campaign_documents")
 }
 
@@ -94,6 +96,7 @@ model CampaignReview {
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   admin    User     @relation(fields: [adminId], references: [id])
 
+  @@index([campaignId])
   @@map("campaign_reviews")
 }
 
@@ -201,6 +204,7 @@ model Disbursement {
 
   @@index([campaignId, status])
   @@index([status, requestedAt])
+  @@index([requesterId])
   @@map("disbursements")
 }
 

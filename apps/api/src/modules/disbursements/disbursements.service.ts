@@ -42,6 +42,9 @@ export function assertNoOpenMilestone(openCount: number) {
   }
 }
 
+/** BUG-012 / #30: batas baris pencairan per campaign (maks. 5 tahap aktif + riwayat penolakan). */
+export const DISBURSEMENT_LIST_MAX = 100;
+
 type MilestoneRow = {
   id: string;
   description: string;
@@ -133,9 +136,12 @@ export class DisbursementsService {
   async milestones(campaignId: string) {
     const campaign = await this.prisma.campaign.findUnique({ where: { id: campaignId }, select: { id: true } });
     if (!campaign) throw new AppError('CAMPAIGN_NOT_FOUND', 'Campaign tidak ditemukan.');
+    // BUG-012 / #30: pengajuan ditolak tidak dihitung sebagai tahap → tidak perlu dimuat; tetap dibatasi.
     const rows = await this.prisma.disbursement.findMany({
-      where: { campaignId },
+      where: { campaignId, status: { not: 'REJECTED' } },
       select: { id: true, description: true, amount: true, status: true, requestedAt: true, approvedAt: true, paidAt: true },
+      orderBy: { requestedAt: 'asc' },
+      take: DISBURSEMENT_LIST_MAX,
     });
     return buildMilestones(rows);
   }
@@ -206,8 +212,21 @@ export class DisbursementsService {
     const privileged = viewer?.role === 'ADMIN' || viewer?.id === campaign.creatorId;
     const rows = await this.prisma.disbursement.findMany({
       where: { campaignId },
-      include: { admin: { select: { name: true } } },
+      select: {
+        id: true,
+        amount: true,
+        description: true,
+        status: true,
+        rejectionReason: true,
+        requestedAt: true,
+        approvedAt: true,
+        paidAt: true,
+        proofName: true,
+        proofType: true,
+        admin: { select: { name: true } },
+      },
       orderBy: { requestedAt: 'desc' },
+      take: DISBURSEMENT_LIST_MAX, // BUG-012 / #30
     });
     // Publik melihat ringkasan (transparansi); bukti hanya untuk pemilik/admin.
     return rows.map((d) => ({

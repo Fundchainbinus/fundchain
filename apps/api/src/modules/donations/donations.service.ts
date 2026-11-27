@@ -10,6 +10,23 @@ import { BlockchainService } from '../blockchain/blockchain.service';
 import { PaymentsService } from '../payments/payments.service';
 import { computePoints } from './points';
 
+/** Tab "Donasi Saya" → status donasi. FAILED mencakup EXPIRED (sama seperti tampilan web). */
+export const MY_DONATION_TABS: Record<string, string[]> = {
+  PAID: ['PAID'],
+  PENDING: ['PENDING'],
+  FAILED: ['FAILED', 'EXPIRED'],
+};
+export const MY_DONATIONS_DEFAULT = 20;
+export const MY_DONATIONS_MAX = 100;
+/** Riwayat poin yang dikirim ke web; total tetap dari seluruh donasi PAID. */
+export const POINTS_HISTORY_MAX = 50;
+
+export function clampMyDonationsLimit(limit: string | number | undefined): number {
+  const n = Number(limit);
+  if (limit === undefined || limit === '' || !Number.isFinite(n)) return MY_DONATIONS_DEFAULT;
+  return Math.min(MY_DONATIONS_MAX, Math.max(1, Math.trunc(n)));
+}
+
 @Injectable()
 export class DonationsService {
   private readonly logger = new Logger('Donations');
@@ -221,30 +238,81 @@ export class DonationsService {
     }));
   }
 
-  async listMine(user: CurrentUserPayload) {
-    const donations = await this.prisma.donation.findMany({
-      where: { donorId: user.id },
-      include: { campaign: { select: { id: true, title: true, status: true } }, blockchain: true, payment: true },
-      orderBy: { createdAt: 'desc' },
+  /**
+   * "Donasi Saya" (BUG-009 / #27): per halaman (cursor, seperti audit log), hanya kolom yang dipakai web.
+   * `summary` dihitung di DB supaya jumlah per tab & total lunas tetap benar walau baru satu halaman dimuat.
+   */
+  async listMine(user: CurrentUserPayload, query: { limit?: string | number; cursor?: string; status?: string } = {}) {
+    const limit = clampMyDonationsLimit(query.limit);
+    const statuses = query.status ? MY_DONATION_TABS[query.status] : undefined;
+    if (query.status && !statuses) throw new AppError('VALIDATION_ERROR', 'Filter status tidak valid.');
+
+    const rows = await this.prisma.donation.findMany({
+      where: { donorId: user.id, status: statuses ? { in: statuses } : undefined },
+      select: {
+        id: true,
+        amount: true,
+        status: true,
+        isAnonymous: true,
+        createdAt: true,
+        donatedAt: true,
+        integrityStatus: true,
+        campaign: { select: { id: true, title: true, status: true } },
+        payment: { select: { status: true } },
+        blockchain: { select: { status: true, txHash: true } },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
-    return donations.map((d) => ({
-      id: d.id,
-      amount: d.amount,
-      status: d.status,
-      isAnonymous: d.isAnonymous,
-      campaign: d.campaign,
-      createdAt: d.createdAt,
-      donatedAt: d.donatedAt,
-      integrityStatus: d.integrityStatus,
-      paymentStatus: d.payment?.status ?? null,
-      blockchainStatus: d.blockchain?.status ?? null,
-      txHash: d.blockchain?.txHash ?? null,
-    }));
+    const page = rows.slice(0, limit);
+
+    const groups = await this.prisma.donation.groupBy({
+      by: ['status'],
+      where: { donorId: user.id },
+      _count: { _all: true },
+      _sum: { amount: true },
+    });
+    const count = (...s: string[]) => groups.filter((g) => s.includes(g.status)).reduce((n, g) => n + g._count._all, 0);
+
+    return {
+      donations: page.map((d) => ({
+        id: d.id,
+        amount: d.amount,
+        status: d.status,
+        isAnonymous: d.isAnonymous,
+        campaign: d.campaign,
+        createdAt: d.createdAt,
+        donatedAt: d.donatedAt,
+        integrityStatus: d.integrityStatus,
+        paymentStatus: d.payment?.status ?? null,
+        blockchainStatus: d.blockchain?.status ?? null,
+        txHash: d.blockchain?.txHash ?? null,
+      })),
+      nextCursor: rows.length > limit ? page[page.length - 1].id : null,
+      summary: {
+        counts: {
+          ALL: groups.reduce((n, g) => n + g._count._all, 0),
+          PAID: count('PAID'),
+          PENDING: count('PENDING'),
+          FAILED: count(...MY_DONATION_TABS.FAILED),
+        },
+        paidTotal: groups.find((g) => g.status === 'PAID')?._sum.amount ?? 0,
+      },
+    };
   }
 
-  /** Poin comserve milik donatur yang login (BFD-98). */
+  /**
+   * Poin comserve milik donatur yang login (BFD-98). BUG-010 / #28: total & jumlah donasi dihitung di DB
+   * (poin per donasi dibulatkan ke bawah, lalu dijumlah — sama dengan computePoints); riwayat dibatasi.
+   */
   async pointsMine(user: CurrentUserPayload) {
-    const donations = await this.prisma.donation.findMany({
+    const [agg] = await this.prisma.$queryRaw<{ total: bigint | number | null; count: bigint | number }[]>`
+      SELECT COALESCE(SUM(FLOOR(amount / ${LIMITS.RUPIAH_PER_POINT}::numeric)), 0)::bigint AS total,
+             COUNT(*)::bigint AS count
+      FROM donations
+      WHERE donor_id = ${user.id} AND status = 'PAID'`;
+    const recent = await this.prisma.donation.findMany({
       where: { donorId: user.id, status: 'PAID' },
       select: {
         id: true,
@@ -254,8 +322,11 @@ export class DonationsService {
         createdAt: true,
         campaign: { select: { id: true, title: true } },
       },
+      orderBy: [{ donatedAt: 'desc' }, { createdAt: 'desc' }],
+      take: POINTS_HISTORY_MAX,
     });
-    return computePoints(donations);
+    const { entries, rule } = computePoints(recent);
+    return { total: Number(agg?.total ?? 0), count: Number(agg?.count ?? 0), entries, rule };
   }
 
   /** Daftar donasi untuk admin (integrity checker). */

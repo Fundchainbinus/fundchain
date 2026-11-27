@@ -117,6 +117,13 @@ export interface MyDonation {
   txHash: string | null;
 }
 
+/** Respons GET /me/donations: satu halaman + ringkasan dari DB (BUG-009 / #27). */
+export interface MyDonationsPage {
+  donations: MyDonation[];
+  nextCursor: string | null;
+  summary: { counts: { ALL: number; PAID: number; PENDING: number; FAILED: number }; paidTotal: number };
+}
+
 /** Satu baris perolehan poin comserve dari sebuah donasi PAID. */
 export interface PointsEntry {
   donationId: string;
@@ -129,6 +136,8 @@ export interface PointsEntry {
 /** Respons GET /me/points (BFD-98). Poin hanya dari donasi berstatus PAID. */
 export interface PointsSummary {
   total: number;
+  /** Jumlah seluruh donasi PAID (dihitung di DB); `entries` hanya riwayat terbaru. */
+  count: number;
   entries: PointsEntry[];
   rule: string;
 }

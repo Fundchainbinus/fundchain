@@ -91,8 +91,13 @@ export class DonationsController {
   }
 
   @Get('me/donations')
-  mine(@CurrentUser() user: CurrentUserPayload) {
-    return this.donations.listMine(user);
+  mine(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.donations.listMine(user, { limit, cursor, status });
   }
 
   @Get('me/points')
