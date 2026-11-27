@@ -3,11 +3,12 @@
  * scripts/fix-campaign-content.ts (mengganti deskripsi/proposal asal ketik di database).
  * Semua angka anggaran menjumlah tepat ke target campaign.
  */
+import { RENAMED_CAMPAIGNS } from './renamed-campaigns';
 import type { PdfDocument, PdfSection } from './sample-pdf';
 
 const rp = (n: number) => `Rp${n.toLocaleString('id-ID')}`;
 
-interface ProposalInput {
+export interface ProposalInput {
   title: string;
   sdg: string;
   location: string;
@@ -359,7 +360,7 @@ export const PREPARED_SDG: Record<string, string> = {
 };
 
 export function proposalFor(title: string): PdfDocument | null {
-  const p = PROPOSALS[title];
+  const p = PROPOSALS[title] ?? RENAMED_CAMPAIGNS.find((c) => c.title === title)?.proposal;
   return p ? build(p) : null;
 }
 

@@ -25,12 +25,14 @@ export interface PdfDocument {
 /**
  * PDF A4 multi-halaman dengan teks yang dibungkus otomatis (Helvetica). Cukup untuk proposal
  * dan bukti milestone yang benar-benar terbaca, tanpa dependensi tambahan.
+ * Lebar teks diukur dengan metrik glyph Helvetica asli, jadi tidak ada baris yang melewati margin kanan.
  */
 export function buildDocumentPdf(doc: PdfDocument): Buffer {
-  const LEFT = 60;
-  const RIGHT = 535;
-  const TOP = 780;
-  const BOTTOM = 70;
+  const LEFT = 56;
+  const RIGHT = 539; // A4 = 595pt; margin kanan sama dengan kiri
+  const TOP = 786;
+  const BOTTOM = 64;
+  const WIDTH = RIGHT - LEFT;
   const pages: string[][] = [[]];
   let y = TOP;
   const page = () => pages[pages.length - 1];
@@ -40,78 +42,137 @@ export function buildDocumentPdf(doc: PdfDocument): Buffer {
       y = TOP;
     }
   };
-  const line = (text: string, size: number, x = LEFT, font = 'F1') => {
-    ensure(size + 4);
-    page().push(`BT /${font} ${size} Tf ${x} ${y} Td (${esc(text)}) Tj ET`);
-    y -= size + 5;
+  const text = (t: string, size: number, x: number, font: Font = 'F1') =>
+    page().push(`BT /${font} ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td (${esc(t)}) Tj ET`);
+  const rule = (gray = 0.8, w = 0.6) => page().push(`q ${gray} G ${w} w ${LEFT} ${y.toFixed(2)} m ${RIGHT} ${y.toFixed(2)} l S Q`);
+  const line = (t: string, size: number, x = LEFT, font: Font = 'F1', lead = 1.4) => {
+    ensure(size * lead);
+    text(t, size, x, font);
+    y -= size * lead;
   };
-  const wrapped = (text: string, size: number, x = LEFT, indent = 0) => {
-    for (const l of wrap(text, size, RIGHT - x - indent)) line(l, size, x + indent);
+  const wrapped = (t: string, size: number, font: Font = 'F1', x = LEFT, lead = 1.4) => {
+    for (const l of wrap(t, size, RIGHT - x, font)) line(l, size, x, font, lead);
   };
 
-  line(doc.title, 18, LEFT, 'F2');
-  if (doc.subtitle) wrapped(doc.subtitle, 11);
-  y -= 8;
+  // Kepala dokumen: judul (dibungkus bila panjang), subjudul, garis pemisah.
+  wrapped(doc.title, 17, 'F2', LEFT, 1.25);
+  if (doc.subtitle) {
+    y -= 2;
+    wrapped(doc.subtitle, 10, 'F1');
+  }
+  y -= 2;
+  rule(0.55, 1);
+  y -= 16;
+
   for (const s of doc.sections) {
-    ensure(40);
-    y -= 6;
-    line(s.heading, 13, LEFT, 'F2');
+    ensure(52); // judul bagian tidak tertinggal sendirian di bawah halaman
+    y -= 4;
+    wrapped(s.heading, 12.5, 'F2', LEFT, 1.45);
     for (const p of s.paragraphs ?? []) {
       wrapped(p, 10.5);
       y -= 4;
     }
     for (const b of s.bullets ?? []) {
-      const [first, ...rest] = wrap(b, 10.5, RIGHT - LEFT - 14);
-      line(`-  ${first}`, 10.5);
+      const [first, ...rest] = wrap(b, 10.5, WIDTH - 14);
+      ensure(10.5 * 1.4);
+      text('-', 10.5, LEFT + 2);
+      line(first, 10.5, LEFT + 14);
       for (const r of rest) line(r, 10.5, LEFT + 14);
     }
+    if (s.bullets?.length) y -= 2;
     if (s.table) {
-      const amountX = RIGHT - 110;
-      const row = ([a, b]: [string, string], font = 'F1') => {
-        const parts = wrap(a, 10, amountX - LEFT - 10);
-        ensure(parts.length * 15);
-        page().push(`BT /${font} 10 Tf ${amountX} ${y} Td (${esc(b)}) Tj ET`);
-        for (const p of parts) line(p, 10, LEFT, font);
+      const amountW = 120;
+      const row = ([a, b]: [string, string], font: Font = 'F1') => {
+        const parts = wrap(a, 10, WIDTH - amountW - 12, font);
+        ensure(parts.length * 14 + 4);
+        // Nominal rata kanan di margin kanan, sejajar baris pertama teks.
+        text(b, 10, RIGHT - textWidth(b, 10, font), font);
+        for (const p of parts) line(p, 10, LEFT, font, 1.4);
       };
       row(s.table.head, 'F2');
+      y += 10;
+      rule(0.6);
+      y -= 14;
       for (const r of s.table.rows) row(r);
-      if (s.table.total) row(s.table.total, 'F2');
+      if (s.table.total) {
+        y += 10;
+        rule(0.6);
+        y -= 14;
+        row(s.table.total, 'F2');
+      }
+      y -= 4;
     }
+    y -= 6;
   }
   if (doc.footer) {
-    y -= 10;
-    wrapped(doc.footer, 9);
+    ensure(40);
+    y -= 4;
+    rule(0.8);
+    y -= 14;
+    wrapped(doc.footer, 8.5, 'F1', LEFT, 1.4);
   }
   const total = pages.length;
   return assemble(
-    pages.map((ops, i) => [...ops, `BT /F1 9 Tf ${RIGHT - 60} 40 Td (${esc(`Halaman ${i + 1}/${total}`)}) Tj ET`].join('\n')),
+    pages.map((ops, i) => {
+      const label = esc(`Halaman ${i + 1}/${total}`);
+      const x = RIGHT - textWidth(`Halaman ${i + 1}/${total}`, 8.5, 'F1');
+      return [...ops, `BT /F1 8.5 Tf ${x.toFixed(2)} 36 Td (${label}) Tj ET`].join('\n');
+    }),
   );
 }
 
-function esc(s: string) {
+type Font = 'F1' | 'F2';
+
+/* Lebar glyph Helvetica / Helvetica-Bold (AFM Adobe, per 1000 em) untuk karakter 32..126, StandardEncoding. */
+// prettier-ignore
+const HELVETICA = [278,278,355,556,556,889,667,222,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,222,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+// prettier-ignore
+const HELVETICA_BOLD = [278,333,474,556,556,889,722,278,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,278,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584];
+
+/** Lebar teks (pt) setelah karakter dinormalkan seperti di PDF (lihat esc). */
+export function textWidth(t: string, size: number, font: Font = 'F1'): number {
+  const table = font === 'F2' ? HELVETICA_BOLD : HELVETICA;
+  let w = 0;
+  for (const ch of normalize(t)) {
+    const c = ch.charCodeAt(0);
+    w += c >= 32 && c <= 126 ? table[c - 32] : 556;
+  }
+  return (w * size) / 1000;
+}
+
+function normalize(s: string) {
   return s
     .replace(/[–—]/g, '-')
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
-    .replace(/[\\()]/g, (c) => `\\${c}`)
-    .replace(/[^\x20-\x7e]/g, '?');
+    .replace(/[^ -~]/g, '?');
 }
 
-/** Pembungkus kata berdasarkan perkiraan lebar rata-rata glyph Helvetica (~0,5 em). */
-function wrap(text: string, size: number, width: number): string[] {
-  const max = Math.max(10, Math.floor(width / (size * 0.5)));
+function esc(s: string) {
+  return normalize(s).replace(/[\\()]/g, (c) => `\\${c}`);
+}
+
+/** Pembungkus kata berdasarkan lebar glyph sebenarnya; kata yang lebih panjang dari satu baris dipotong paksa. */
+function wrap(text: string, size: number, width: number, font: Font = 'F1'): string[] {
   const out: string[] = [];
   let cur = '';
-  for (const word of text.split(/\s+/)) {
-    if (!cur) cur = word;
-    else if ((cur + ' ' + word).length <= max) cur += ' ' + word;
-    else {
-      out.push(cur);
-      cur = word;
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const next = cur ? `${cur} ${word}` : word;
+    if (textWidth(next, size, font) <= width) {
+      cur = next;
+      continue;
+    }
+    if (cur) out.push(cur);
+    cur = word;
+    while (textWidth(cur, size, font) > width) {
+      let cut = cur.length - 1;
+      while (cut > 1 && textWidth(cur.slice(0, cut), size, font) > width) cut--;
+      out.push(cur.slice(0, cut));
+      cur = cur.slice(cut);
     }
   }
   if (cur) out.push(cur);
-  return out;
+  return out.length ? out : [''];
 }
 
 /** Rakit objek PDF: katalog, pohon halaman, satu content stream per halaman, dua font standar. */
