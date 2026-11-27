@@ -136,12 +136,13 @@ describe('NotarizationWorker.tick dengan lease (BFD-127)', () => {
     expect(typeof row.lastTickMs).toBe('number');
   });
 
-  it('lease gagal diambil (DB error): tick tidak jalan, tidak melempar', async () => {
+  it('lease tidak tersedia (mis. tabel belum dimigrasi): fail-open, tick tetap jalan tanpa release', async () => {
     const systemState = fakeSystemState();
-    systemState.updateMany.mockRejectedValueOnce(new Error('db down'));
+    systemState.updateMany.mockRejectedValueOnce(new Error('relation "system_state" does not exist'));
     const { worker, payments } = makeWorker(systemState);
-    await expect(worker.tick('cron')).resolves.toEqual({ ran: false });
-    expect(payments.expireStale).not.toHaveBeenCalled();
+    await expect(worker.tick('cron')).resolves.toEqual({ ran: true });
+    expect(payments.expireStale).toHaveBeenCalledTimes(1);
+    expect(systemState.updateMany).toHaveBeenCalledTimes(1); // tidak ada release
   });
 });
 

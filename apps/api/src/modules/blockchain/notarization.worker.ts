@@ -80,6 +80,8 @@ export function gasFields(receipt?: GasReceipt | null) {
  */
 /** Tick di atas ini dicatat sebagai log biasa walau dari mode interval (batas function Vercel 60 dtk). */
 const SLOW_TICK_MS = 20_000;
+/** Penanda tick yang berjalan tanpa lease (fail-open saat system_state tidak terbaca). */
+const NO_LEASE = 'no-lease';
 
 @Injectable()
 export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestroy {
@@ -157,9 +159,10 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     try {
       owner = await this.lease.acquire();
     } catch (e) {
-      this.logger.error(`Lease tick gagal diambil: ${(e as Error).message}`);
-      this.running = false;
-      return { ran: false };
+      // Fail-open: lease tidak terbaca (mis. migrasi system_state belum diterapkan) tidak boleh menghentikan
+      // expiry & notarisasi. Bagian tick tetap idempoten (lihat D-017), hanya tanpa perlindungan lease.
+      this.logger.warn(`Lease tick tidak tersedia, tick tetap jalan tanpa lease: ${(e as Error).message}`);
+      owner = NO_LEASE;
     }
     if (!owner) {
       this.running = false;
@@ -224,9 +227,11 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
       // Mode interval (lokal) berdetak tiap 2 dtk: cukup debug kecuali lambat/gagal. Cron & kick selalu dicatat.
       if (source === 'interval' && ok && totalMs < SLOW_TICK_MS) this.logger.debug(line);
       else this.logger.log(line);
-      await this.lease
-        .release(owner, { ok, totalMs, steps, source })
-        .catch((e) => this.logger.warn(`Lease tick gagal dilepas: ${(e as Error).message}`));
+      if (owner !== NO_LEASE) {
+        await this.lease
+          .release(owner, { ok, totalMs, steps, source })
+          .catch((e) => this.logger.warn(`Lease tick gagal dilepas: ${(e as Error).message}`));
+      }
       this.running = false;
     }
   }

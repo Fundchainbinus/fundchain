@@ -505,6 +505,8 @@ Pemicu lain tetap ada sebagai cadangan: `cron-tick.yml` (GitHub, tidak tepat wak
   klaim notarisasi memakai `updateMany` bersyarat + `isNotarized()` + revert `AlreadyNotarized`; `expireStale`,
   `completeExpired`, dan `softDeleteFrozen` adalah UPDATE bersyarat status; integrity checker hanya membaca dan
   menulis status hasil hitungan yang sama.
+- **Fail-open.** Bila lease tidak bisa dibaca (mis. migrasi `system_state` belum diterapkan, error DB), tick tetap
+  berjalan tanpa lease dan mencatat warning, supaya expiry & notarisasi tidak berhenti karena fitur pengaman.
 
 ### Monitoring
 
