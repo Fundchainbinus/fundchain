@@ -379,3 +379,58 @@ Sepolia akan gagal diverifikasi ("hash tidak ditemukan").
 - Trade-off yang harus disetujui: jaringan privat tidak bisa diaudit publik seperti Etherscan; transparansi bergantung
   pada explorer yang dibuka BINUS. Pertimbangkan tetap menulis checkpoint berkala ke chain publik.
 - Redeploy contract di jaringan baru dan ganti env production (langkah di `infra/binusian-chain/README.md`).
+
+## D-014 — Repo tetap public walau workflow backup mengunggah dump terenkripsi (QA-001, issue #33)
+
+**Status:** diterima sebagai risiko (27 Nov 2026) · **Kode:** `.github/workflows/backup.yml`, `docs/BACKUP.md`
+
+> **PENTING — wajib ditindaklanjuti bila FundChain dipakai sungguhan (bukan proyek kelas):**
+> jadikan repo **private**, atau pindahkan backup ke storage privat lalu hapus semua artifact lama.
+> Selama repo public, siapa pun bisa mengunduh dump database (berisi data pribadi donatur) dan
+> satu-satunya pengaman adalah `BACKUP_PASSPHRASE`.
+
+### Konteks
+
+Repo `Fundchainbinus/fundchain` public agar bisa dinilai dosen dan diakses anggota tim tanpa undangan. Workflow
+`DB backup` mengunggah dump harian sebagai artifact Actions (retensi 14 hari). Dump dienkripsi AES256 (gpg), tetapi
+artifact repo public bisa diunduh siapa saja.
+
+### Keputusan
+
+1. Untuk fase proyek kelas, repo tetap public dan backup tetap sebagai artifact.
+2. Mitigasi yang dipertahankan: enkripsi gpg, `BACKUP_PASSPHRASE` panjang dan acak (≥ 32 karakter), tidak pernah
+   ditulis di repo/log, dan dirotasi bila ada anggota tim yang keluar.
+3. Data di production adalah data demo/uji coba mahasiswa, bukan donatur publik.
+
+### Konsekuensi
+
+- Bila passphrase bocor, seluruh backup 14 hari terakhir bisa dibuka.
+- Sebelum menerima donasi dari publik: jalankan salah satu opsi di catatan PENTING di atas (lihat issue #33).
+
+## D-015 — Cron tick tetap lewat GitHub Actions walau hanya jalan tiap 5–11 jam (QA-002, issue #34)
+
+**Status:** diterima sebagai risiko (27 Nov 2026) · **Kode:** `.github/workflows/cron-tick.yml`,
+`GET /api/v1/cron/tick` (`integrity.controller.ts`), `NotarizationWorker.tick()` · Memperbarui D-005.
+
+> **PENTING — wajib ditindaklanjuti bila FundChain dipakai sungguhan:** pindahkan pemicu cron ke scheduler
+> yang bisa diandalkan (tugas backend: [`docs/tasks/EXTERNAL-SCHEDULER.md`](tasks/EXTERNAL-SCHEDULER.md)).
+
+### Konteks
+
+D-005 mengandalkan `cron-tick.yml` dengan jadwal `*/10 * * * *`. Data GitHub 21–27 Nov 2026: 17 run terjadwal dalam
+6 hari, jarak antar-run 5–11 jam. GitHub menunda/melewati schedule pada repo dengan beban rendah; ini perilaku
+GitHub, bukan bug kode.
+
+### Keputusan
+
+Untuk fase proyek kelas, jarak 5–11 jam diterima. Sebelum demo, jalankan **Cron tick** manual sekali
+(Actions → Cron tick → Run workflow).
+
+### Dampak yang diterima
+
+| Pekerjaan di tick | Yang terjadi bila tick terlambat | Jaring pengaman yang sudah ada |
+|---|---|---|
+| Expire donasi PENDING > 15 menit | Donasi tetap tampil "Pending" berjam-jam | QR sudah kedaluwarsa di gateway, jadi tidak bisa dibayar; halaman donasi melakukan polling |
+| Antrean notarisasi | Hash baru tercatat di chain terlambat | Worker juga dipicu setelah pembayaran lunas, saat halaman donasi polling, dan saat admin retry |
+| Campaign lewat deadline → COMPLETED | Status "Berakhir" terlambat sampai beberapa jam | Donasi baru ditolak oleh pengecekan deadline saat membuat donasi |
+| Integrity checker berkala | Data yang diubah terdeteksi lebih lambat | Admin bisa verifikasi manual |
