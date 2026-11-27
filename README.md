@@ -190,6 +190,18 @@ readiness) ada di [`docs/qa/`](docs/qa/README.md). Bug terbuka dilacak sebagai G
 
 Live: **https://fundchain-web.vercel.app** (web) · **https://fundchain-api.vercel.app/api/v1** (API)
 
+> [!IMPORTANT]
+> **Catatan rilis — baca sebelum mengaktifkan fitur baru di production:**
+> - **Pembayaran Sakurupiah (D-011)** sudah ada di kode, tetapi **baru berjalan setelah env Vercel `fundchain-api` diisi:**
+>   `PAYMENT_PROVIDER=sakurupiah`, `SAKURUPIAH_API_ID`, `SAKURUPIAH_API_KEY`, `SAKURUPIAH_CALLBACK_URL`,
+>   `SAKURUPIAH_PHONE`, `SAKURUPIAH_FEE_BY`, dan `SAKURUPIAH_SANDBOX=false` untuk transaksi sungguhan, lalu redeploy.
+>   Selama `PAYMENT_PROVIDER` belum diganti, pembayaran tetap memakai provider lama.
+>   Jangan ganti `SAKURUPIAH_FEE_BY` saat masih ada donasi PENDING (bisa memicu nominal tidak cocok, D-016).
+> - **Mitra CSR (D-012) wajib migrasi dulu.** Vercel **tidak** menjalankan migrasi. Sebelum commit CSR di-push:
+>   backup database, lalu dari `apps/api` jalankan
+>   `node --env-file=.env node_modules/prisma/build/index.js migrate deploy`.
+>   Tanpa itu, halaman dan API CSR error karena tabelnya belum ada.
+
 Dua project Vercel dari repo yang sama:
 
 | Project         | Root Directory | Isi                                                                                                 |
