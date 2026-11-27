@@ -16,6 +16,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { PaymentsService } from '../payments/payments.service';
+import { readTickStatus } from '../blockchain/tick-lease';
 
 class GoogleLoginDto {
   @IsString()
@@ -63,8 +64,11 @@ export class UsersController {
 
   @Public()
   @Get('health')
-  health() {
-    return { status: 'ok', time: new Date().toISOString() };
+  async health() {
+    // BFD-128: kesegaran cron tick ikut dilaporkan supaya uptime monitor/watchdog bisa memberi alarm.
+    // Status HTTP tetap 200 (API hidup); `tick.stale` = tick terakhir > 30 menit lalu atau belum pernah.
+    const tick = await readTickStatus(this.prisma).catch(() => null);
+    return { status: 'ok', time: new Date().toISOString(), tick };
   }
 
   /** Konfigurasi publik untuk frontend (tanpa secret). */
@@ -207,7 +211,7 @@ export class UsersController {
   @Roles('ADMIN')
   @Get('admin/stats')
   async stats() {
-    const [campaigns, donations, raised, blockchain, integrity, disbursements, chain] = await Promise.all([
+    const [campaigns, donations, raised, blockchain, integrity, disbursements, chain, tick] = await Promise.all([
       this.prisma.campaign.groupBy({ by: ['status'], _count: true }),
       this.prisma.donation.groupBy({ by: ['status'], _count: true }),
       this.prisma.donation.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } }),
@@ -215,6 +219,7 @@ export class UsersController {
       this.prisma.donation.groupBy({ by: ['integrityStatus'], where: { status: 'PAID' }, _count: true }),
       this.prisma.disbursement.groupBy({ by: ['status'], _count: true, _sum: { amount: true } }),
       this.blockchain.info(),
+      readTickStatus(this.prisma).catch(() => null),
     ]);
     const toMap = (rows: { _count: number }[], key: string) =>
       Object.fromEntries(rows.map((r) => [(r as unknown as Record<string, string>)[key], r._count]));
@@ -228,6 +233,7 @@ export class UsersController {
         disbursements.map((d) => [d.status, { count: d._count, amount: d._sum.amount ?? 0 }]),
       ),
       chain,
+      tick,
     };
   }
 }

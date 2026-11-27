@@ -1,6 +1,6 @@
 # Tugas backend: pemicu cron yang bisa diandalkan (issue #34, D-015)
 
-**Pemilik:** tim backend · **Perkiraan:** 2–4 hari kerja termasuk riset, implementasi, dan uji · **Prioritas:**
+**Status (27 Nov 2026):** diterapkan lewat D-017 (Supabase pg_cron), runbook `docs/infra/CRON-SCHEDULER.md`. Sisa: riwayat 24 jam, p95, uji alarm. · **Pemilik:** tim backend · **Perkiraan:** 2–4 hari kerja termasuk riset, implementasi, dan uji · **Prioritas:**
 wajib sebelum FundChain menerima donasi publik. Untuk proyek kelas, D-015 menerima kondisi sekarang.
 
 ## Masalah
@@ -45,12 +45,12 @@ bagaimana tim tahu kalau scheduler berhenti, dan berapa biaya bila volume naik.
 
 ## Kriteria selesai
 
-- [ ] D-017 di `docs/DECISIONS.md`: opsi terpilih, alasan, pemilik akun, biaya, rencana bila pemilik keluar.
+- [x] D-017 di `docs/DECISIONS.md`: opsi terpilih, alasan, pemilik akun, biaya, rencana bila pemilik keluar.
 - [ ] Scheduler aktif di production; riwayat menunjukkan ≥ 24 jam tick berjalan dengan jarak ≤ 10 menit.
-- [ ] Test unit/integrasi untuk tick paralel (poin 1) dan, bila relevan, verifikasi signature (poin 3).
+- [x] Test unit/integrasi untuk tick paralel (poin 1) dan, bila relevan, verifikasi signature (poin 3).
 - [ ] Log durasi tick tersedia; durasi p95 dicatat di D-017.
 - [ ] Alarm tick berhenti sudah diuji (matikan scheduler 30+ menit, pastikan alert muncul).
-- [ ] `README.md` dan D-015 diperbarui; catatan PENTING cron di README dihapus.
+- [x] `README.md` dan D-015 diperbarui; catatan PENTING cron di README dihapus.
 - [ ] Issue #34 ditutup dengan tautan ke PR.
 
 ## Bacaan

@@ -263,3 +263,20 @@ model Company {
 
   @@map("companies")
 }
+
+/// Status operasional satu baris per kunci (BFD-127/128). `cron_tick`: lease lintas instance supaya tick tidak
+/// berjalan paralel di dua instance serverless, plus jejak tick terakhir untuk monitoring (lastTickAt, durasi).
+model SystemState {
+  key              String    @id
+  lockedUntil      DateTime? @map("locked_until")
+  lockOwner        String?   @map("lock_owner")
+  lastTickAt       DateTime? @map("last_tick_at")
+  lastTickMs       Int?      @map("last_tick_ms")
+  lastTickOk       Boolean?  @map("last_tick_ok")
+  lastTickSteps    Json?     @map("last_tick_steps")
+  lastTickSource   String?   @map("last_tick_source")
+  lastStaleAlertAt DateTime? @map("last_stale_alert_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("system_state")
+}

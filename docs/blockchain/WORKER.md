@@ -11,7 +11,7 @@ Antrean disimpan di tabel `blockchain_transactions` (outbox pattern, tanpa Redis
 | Mode | `WORKER_MODE` | Pemicu |
 | --- | --- | --- |
 | Server biasa / lokal | `interval` (default) | `setInterval` tiap `WORKER_POLL_MS` (default 2 dtk) |
-| Vercel (production) | `on-demand` | (1) **cron**: `.github/workflows/cron-tick.yml` memanggil `GET /api/v1/cron/tick` tiap 10 menit (Vercel Cron Hobby hanya sekali sehari, `vercel.json` `0 0 * * *`); (2) **kick on event**: `worker.kick()` setelah webhook pembayaran PAID, simulasi bayar, polling status donasi yang belum selesai, dan manual retry admin. `kick()` memakai `waitUntil()` supaya tick selesai setelah response terkirim |
+| Vercel (production) | `on-demand` | (1) **cron**: Supabase `pg_cron` memanggil `GET /api/v1/cron/tick` tiap 5 menit (D-017, `docs/infra/CRON-SCHEDULER.md`); cadangan: `.github/workflows/cron-tick.yml` dan Vercel Cron harian (`vercel.json` `0 0 * * *`); (2) **kick on event**: `worker.kick()` setelah webhook pembayaran PAID, simulasi bayar, polling status donasi yang belum selesai, dan manual retry admin. `kick()` memakai `waitUntil()` supaya tick selesai setelah response terkirim |
 
 Satu tick (`tick()`) berjalan berurutan dan tidak pernah paralel di instance yang sama:
 
@@ -23,7 +23,9 @@ Satu tick (`tick()`) berjalan berurutan dan tidak pernah paralel di instance yan
 6. Memproses maksimal 5 job `QUEUED`/`RETRYING` yang `nextAttemptAt <= now`, hanya job milik `CHAIN_ID` aktif.
 7. `integritySweep()`: hash checker otomatis.
 
-Di serverless beberapa instance bisa memproses antrean bersamaan. Tx dobel dicegah oleh:
+Setiap tick lebih dulu mengambil **lease lintas instance** (BFD-127, `tick-lease.ts`): baris `system_state.cron_tick` diklaim dengan UPDATE bersyarat selama 55 detik, sehingga hanya satu tick berjalan di seluruh instance; yang kalah melewatkan putarannya. Akhir tick menyimpan `last_tick_at` dan durasi per langkah (BFD-128) untuk `GET /health`, dashboard admin, dan watchdog.
+
+Bila lease kedaluwarsa di tengah tick yang sangat lambat, beberapa instance tetap bisa memproses antrean bersamaan. Tx dobel dicegah oleh:
 - klaim atomic `updateMany(status IN (QUEUED, RETRYING) → SUBMITTED)`, sehingga hanya pemenang klaim yang mengirim tx;
 - pengecekan `isNotarized(key)` sebelum mengirim;
 - penundaan tanpa kirim ulang bila tx lama masih pending di mempool;

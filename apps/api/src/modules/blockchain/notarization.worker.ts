@@ -11,6 +11,7 @@ import { CampaignsService } from '../campaigns/campaigns.service';
 import { IntegrityService } from '../integrity/integrity.service';
 import { PaymentsService } from '../payments/payments.service';
 import { BlockchainService } from './blockchain.service';
+import { TickLease } from './tick-lease';
 import {
   bumpFees,
   classifyRelayerError,
@@ -77,6 +78,11 @@ export function gasFields(receipt?: GasReceipt | null) {
  * BFD-49: error kirim tx diklasifikasi (relayer-errors.ts): nonce -> nonce 'pending' baru, underpriced -> fee naik,
  *         insufficient funds -> FAILED tanpa menghabiskan retry + alert + jeda kirim. Lihat docs/blockchain/WORKER.md.
  */
+/** Tick di atas ini dicatat sebagai log biasa walau dari mode interval (batas function Vercel 60 dtk). */
+const SLOW_TICK_MS = 20_000;
+/** Penanda tick yang berjalan tanpa lease (fail-open saat system_state tidak terbaca). */
+const NO_LEASE = 'no-lease';
+
 @Injectable()
 export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger('NotarizationWorker');
@@ -90,6 +96,8 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
   private lastBalanceCheck = 0;
   /** BFD-49: kirim tx dijeda sampai waktu ini setelah INSUFFICIENT_FUNDS (per instance). */
   private fundsPausedUntil = 0;
+  /** BFD-127: lease lintas instance (lihat tick-lease.ts). */
+  private readonly lease: TickLease;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -98,7 +106,9 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     private readonly campaigns: CampaignsService,
     private readonly payments: PaymentsService,
     private readonly audit: AuditService,
-  ) {}
+  ) {
+    this.lease = new TickLease(prisma);
+  }
 
   onApplicationBootstrap() {
     const cfg = env().worker;
@@ -110,7 +120,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
       this.logger.log('Worker mode on-demand: dipicu oleh request & cron (serverless)');
       return;
     }
-    this.timer = setInterval(() => void this.tick(), cfg.pollMs);
+    this.timer = setInterval(() => void this.tick('interval'), cfg.pollMs);
     this.logger.log(`Worker aktif, polling tiap ${cfg.pollMs}ms`);
   }
 
@@ -122,7 +132,7 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
   kick() {
     const cfg = env().worker;
     if (!cfg.enabled || cfg.mode !== 'on-demand' || this.running) return;
-    const work = this.tick();
+    const work = this.tick('kick');
     try {
       waitUntil(work);
     } catch {
@@ -134,48 +144,94 @@ export class NotarizationWorker implements OnApplicationBootstrap, OnModuleDestr
     if (this.timer) clearInterval(this.timer);
   }
 
-  async tick() {
-    if (this.running) return;
+  /**
+   * Satu putaran kerja. `source` hanya untuk jejak monitoring: 'cron' (scheduler), 'kick' (request), 'interval'.
+   * BFD-127: dijaga lease lintas instance (tick-lease.ts); instance yang kalah melewatkan putaran ini.
+   * BFD-128: durasi per langkah di-log dan disimpan di system_state (lastTickAt) untuk health & watchdog.
+   */
+  async tick(source: 'cron' | 'kick' | 'interval' = 'interval'): Promise<{ ran: boolean; ms?: number }> {
+    if (this.running) return { ran: false };
     this.running = true;
+    const started = Date.now();
+    const steps: Record<string, number> = {};
+    let ok = true;
+    let owner: string | null = null;
     try {
-      await this.housekeeping();
+      owner = await this.lease.acquire();
+    } catch (e) {
+      // Fail-open: lease tidak terbaca (mis. migrasi system_state belum diterapkan) tidak boleh menghentikan
+      // expiry & notarisasi. Bagian tick tetap idempoten (lihat D-017), hanya tanpa perlindungan lease.
+      this.logger.warn(`Lease tick tidak tersedia, tick tetap jalan tanpa lease: ${(e as Error).message}`);
+      owner = NO_LEASE;
+    }
+    if (!owner) {
+      this.running = false;
+      this.logger.debug('Tick dilewati: tick lain masih berjalan di instance lain');
+      return { ran: false };
+    }
+    const step = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
+      const t = Date.now();
+      try {
+        return await fn();
+      } finally {
+        steps[name] = (steps[name] ?? 0) + (Date.now() - t);
+      }
+    };
+    try {
+      await step('housekeeping', () => this.housekeeping());
       // Sebelum cek RPC: antrean yang macet karena RPC mati juga harus terdeteksi.
-      await this.alertStuck();
-      const health = await this.blockchain.health();
+      await step('alertStuck', () => this.alertStuck());
+      const health = await step('health', () => this.blockchain.health());
       if (!health.ready) {
         if (health.reason !== this.lastNotReadyReason) {
           this.logger.warn(`Blockchain belum siap: ${health.reason}. Notarisasi ditunda.`);
           this.lastNotReadyReason = health.reason ?? '';
         }
         this.chainReady = false;
-        return;
+        return { ran: true };
       }
       if (!this.chainReady) {
         this.chainReady = true;
         this.lastNotReadyReason = '';
         this.logger.log(`Terhubung ke ${this.blockchain.target().network} @ ${this.blockchain.target().contractAddress}`);
-        await this.resyncLocalChain();
+        await step('resync', () => this.resyncLocalChain());
       }
-      await this.recoverStuck();
-      await this.checkRelayerBalance();
+      await step('recoverStuck', () => this.recoverStuck());
+      await step('relayerBalance', () => this.checkRelayerBalance());
       if (Date.now() < this.fundsPausedUntil) {
         // Saldo relayer habis: jangan gagalkan antrean satu per satu. Job tetap QUEUED/RETRYING sampai jeda selesai.
-        await this.integritySweep();
-        return;
+        await step('integritySweep', () => this.integritySweep());
+        return { ran: true };
       }
-      const due = await this.prisma.blockchainTransaction.findMany({
+      const due = await step('queue', () => this.prisma.blockchainTransaction.findMany({
         // Hanya antrean milik chain ini — dev lokal & production bisa berbagi database.
         where: { status: { in: ['QUEUED', 'RETRYING'] }, nextAttemptAt: { lte: new Date() }, chainId: this.blockchain.target().chainId },
         orderBy: { createdAt: 'asc' },
         take: 5,
+      }));
+      await step('notarize', async () => {
+        for (const job of due) {
+          if ((await this.process(job)) === 'halt') break;
+        }
       });
-      for (const job of due) {
-        if ((await this.process(job)) === 'halt') break;
-      }
-      await this.integritySweep();
+      await step('integritySweep', () => this.integritySweep());
+      return { ran: true };
     } catch (e) {
+      ok = false;
       this.logger.error(`Tick gagal: ${(e as Error).message}`);
+      return { ran: true };
     } finally {
+      const totalMs = Date.now() - started;
+      const detail = Object.entries(steps).map(([k, v]) => `${k}=${v}`).join(' ');
+      const line = `Tick ${source} selesai ${totalMs}ms ${ok ? 'ok' : 'GAGAL'} (${detail})`;
+      // Mode interval (lokal) berdetak tiap 2 dtk: cukup debug kecuali lambat/gagal. Cron & kick selalu dicatat.
+      if (source === 'interval' && ok && totalMs < SLOW_TICK_MS) this.logger.debug(line);
+      else this.logger.log(line);
+      if (owner !== NO_LEASE) {
+        await this.lease
+          .release(owner, { ok, totalMs, steps, source })
+          .catch((e) => this.logger.warn(`Lease tick gagal dilepas: ${(e as Error).message}`));
+      }
       this.running = false;
     }
   }
