@@ -91,6 +91,24 @@ interface Stats {
   integrity: Record<string, number>;
   disbursements: Record<string, { count: number; amount: number }>;
   chain: ChainInfo;
+  /** BFD-128: jejak cron tick terakhir (null bila API lama / gagal dibaca). */
+  tick: TickStatus | null;
+}
+
+interface TickStatus {
+  lastTickAt: string | null;
+  ageSeconds: number | null;
+  lastTickMs: number | null;
+  ok: boolean | null;
+  source: string | null;
+  stale: boolean;
+}
+
+function tickAge(sec: number | null): string {
+  if (sec === null) return 'belum pernah';
+  if (sec < 90) return `${sec} dtk lalu`;
+  if (sec < 5400) return `${Math.round(sec / 60)} menit lalu`;
+  return `${Math.round(sec / 3600)} jam lalu`;
 }
 
 export function AdminDashboardPage() {
@@ -143,6 +161,22 @@ export function AdminDashboardPage() {
           value={`${n(s.blockchain, 'CONFIRMED')} On-Chain`}
           hint={`${pendingChain} Dalam Progress · ${n(s.blockchain, 'FAILED')} Gagal`}
         />
+        {s.tick && (
+          <Stat
+            label="Cron tick"
+            danger={s.tick.stale}
+            value={s.tick.stale ? 'Berhenti' : tickAge(s.tick.ageSeconds)}
+            hint={
+              s.tick.stale ? (
+                <span className="text-red-700">
+                  Tick terakhir {tickAge(s.tick.ageSeconds)}: expiry & antrean notarisasi tertunda (cek scheduler)
+                </span>
+              ) : (
+                `${s.tick.source ?? '-'} · ${s.tick.lastTickMs ?? '-'} ms${s.tick.ok === false ? ' · terakhir gagal' : ''}`
+              )
+            }
+          />
+        )}
       </div>
       <h2 className="pt-2 text-[28px] font-normal text-ink">Monitoring Blockchain</h2>
       <ChainCard chain={s.chain} onRefresh={() => void stats.refetch()} refreshing={stats.isFetching} />

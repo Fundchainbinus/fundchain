@@ -409,7 +409,7 @@ artifact repo public bisa diunduh siapa saja.
 
 ## D-015 — Cron tick tetap lewat GitHub Actions walau hanya jalan tiap 5–11 jam (QA-002, issue #34)
 
-**Status:** diterima sebagai risiko (27 Nov 2026) · **Kode:** `.github/workflows/cron-tick.yml`,
+**Status:** diterima sebagai risiko (27 Nov 2026), **digantikan oleh D-017** (27 Nov 2026) · **Kode:** `.github/workflows/cron-tick.yml`,
 `GET /api/v1/cron/tick` (`integrity.controller.ts`), `NotarizationWorker.tick()` · Memperbarui D-005.
 
 > **PENTING — wajib ditindaklanjuti bila FundChain dipakai sungguhan:** pindahkan pemicu cron ke scheduler
@@ -461,3 +461,74 @@ bisa menutup seluruh antrean.
 - Admin harus memeriksa transaksi di dashboard gateway: bila uang benar-benar masuk, selesaikan di luar sistem
   (refund ke donatur, atau minta donatur berdonasi ulang). Belum ada tombol admin untuk ini.
 - Donatur melihat donasinya "Failed".
+
+---
+
+## D-017 — Pemicu cron tick: Supabase `pg_cron` + `pg_net` (BFD-128, issue #34)
+
+**Status:** diterapkan (27 Nov 2026) · **Menggantikan:** D-015 · **Memperbarui:** D-005 ·
+**Kode:** `apps/api/supabase/cron-scheduler.sql`, `apps/api/src/modules/blockchain/tick-lease.ts`,
+`NotarizationWorker.tick()`, migrasi `20261127000100_system_state` · **Runbook:** `docs/infra/CRON-SCHEDULER.md`
+
+### Konteks
+
+`GET /api/v1/cron/tick` harus dipanggil tiap 5–10 menit. GitHub Actions hanya menjalankannya tiap 5–11 jam (D-015)
+dan Vercel Cron paket Hobby hanya harian. Opsi yang dibandingkan ada di `docs/tasks/EXTERNAL-SCHEDULER.md`.
+
+### Keputusan
+
+Pemicu utama = **Supabase `pg_cron` + `pg_net`** di project database yang sudah dipakai:
+
+| Job | Jadwal | Isi |
+|---|---|---|
+| `fundchain-cron-tick` | `*/5 * * * *` | `fundchain_ops.cron_tick()`: GET `/api/v1/cron/tick` dengan `Authorization: Bearer` dari Vault |
+| `fundchain-tick-watchdog` | `*/10 * * * *` | `fundchain_ops.tick_watchdog()`: alert Discord bila `last_tick_at` > 30 menit (maks. sekali per jam) |
+
+Alasan dibanding opsi lain:
+
+- **Tanpa vendor & akun baru.** Database sudah di Supabase; tidak menambah pemilik akun yang bisa hilang saat
+  anggota tim lulus (bus factor). cron-job.org / QStash / Cloudflare butuh akun terpisah dan menyimpan secret di vendor
+  lain. Vercel Pro berbayar (± US$20/bulan per anggota).
+- **Secret tidak di repo maupun di tabel.** `CRON_SECRET` disimpan di Supabase Vault (terenkripsi), dibaca oleh fungsi
+  `security definer` di schema `fundchain_ops` yang tidak diekspos PostgREST; EXECUTE dicabut dari `anon`/`authenticated`.
+- **Riwayat dan status gratis.** `cron.job_run_details` (jalan/tidak) dan `net._http_response` (status HTTP) menjadi
+  riwayat scheduler.
+
+Pemicu lain tetap ada sebagai cadangan: `cron-tick.yml` (GitHub, tidak tepat waktu), Vercel Cron harian, dan
+`kick()` setelah pembayaran/polling/retry. Semua aman berjalan bersamaan karena **lease lintas instance** (BFD-127):
+
+- `system_state(key='cron_tick')` diklaim dengan `UPDATE … WHERE locked_until IS NULL OR locked_until < now()`;
+  hanya satu instance yang mendapat baris. Lease 55 detik (< `maxDuration` 60 dtk), jadi instance yang mati di
+  tengah tick melepas lease sendiri. Advisory lock tidak dipakai karena koneksi lewat pooler Supabase tidak menjamin
+  sesi yang sama antara lock dan unlock.
+- Bagian tick yang tetap bisa tumpang-tindih di jendela ≤ 5 detik setelah lease kedaluwarsa sudah idempoten:
+  klaim notarisasi memakai `updateMany` bersyarat + `isNotarized()` + revert `AlreadyNotarized`; `expireStale`,
+  `completeExpired`, dan `softDeleteFrozen` adalah UPDATE bersyarat status; integrity checker hanya membaca dan
+  menulis status hasil hitungan yang sama.
+
+### Monitoring
+
+- Setiap tick menyimpan `last_tick_at`, durasi total dan per langkah, sumber, dan ok/gagal; durasi juga di-log
+  (`Tick cron selesai …ms`).
+- `GET /api/v1/health` → `tick.stale` (> 30 menit) untuk uptime monitor apa pun; kartu **Cron tick** di dashboard admin.
+- Watchdog di database mengirim alert ke `fundchain_alert_webhook_url` (Vault).
+
+### Kepemilikan & risiko
+
+| Hal | Jawaban |
+|---|---|
+| Pemilik akun/secret | Project Supabase "Fundchain" (org tim). Tech lead mengisi Vault; anggota org dengan akses owner bisa merotasi |
+| Bila pemilik keluar/lulus | Tambahkan minimal satu anggota lain sebagai Owner org Supabase sebelum serah terima; jadwal & fungsi ikut database, tidak terikat akun pribadi |
+| Biaya | Rp0 di paket gratis Supabase (pg_cron & pg_net termasuk). Volume 288 tick/hari jauh di bawah batas |
+| Scheduler berhenti | Watchdog + `health.tick.stale` + kartu admin. Bila seluruh project di-pause, API juga mati (DB sama) sehingga gejalanya langsung terlihat |
+| Paket gratis di-pause setelah 7 hari tanpa aktivitas | Tick tiap 5 menit sendiri sudah menjadi aktivitas database |
+
+### Konsekuensi
+
+- `README.md`: catatan PENTING cron dihapus.
+- Durasi p95 tick dan hasil uji alarm dicatat di bawah setelah 24 jam berjalan di production.
+
+### Hasil di production
+
+_Diisi setelah ≥ 24 jam: jarak antar-tick maksimum, p95 `last_tick_ms`, hasil uji alarm._
+
