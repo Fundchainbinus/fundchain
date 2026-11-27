@@ -37,8 +37,9 @@ export class IntegrityController {
     if (!secret || expected.length !== given.length || !timingSafeEqual(expected, given)) {
       throw new AppError('AUTH_UNAUTHENTICATED', 'Cron secret tidak valid.');
     }
-    await this.worker.tick();
-    return { ok: true, at: new Date().toISOString() };
+    // BFD-127: ran=false berarti tick lain sedang berjalan (lease dipegang instance lain), bukan error.
+    const result = await this.worker.tick('cron');
+    return { ok: true, ran: result.ran, ms: result.ms, at: new Date().toISOString() };
   }
 
   @Public()

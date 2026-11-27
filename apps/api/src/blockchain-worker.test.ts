@@ -67,6 +67,12 @@ function createFakePrisma() {
   const donations = new Map<string, { id: string; status: string; hash: string | null }>();
   const auditLogs: { action: string; entityId?: string | null; metadata?: any }[] = [];
   const prisma: any = {
+    // BFD-127: lease tick selalu didapat (satu instance); perilaku lease diuji di tick-lease.test.ts.
+    systemState: {
+      updateMany: vi.fn(async () => ({ count: 1 })),
+      findUnique: vi.fn(async () => ({ key: 'cron_tick' })),
+      create: vi.fn(),
+    },
     jobs,
     donations,
     auditLogs,
