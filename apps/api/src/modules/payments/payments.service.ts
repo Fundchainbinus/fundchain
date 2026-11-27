@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { hashDonation, toOnchainKey } from '@fundchain/shared';
+import { sendAlert } from '../../common/alert';
 import { AppError } from '../../common/app-error';
 import { floorToSecond } from '../../common/format';
 import { PrismaService } from '../../common/prisma.service';
@@ -120,12 +121,34 @@ export class PaymentsService {
 
     // SETTLED — amount final berasal dari DB, webhook hanya divalidasi (BR-DON-002).
     if (!Number.isFinite(event.amount) || event.amount !== payment.amount) {
-      await this.audit.log({
-        action: 'PAYMENT_AMOUNT_MISMATCH',
-        entityType: 'Donation',
-        entityId: donationId,
-        metadata: { expected: payment.amount, received: event.amount, provider: this.gateway.name },
+      // BUG-013 / #31 (D-016): jangan biarkan PENDING. Kalau tetap PENDING, expireStale mengambilnya lagi
+      // tiap tick, audit ditulis berulang, dan 100 baris macet menutup antrean. Tandai FAILED sekali,
+      // catat & kirim alert sekali, lalu admin memeriksa transaksinya di dashboard gateway.
+      // Bila kemudian datang SETTLED dengan nominal yang benar, jalur settle di bawah tetap menerimanya.
+      const first = await this.prisma.$transaction(async (tx) => {
+        const { count } = await tx.payment.updateMany({
+          where: { id: payment.id, status: { in: ['PENDING', 'EXPIRED'] } },
+          data: { status: 'FAILED' },
+        });
+        if (count === 0) return false;
+        await tx.donation.update({ where: { id: donationId }, data: { status: 'FAILED' } });
+        await this.audit.log(
+          {
+            action: 'PAYMENT_AMOUNT_MISMATCH',
+            entityType: 'Donation',
+            entityId: donationId,
+            metadata: { expected: payment.amount, received: event.amount, provider: this.gateway.name, newStatus: 'FAILED' },
+          },
+          tx,
+        );
+        return true;
       });
+      if (first) {
+        await sendAlert(
+          `Nominal pembayaran tidak cocok untuk donasi ${donationId}: diharapkan Rp${payment.amount}, gateway ${this.gateway.name} ` +
+            `melaporkan ${event.amount}. Donasi ditandai FAILED. Periksa transaksinya di dashboard gateway.`,
+        ).catch(() => undefined);
+      }
       throw new AppError('PAYMENT_AMOUNT_MISMATCH', 'Nominal pembayaran tidak sesuai.');
     }
 

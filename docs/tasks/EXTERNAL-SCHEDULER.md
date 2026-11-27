@@ -14,7 +14,7 @@ deadline, soft-delete campaign FROZEN, integrity checker, dan alert antrean mace
 
 ## Pilihan yang harus dibandingkan
 
-Tim **memilih satu** dan menuliskan alasannya sebagai keputusan baru di `docs/DECISIONS.md` (D-016).
+Tim **memilih satu** dan menuliskan alasannya sebagai keputusan baru di `docs/DECISIONS.md` (D-017).
 
 | Opsi | Kelebihan | Kekurangan / risiko |
 |---|---|---|
@@ -24,7 +24,7 @@ Tim **memilih satu** dan menuliskan alasannya sebagai keputusan baru di `docs/DE
 | **Cloudflare Workers Cron Triggers** | Gratis, presisi, kode pemanggil di-version-control | Akun & deployment terpisah; secret disimpan di Cloudflare |
 | **Vercel Pro** (Cron per menit) | Paling sederhana, satu platform | Berbayar (±US$20/bulan per anggota); butuh pemilik akun Vercel |
 
-Pertanyaan yang harus dijawab di D-016: siapa pemilik akun/secret, apa yang terjadi bila pemilik akun lulus/keluar,
+Pertanyaan yang harus dijawab di D-017: siapa pemilik akun/secret, apa yang terjadi bila pemilik akun lulus/keluar,
 bagaimana tim tahu kalau scheduler berhenti, dan berapa biaya bila volume naik.
 
 ## Hal teknis yang wajib ditangani (bukan sekadar "pasang scheduler")
@@ -45,10 +45,10 @@ bagaimana tim tahu kalau scheduler berhenti, dan berapa biaya bila volume naik.
 
 ## Kriteria selesai
 
-- [ ] D-016 di `docs/DECISIONS.md`: opsi terpilih, alasan, pemilik akun, biaya, rencana bila pemilik keluar.
+- [ ] D-017 di `docs/DECISIONS.md`: opsi terpilih, alasan, pemilik akun, biaya, rencana bila pemilik keluar.
 - [ ] Scheduler aktif di production; riwayat menunjukkan ≥ 24 jam tick berjalan dengan jarak ≤ 10 menit.
 - [ ] Test unit/integrasi untuk tick paralel (poin 1) dan, bila relevan, verifikasi signature (poin 3).
-- [ ] Log durasi tick tersedia; durasi p95 dicatat di D-016.
+- [ ] Log durasi tick tersedia; durasi p95 dicatat di D-017.
 - [ ] Alarm tick berhenti sudah diuji (matikan scheduler 30+ menit, pastikan alert muncul).
 - [ ] `README.md` dan D-015 diperbarui; catatan PENTING cron di README dihapus.
 - [ ] Issue #34 ditutup dengan tautan ke PR.

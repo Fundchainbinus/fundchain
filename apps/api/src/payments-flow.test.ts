@@ -239,18 +239,33 @@ describe('PaymentsService — idempotency webhook ganda', () => {
 });
 
 describe('PaymentsService — validasi nominal', () => {
-  it('nominal webhook ≠ nominal di DB → PAYMENT_AMOUNT_MISMATCH, tidak ada settle', async () => {
-    const { service, state, tx } = setup([{ donationId: 'd1', amount: 50_000 }]);
+  it('nominal webhook ≠ nominal di DB → PAYMENT_AMOUNT_MISMATCH, tidak ada settle, donasi FAILED (BUG-013)', async () => {
+    const { service, state } = setup([{ donationId: 'd1', amount: 50_000 }]);
 
     await expect(service.applyEvent(settled('d1', 5_000))).rejects.toMatchObject({ code: 'PAYMENT_AMOUNT_MISMATCH' });
 
-    expect(tx.payment.updateMany).not.toHaveBeenCalled();
-    expect(state.payments.get('d1')!.status).toBe('PENDING');
-    expect(state.donations.get('d1')!.status).toBe('PENDING');
+    expect(state.payments.get('d1')!.status).toBe('FAILED');
+    expect(state.donations.get('d1')!.status).toBe('FAILED');
     expect(state.campaign.currentAmount).toBe(0);
+    expect(state.outbox).toHaveLength(0);
     expect(state.audit).toEqual([
       expect.objectContaining({ action: 'PAYMENT_AMOUNT_MISMATCH', metadata: expect.objectContaining({ expected: 50_000, received: 5_000 }) }),
     ]);
+  });
+
+  it('mismatch yang datang berulang hanya dicatat sekali', async () => {
+    const { service, state } = setup([{ donationId: 'd1', amount: 50_000 }]);
+    await expect(service.applyEvent(settled('d1', 5_000))).rejects.toMatchObject({ code: 'PAYMENT_AMOUNT_MISMATCH' });
+    await expect(service.applyEvent(settled('d1', 5_000))).rejects.toMatchObject({ code: 'PAYMENT_AMOUNT_MISMATCH' });
+    expect(actions(state.audit)).toEqual(['PAYMENT_AMOUNT_MISMATCH']);
+  });
+
+  it('setelah FAILED karena mismatch, SETTLED dengan nominal benar tetap diterima', async () => {
+    const { service, state } = setup([{ donationId: 'd1', amount: 50_000 }]);
+    await expect(service.applyEvent(settled('d1', 5_000))).rejects.toMatchObject({ code: 'PAYMENT_AMOUNT_MISMATCH' });
+    await expect(service.applyEvent(settled('d1', 50_000))).resolves.toMatchObject({ status: 'PAID' });
+    expect(state.donations.get('d1')!.status).toBe('PAID');
+    expect(state.campaign.currentAmount).toBe(50_000);
   });
 
   it('nominal bukan angka (NaN) juga ditolak', async () => {
@@ -317,6 +332,20 @@ describe('PaymentsService.expireStale', () => {
     expect(state.campaign.currentAmount).toBe(20_000);
     expect(state.outbox).toHaveLength(1);
     expect(cancelCharge).not.toHaveBeenCalled();
+  });
+
+  it('BUG-013: gateway SETTLED dengan nominal salah → keluar dari antrean (FAILED), audit sekali walau tick diulang', async () => {
+    const { service, state } = setup([{ donationId: 'bad', amount: 20_000, expiresAt: past() }], {
+      fetchStatus: async (orderId) => settled(orderId, 2_000),
+    });
+
+    await expect(service.expireStale()).resolves.toBe(1);
+    await expect(service.expireStale()).resolves.toBe(0); // tidak diambil lagi di tick berikutnya
+
+    expect(state.payments.get('bad')!.status).toBe('FAILED');
+    expect(state.donations.get('bad')!.status).toBe('FAILED');
+    expect(actions(state.audit)).toEqual(['PAYMENT_AMOUNT_MISMATCH']);
+    expect(state.campaign.currentAmount).toBe(0);
   });
 
   it('fetchStatus gagal (gateway down) → dianggap EXPIRED; cancelCharge gagal tidak menggagalkan tick', async () => {

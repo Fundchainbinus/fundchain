@@ -434,3 +434,30 @@ Untuk fase proyek kelas, jarak 5–11 jam diterima. Sebelum demo, jalankan **Cro
 | Antrean notarisasi | Hash baru tercatat di chain terlambat | Worker juga dipicu setelah pembayaran lunas, saat halaman donasi polling, dan saat admin retry |
 | Campaign lewat deadline → COMPLETED | Status "Berakhir" terlambat sampai beberapa jam | Donasi baru ditolak oleh pengecekan deadline saat membuat donasi |
 | Integrity checker berkala | Data yang diubah terdeteksi lebih lambat | Admin bisa verifikasi manual |
+
+## D-016 — Nominal pembayaran tidak cocok → donasi FAILED, dicatat & di-alert sekali (BUG-013, issue #31)
+
+**Status:** diterapkan (27 Nov 2026) · **Kode:** `PaymentsService.applyEvent` (`payments.service.ts`),
+test di `payments-flow.test.ts`
+
+### Konteks
+
+Dengan QRIS dinamis, nominal terkunci di QR, jadi donatur tidak bisa membayar nominal lain. Selisih hanya muncul dari
+sistem di sekitarnya: pengaturan fee Sakurupiah (`SAKURUPIAH_FEE_BY`) diganti saat masih ada pembayaran PENDING,
+perubahan arti field di API gateway, atau dua environment memakai akun merchant yang sama. Sebelumnya pembayaran
+seperti ini tetap PENDING, diambil lagi oleh `expireStale` setiap tick, menulis audit berulang, dan 100 baris macet
+bisa menutup seluruh antrean.
+
+### Keputusan
+
+1. Payment PENDING/EXPIRED yang dilaporkan SETTLED dengan nominal berbeda → payment & donasi **FAILED**.
+2. `PAYMENT_AMOUNT_MISMATCH` ditulis di audit log **sekali** (dalam transaksi yang sama), dan alert dikirim sekali
+   (log + `ALERT_WEBHOOK_URL` bila diisi). Notifikasi berikutnya untuk donasi yang sama tidak menulis audit lagi.
+3. Saldo campaign tidak bertambah dan tidak ada notarisasi.
+4. Bila kemudian gateway melaporkan SETTLED dengan nominal yang benar, donasi tetap diterima (jalur settle biasa).
+
+### Konsekuensi
+
+- Admin harus memeriksa transaksi di dashboard gateway: bila uang benar-benar masuk, selesaikan di luar sistem
+  (refund ke donatur, atau minta donatur berdonasi ulang). Belum ada tombol admin untuk ini.
+- Donatur melihat donasinya "Failed".
