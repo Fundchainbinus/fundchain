@@ -263,7 +263,7 @@ export function CampaignDetailPage() {
           <Panel title="Detail Kampanye">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <h1 className="text-[22px] font-medium [overflow-wrap:anywhere]">{c.title}</h1>
-              <CampaignBadge status={c.status} />
+              <CampaignBadge status={c.status} raised={c.currentAmount} target={c.targetAmount} />
             </div>
             <p className="mt-3 text-[13px] text-slate-500 [overflow-wrap:anywhere]">
               {c.creator.name} · {s ? `SDG ${s.number}` : c.sdgCategory} · Target {rupiah(c.targetAmount)} · Batas waktu {date(c.deadline)}

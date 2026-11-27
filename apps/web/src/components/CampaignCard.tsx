@@ -28,7 +28,7 @@ export function CampaignCard({ c, to }: { c: CampaignSummary; to?: string }) {
       </Link>
       <div className="flex flex-1 flex-col px-4 pb-4 pt-4">
         <div className="flex items-start justify-between gap-2">
-          <CampaignBadge status={c.status} />
+          <CampaignBadge status={c.status} raised={c.currentAmount} target={c.targetAmount} />
           <span className="text-xs text-slate-500">{date(c.deadline)}</span>
         </div>
         <p className="mt-3 text-xs text-slate-500">{s ? `SDG ${s.number} · ${s.label}` : c.sdgCategory}</p>

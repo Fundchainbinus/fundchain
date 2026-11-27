@@ -20,7 +20,8 @@ const CAMPAIGN: Record<CampaignStatus, [string, keyof typeof tone]> = {
   ACTIVE: ['Active', 'sky'],
   REJECTED: ['Rejected', 'red'],
   FROZEN: ['Frozen', 'red'],
-  COMPLETED: ['Completed', 'green'],
+  // COMPLETED = batas waktu lewat, BUKAN target tercapai (lihat CampaignBadge).
+  COMPLETED: ['Berakhir', 'gray'],
 };
 const DONATION: Record<DonationStatus, [string, keyof typeof tone]> = {
   PENDING: ['Pending', 'amber'],
@@ -62,7 +63,16 @@ function StatusText({ label, t, upper = true }: { label: string; t: keyof typeof
   return <span className={`whitespace-nowrap text-xs ${upper ? 'uppercase' : ''} ${plainTone[t]}`}>{label}</span>;
 }
 
-export const CampaignBadge = ({ status }: { status: CampaignStatus }) => <Badge label={CAMPAIGN[status][0]} t={CAMPAIGN[status][1]} />;
+/**
+ * COMPLETED hanya berarti batas waktu lewat. Agar kampanye 0% tidak terlihat "selesai",
+ * label hijau "Tercapai" hanya dipakai bila dana terkumpul ≥ target; selain itu "Berakhir".
+ */
+export function CampaignBadge({ status, raised, target }: { status: CampaignStatus; raised?: number; target?: number }) {
+  if (status === 'COMPLETED' && raised !== undefined && target !== undefined && target > 0 && raised >= target) {
+    return <Badge label="Tercapai" t="green" />;
+  }
+  return <Badge label={CAMPAIGN[status][0]} t={CAMPAIGN[status][1]} />;
+}
 export const DonationBadge = ({ status }: { status: DonationStatus }) => <StatusText label={DONATION[status][0]} t={DONATION[status][1]} />;
 export const DisbursementBadge = ({ status }: { status: DisbursementStatus }) => (
   <StatusText label={DISBURSEMENT[status][0]} t={DISBURSEMENT[status][1]} />

@@ -29,10 +29,10 @@ const CAMPAIGN_TABS = [
   ["PENDING_REVIEW", "Pending"],
   ["REJECTED", "Rejected"],
   ["FROZEN", "Frozen"],
-  ["COMPLETED", "Completed"],
+  ["COMPLETED", "Berakhir"],
 ] as const;
 
-const STATUS_TEXT: Record<string, string> = { PENDING_REVIEW: "PENDING" };
+const STATUS_TEXT: Record<string, string> = { PENDING_REVIEW: "PENDING", COMPLETED: "BERAKHIR" };
 const link = "text-ink hover:text-navy hover:underline";
 
 /** Aksi per status, mengikuti kolom "Aksi" di Figma. Edit membuka form di sebelah kanan. */

@@ -28,7 +28,7 @@ function SummaryStats() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Stat large label="Dana terkumpul" value={rupiah(cs.reduce((n, c) => n + c.currentAmount, 0))} hint={`Dari ${totalDonations} donasi berhasil`} />
-      <Stat large label="Kampanye publik" value={`${cs.length} kampanye`} hint={`${by('ACTIVE')} Active · ${by('COMPLETED')} Completed · ${by('FROZEN')} Frozen`} />
+      <Stat large label="Kampanye publik" value={`${cs.length} kampanye`} hint={`${by('ACTIVE')} Active · ${by('COMPLETED')} Berakhir · ${by('FROZEN')} Frozen`} />
       <Stat
         large
         label={me ? <>Donasi saya · <b className="font-semibold text-ink">{me.name.split(' ')[0]}</b></> : 'Donasi saya'}
@@ -95,7 +95,7 @@ export function HomePage() {
               items={[
                 { value: '', label: 'Semua', count: list.length },
                 { value: 'ACTIVE', label: 'Active', count: n('ACTIVE') },
-                { value: 'COMPLETED', label: 'Completed', count: n('COMPLETED') },
+                { value: 'COMPLETED', label: 'Berakhir', count: n('COMPLETED') },
                 { value: 'FROZEN', label: 'Frozen', count: n('FROZEN') },
               ]}
             />

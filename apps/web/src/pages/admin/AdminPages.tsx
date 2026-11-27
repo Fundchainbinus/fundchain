@@ -130,7 +130,7 @@ export function AdminDashboardPage() {
         <Stat
           label="Campaign aktif"
           value={`${n(s.campaigns, 'ACTIVE')} aktif`}
-          hint={`${n(s.campaigns, 'COMPLETED')} Completed · ${n(s.campaigns, 'FROZEN')} Frozen`}
+          hint={`${n(s.campaigns, 'COMPLETED')} Berakhir · ${n(s.campaigns, 'FROZEN')} Frozen`}
         />
         <Stat label="Dana terkumpul" value={rupiah(s.totalRaised)} hint={`Dari ${n(s.donations, 'PAID')} donasi`} />
         <Stat
@@ -246,7 +246,7 @@ function ReviewPanel({ id }: { id: string }) {
         </>
       ) : (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <CampaignBadge status={c.status} />
+          <CampaignBadge status={c.status} raised={c.currentAmount} target={c.targetAmount} />
           {c.rejectionReason && <span className="text-xs text-slate-600">Alasan: {c.rejectionReason}</span>}
           {c.frozenReason && <span className="text-xs text-slate-600">Alasan: {c.frozenReason}</span>}
           <Link to={`/campaigns/${c.id}`} className="btn-secondary btn-sm ml-auto">Buka halaman kampanye</Link>
@@ -531,6 +531,8 @@ export function AdminDisbursementsPage() {
   const all = q.data ?? [];
   const list = all.filter((d) => d.status === status);
   const selected = list.find((d) => d.id === selectedId) ?? list[0];
+  // BR-DIS-004: API menolak approve/mark paid di campaign FROZEN; UI ikut mengunci agar tidak menyesatkan.
+  const selectedFrozen = selected?.campaign.status === 'FROZEN';
   const openProof = (id: string) => {
     setProofError(null);
     openSignedFile(`/disbursements/${id}/proof/link`).catch((e) => setProofError(errorMessage(e)));
@@ -584,7 +586,7 @@ export function AdminDisbursementsPage() {
                         <>
                           {' · '}
                           <button type="button" className="btn-link" onClick={() => setSelectedId(d.id)}>
-                            {d.status === 'REQUESTED' ? 'Review' : 'Tandai paid'}
+                            {d.campaign.status === 'FROZEN' ? 'Terkunci (Frozen)' : d.status === 'REQUESTED' ? 'Review' : 'Tandai paid'}
                           </button>
                         </>
                       )}
@@ -626,7 +628,7 @@ export function AdminDisbursementsPage() {
                 </button>
                 {selected.status === 'REQUESTED' ? (
                   <div className="flex gap-2">
-                    <button className="btn-primary btn-sm flex-1" disabled={act.isPending} onClick={() => askConfirm(selected, 'approve')}>
+                    <button className="btn-primary btn-sm flex-1" disabled={act.isPending || selectedFrozen} onClick={() => askConfirm(selected, 'approve')}>
                       Setujui
                     </button>
                     <button
@@ -638,11 +640,19 @@ export function AdminDisbursementsPage() {
                     </button>
                   </div>
                 ) : (
-                  <button className="btn-primary btn-sm" disabled={act.isPending} onClick={() => askConfirm(selected, 'mark-paid')}>
+                  <button className="btn-primary btn-sm" disabled={act.isPending || selectedFrozen} onClick={() => askConfirm(selected, 'mark-paid')}>
                     Tandai transfer dibayar
                   </button>
                 )}
               </div>
+              {selectedFrozen && (
+                <div className="md:col-span-2">
+                  <InfoNote tone="amber">
+                    Kampanye ini Frozen karena masalah integritas. Persetujuan dan pembayaran terkunci sampai kampanye di-unfreeze
+                    — jangan transfer dana di luar aplikasi.
+                  </InfoNote>
+                </div>
+              )}
               <p className="text-xs text-slate-500 md:col-span-2">
                 Mark paid mencatat transfer dana di luar blockchain. Riwayat mahasiswa menampilkan Requested → Approved → Paid, atau Rejected beserta alasannya.
               </p>
